@@ -1784,11 +1784,12 @@ function ActivityScreen({ agenda }) {
 }
 
 /* ───────── Gestion de la fiche barber ───────── */
-function FicheScreen({ barbers, setBarbers, products, setProducts, toast }) {
+function FicheScreen({ barbers, setBarbers, products, setProducts, onPreview, toast }) {
   const enzo = barbers.find((b) => b.id === 'enzo');
 
   const [bio, setBio] = useState(enzo.bio);
   const [address, setAddress] = useState(enzo.address);
+  const [salon, setSalon] = useState(enzo.salon);
   const [tagInput, setTagInput] = useState('');
   const [addingProduct, setAddingProduct] = useState(false);
   const [pName, setPName] = useState('');
@@ -1841,6 +1842,17 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, toast }) {
       <Title em="fiche">Ma </Title>
       <Lead>Modifiez votre fiche — les clients voient les changements en temps réel.</Lead>
 
+      <Btn icon="eye" label="APERÇU — VUE CLIENT" onPress={onPreview} />
+
+      {/* Nom du salon */}
+      <Section>Nom du salon</Section>
+      <TextInput style={s.input} value={salon} onChangeText={setSalon}
+        placeholder="Nom du salon" placeholderTextColor="#5A5852" />
+      <Btn ghost label="ENREGISTRER LE NOM" onPress={() => {
+        updateEnzo(() => ({ salon: salon.trim() }));
+        toast('Nom du salon mis à jour.');
+      }} />
+
       {/* Description */}
       <Section>Description</Section>
       <TextInput
@@ -1885,14 +1897,16 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, toast }) {
 
       {/* Photos */}
       <Section note="appuyez sur ✕ pour supprimer">Photos</Section>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 6 }}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}
+        style={{ marginBottom: 6, overflow: 'visible' }}
+        contentContainerStyle={{ overflow: 'visible', paddingTop: 10, paddingBottom: 4 }}>
         {(enzo.photos || []).map((ph) => (
-          <View key={ph.id} style={{ position: 'relative', marginRight: 9 }}>
+          <View key={ph.id} style={{ position: 'relative', marginRight: 12, overflow: 'visible' }}>
             <Photo label={ph.label} tex={ph.tex} />
             <TouchableOpacity style={s.photoRemove}
               onPress={() => { updateEnzo((b) => ({ photos: b.photos.filter((p) => p.id !== ph.id) })); toast('Photo supprimée.'); }}
-              hitSlop={4}>
-              <Feather name="x" size={11} color="#fff" />
+              hitSlop={8}>
+              <Feather name="x" size={12} color="#fff" />
             </TouchableOpacity>
           </View>
         ))}
@@ -1992,6 +2006,7 @@ export default function App() {
 
   const [barbers, setBarbers] = useState(() => [...BARBERS]);
   const [products, setProducts] = useState(() => [...PRODUCTS]);
+  const [barberPreview, setBarberPreview] = useState(false);
 
   const barbersLive = barbers.map((b) => (b.id === 'enzo' ? { ...b, delay: enzoDelay } : b));
 
@@ -2111,9 +2126,20 @@ export default function App() {
       <StatusScreen agenda={agenda} delay={enzoDelay} setDelay={setEnzoDelay} toast={toast} />
     );
     else if (tab === 'fiche') content = (
-      <FicheScreen barbers={barbers} setBarbers={setBarbers} products={products} setProducts={setProducts} toast={toast} />
+      <FicheScreen barbers={barbers} setBarbers={setBarbers} products={products} setProducts={setProducts}
+        onPreview={() => setBarberPreview(true)} toast={toast} />
     );
     else content = <ActivityScreen agenda={agenda} />;
+    // Preview de la fiche : s’affiche par-dessus n’importe quel onglet barber
+    if (barberPreview) content = (
+      <BarberDetailScreen
+        barber={barbersLive.find((b) => b.id === 'enzo')}
+        services={services}
+        toast={toast}
+        onBack={() => setBarberPreview(false)}
+        onBook={() => { setBarberPreview(false); toast('Aperçu — réservation désactivée.'); }}
+      />
+    );
   }
 
   const tabs = role === 'client' ? CLIENT_TABS : BARBER_TABS;
@@ -2150,19 +2176,18 @@ export default function App() {
             </TouchableOpacity>
           </View>
           {content}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}
-            style={s.tabbar} contentContainerStyle={{ flexGrow: 1 }}>
+          <View style={s.tabbar}>
             {tabs.map(([k, ic, l]) => {
               const on = tab === k && !barberDetail;
               return (
                 <TouchableOpacity key={k} style={s.tabBtn}
                   onPress={() => { setTab(k); setBarberDetail(null); }} activeOpacity={0.7}>
-                  <Feather name={ic} size={19} color={on ? C.gold2 : '#6E6B65'} />
-                  <Text style={[s.tabLabel, on && { color: C.gold2 }]}>{l}</Text>
+                  <Feather name={ic} size={17} color={on ? C.gold2 : '#6E6B65'} />
+                  <Text style={[s.tabLabel, on && { color: C.gold2 }]} numberOfLines={1}>{l}</Text>
                 </TouchableOpacity>
               );
             })}
-          </ScrollView>
+          </View>
         </>
       )}
       {toastMsg && (
@@ -2432,8 +2457,8 @@ const s = StyleSheet.create({
     flexDirection: 'row', backgroundColor: '#0E0E10', borderTopWidth: 1, borderTopColor: C.line,
     paddingTop: 9, paddingBottom: Platform.OS === 'ios' ? 4 : 12,
   },
-  tabBtn: { flex: 1, alignItems: 'center', gap: 4, paddingVertical: 2 },
-  tabLabel: { color: '#6E6B65', fontSize: 9, letterSpacing: 0.3 },
+  tabBtn: { flex: 1, alignItems: 'center', gap: 3, paddingVertical: 2 },
+  tabLabel: { color: '#6E6B65', fontSize: 8, letterSpacing: 0 },
 
   toast: {
     position: 'absolute', bottom: 92, left: PAD, right: PAD,
@@ -2488,9 +2513,10 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   photoRemove: {
-    position: 'absolute', top: 5, right: 14,
-    width: 20, height: 20, borderRadius: 10,
-    backgroundColor: 'rgba(0,0,0,0.75)', alignItems: 'center', justifyContent: 'center',
+    position: 'absolute', top: -6, right: 3,
+    width: 22, height: 22, borderRadius: 11,
+    backgroundColor: C.red, alignItems: 'center', justifyContent: 'center',
+    zIndex: 10,
   },
   photoAdd: {
     width: 104, height: 126, borderRadius: 14,
