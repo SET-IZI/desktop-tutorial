@@ -1,0 +1,583 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BarberPro — Démo interactive</title>
+<style>
+  :root{
+    --black:#0D0D0D; --anthra:#2E2E2E; --anthra2:#1C1C1C;
+    --gold:#C9A227; --white:#FFF; --muted:#9A9A9A;
+    --green:#3DBE6B; --orange:#E8932A; --red:#D64545;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  body{
+    margin:0; font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    background:radial-gradient(1200px 600px at 50% -10%, #1d1a10 0%, #0a0a0a 60%);
+    color:var(--white); min-height:100vh;
+    display:flex; flex-direction:column; align-items:center; padding:18px 10px 40px;
+  }
+  .page-title{font-size:22px; font-weight:800; letter-spacing:.5px; margin:6px 0 2px;}
+  .page-title span{color:var(--gold);}
+  .page-sub{color:var(--muted); font-size:13px; margin:0 0 14px; text-align:center;}
+  .roles{display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; justify-content:center;}
+  .roles button{
+    background:transparent; border:1px solid var(--gold); color:var(--gold);
+    padding:8px 16px; border-radius:999px; font-size:13px; font-weight:700; cursor:pointer;
+  }
+  .roles button.on{background:var(--gold); color:#000;}
+
+  .phone{
+    width:390px; max-width:100%; height:780px; background:var(--black);
+    border:1px solid #3a3a3a; border-radius:38px; overflow:hidden;
+    display:flex; flex-direction:column; box-shadow:0 30px 80px rgba(0,0,0,.6);
+    position:relative;
+  }
+  @media (max-width:480px){
+    body{padding:8px 0 0;}
+    .phone{height:calc(100vh - 130px); border-radius:24px;}
+  }
+  .screen{flex:1; overflow-y:auto; padding:20px 16px 24px;}
+  .tabbar{
+    display:flex; background:var(--anthra2); border-top:1px solid #262626;
+  }
+  .tabbar button{
+    flex:1; background:none; border:none; color:var(--muted); padding:10px 2px 12px;
+    font-size:10.5px; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:3px;
+  }
+  .tabbar button .ic{font-size:19px;}
+  .tabbar button.on{color:var(--gold);}
+
+  h1.app{font-size:26px; margin:0;}
+  h1.app span{color:var(--gold);}
+  .caption{color:var(--muted); font-size:13px; margin:4px 0 16px;}
+  h2.sec{font-size:16px; margin:20px 0 10px;}
+  .card{background:var(--anthra); border-radius:16px; padding:14px; margin-bottom:12px;}
+  .row{display:flex; align-items:center; gap:12px;}
+  .grow{flex:1; min-width:0;}
+
+  .avatar{
+    width:58px; height:58px; border-radius:16px; display:flex; align-items:center;
+    justify-content:center; font-size:28px; flex-shrink:0;
+  }
+  .bname{font-weight:700; font-size:15.5px;}
+  .btags{color:var(--muted); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin:2px 0 6px;}
+  .badge{
+    display:inline-flex; align-items:center; gap:6px; background:#0d0d0d;
+    border-radius:999px; padding:4px 10px; font-size:11.5px;
+  }
+  .dot{width:8px; height:8px; border-radius:50%;}
+  .star{color:var(--gold); font-weight:700; font-size:13px;}
+  .chev{color:var(--muted); font-size:18px;}
+
+  .chips{display:flex; flex-wrap:wrap; gap:8px;}
+  .chip{
+    border:1px solid var(--gold); color:var(--gold); border-radius:999px;
+    padding:8px 13px; font-size:12.5px; font-weight:600; cursor:pointer; background:transparent;
+  }
+  .chip.on{background:var(--gold); color:#000;}
+  .chip.gray{border-color:#555; color:#bbb;}
+
+  .slot{
+    display:flex; align-items:center; background:var(--anthra); border-radius:14px;
+    padding:12px 14px; margin-bottom:8px; cursor:pointer; border:1px solid transparent;
+  }
+  .slot:hover{border-color:var(--gold);}
+  .slot .t{font-weight:700; font-size:15px; width:56px;}
+  .slot .who{color:var(--muted); font-size:12px;}
+  .slot .rule{color:var(--orange); font-size:11px;}
+  .price{color:var(--gold); font-weight:800; font-size:15px; margin-left:auto;}
+
+  .btn{
+    display:block; width:100%; background:var(--gold); color:#000; border:none;
+    border-radius:14px; padding:14px; font-size:15px; font-weight:800; cursor:pointer; margin-top:14px;
+  }
+  .btn.ghost{background:transparent; border:1px solid var(--gold); color:var(--gold);}
+  .back{
+    background:none; border:none; color:var(--gold); font-size:14px; font-weight:700;
+    cursor:pointer; padding:0; margin-bottom:12px;
+  }
+
+  .photos{display:flex; gap:8px; overflow-x:auto; padding-bottom:4px;}
+  .photo{
+    width:104px; height:104px; border-radius:12px; flex-shrink:0; display:flex;
+    align-items:flex-end; justify-content:center; font-size:34px; position:relative;
+  }
+  .photo small{
+    position:absolute; bottom:0; left:0; right:0; background:rgba(0,0,0,.55);
+    color:#fff; font-size:10px; text-align:center; padding:3px 0; border-radius:0 0 12px 12px;
+  }
+  .stats{display:flex; background:var(--anthra); border-radius:16px; padding:14px 6px;}
+  .stat{flex:1; text-align:center;}
+  .stat .v{color:var(--gold); font-weight:800; font-size:16px;}
+  .stat .l{color:var(--muted); font-size:10.5px; margin-top:3px;}
+
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  .pcard{background:var(--anthra); border-radius:14px; padding:10px; }
+  .pimg{height:96px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:40px; margin-bottom:8px;}
+  .pname{font-size:13px; font-weight:600; margin-bottom:2px;}
+  .pstock{color:var(--muted); font-size:11px;}
+  .add{width:100%; margin-top:8px; background:transparent; border:1px solid var(--gold); color:var(--gold); border-radius:10px; padding:7px; font-size:12px; font-weight:700; cursor:pointer;}
+
+  .kpis{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  .kpi{background:var(--anthra); border-radius:14px; padding:14px;}
+  .kpi .v{color:var(--gold); font-size:22px; font-weight:800;}
+  .kpi .l{color:var(--muted); font-size:11.5px; margin-top:3px;}
+
+  table{width:100%; border-collapse:collapse; font-size:12.5px;}
+  th{text-align:left; color:var(--gold); padding:8px 6px; font-size:11.5px;}
+  td{padding:9px 6px; border-top:1px solid #3a3a3a;}
+
+  .switchrow{display:flex; justify-content:space-between; align-items:center; background:var(--anthra); border-radius:14px; padding:13px 15px; margin-bottom:10px;}
+  .sw{
+    width:48px; height:27px; border-radius:999px; background:#555; position:relative; cursor:pointer; border:none; flex-shrink:0;
+  }
+  .sw::after{content:''; position:absolute; top:3px; left:3px; width:21px; height:21px; border-radius:50%; background:#fff; transition:left .15s;}
+  .sw.on{background:var(--gold);}
+  .sw.on::after{left:24px;}
+
+  .delaybtn{
+    display:flex; align-items:center; gap:10px; width:100%; background:var(--anthra);
+    border:1px solid transparent; color:#fff; border-radius:14px; padding:14px; margin-bottom:8px;
+    font-size:14px; cursor:pointer; text-align:left;
+  }
+  .delaybtn.on{border-color:var(--gold);}
+
+  .review{border-top:1px solid #3a3a3a; padding:10px 0;}
+  .review:first-of-type{border-top:none;}
+  .review .who{font-weight:700; font-size:13px;}
+  .review .txt{color:#ccc; font-size:12.5px; margin-top:3px;}
+
+  #toast{
+    position:fixed; left:50%; bottom:26px; transform:translateX(-50%) translateY(20px);
+    background:#1c1c1c; border:1px solid var(--gold); color:#fff; padding:12px 18px;
+    border-radius:14px; font-size:13.5px; opacity:0; transition:all .25s; pointer-events:none;
+    max-width:90vw; z-index:99; box-shadow:0 10px 30px rgba(0,0,0,.5);
+  }
+  #toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+  .empty{color:var(--muted); font-size:13px; text-align:center; padding:30px 10px;}
+  .note{background:#1a1710; border:1px solid #4a3d14; color:#d8c171; font-size:11.5px; border-radius:12px; padding:10px 12px; margin-bottom:14px;}
+</style>
+</head>
+<body>
+
+<div class="page-title">💈 Barber<span>Pro</span> — Démo interactive</div>
+<p class="page-sub">Prototype cliquable de l'application. Changez de rôle pour voir les 3 univers :</p>
+<div class="roles" id="roles"></div>
+
+<div class="phone">
+  <div class="screen" id="screen"></div>
+  <nav class="tabbar" id="tabbar"></nav>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* ───────── Données de démonstration ───────── */
+const G = ['linear-gradient(135deg,#3a2f12,#191300)','linear-gradient(135deg,#26313a,#0d1216)',
+           'linear-gradient(135deg,#3a2626,#160d0d)','linear-gradient(135deg,#27332a,#0d130f)'];
+
+const DELAY = {
+  ON_TIME:      {dot:'var(--green)',  label:'À l’heure'},
+  DELAY_5:      {dot:'var(--orange)', label:'5 min de retard'},
+  DELAY_10:     {dot:'var(--orange)', label:'10 min de retard'},
+  DELAY_15:     {dot:'var(--red)',    label:'15 min de retard'},
+  DELAY_15_PLUS:{dot:'var(--red)',    label:'+15 min de retard'},
+  ABSENT:       {dot:'#888',          label:'Absent'},
+};
+
+const barbers = [
+  {id:'enzo', name:'Enzo Moreau', em:'🧔🏻', g:G[0], years:8, rating:4.9, clients:1240, prestations:3680, ponct:97,
+   tags:['Dégradé américain','Coupe afro','Barbe','Hair Design'], delay:'ON_TIME',
+   bio:'Spécialiste du dégradé américain depuis 8 ans. Précision, détail et finitions rasoir.',
+   reviews:[{who:'Karim',note:5,txt:'Meilleur dégradé de la ville, je ne vais plus ailleurs.'},
+            {who:'Lucas',note:5,txt:'Toujours à l’heure, toujours impeccable.'},
+            {who:'Mehdi',note:4,txt:'Très bon travail sur la barbe.'}]},
+  {id:'sofiane', name:'Sofiane K.', em:'🧔🏽', g:G[1], years:6, rating:4.7, clients:860, prestations:2210, ponct:91,
+   tags:['Rasage traditionnel','Barbe','Coloration'], delay:'DELAY_10',
+   bio:'Maître du rasage traditionnel à l’ancienne : serviette chaude, coupe-chou et soins.',
+   reviews:[{who:'Antoine',note:5,txt:'Le rasage serviette chaude est une expérience incroyable.'},
+            {who:'Yanis',note:4,txt:'Top, juste un peu d’attente parfois.'}]},
+  {id:'marco', name:'Marco V.', em:'👨🏻‍🦱', g:G[2], years:5, rating:4.8, clients:540, prestations:1490, ponct:95,
+   tags:['Hair Design','Dégradé américain','Coupe enfant'], delay:'ON_TIME',
+   bio:'Hair design et motifs personnalisés. Chaque coupe est une pièce unique.',
+   reviews:[{who:'Sacha',note:5,txt:'Le design tribal était parfait, photo à l’appui !'}]},
+];
+
+const services = [
+  {id:'s1', name:'Coupe Homme',     dur:30, price:2500},
+  {id:'s2', name:'Coupe + Barbe',   dur:45, price:3500},
+  {id:'s3', name:'Barbe seule',     dur:20, price:1500},
+  {id:'s4', name:'Coupe enfant',    dur:25, price:1800},
+  {id:'s5', name:'Hair Design',     dur:60, price:4500},
+  {id:'s6', name:'Premium Package', dur:90, price:7000},
+];
+
+const CATS = [['ALL','Tous'],['CIRE','Cires'],['POMMADE','Pommades'],['HUILE','Huiles à barbe'],['SHAMP','Shampoings'],['ACC','Accessoires']];
+const products = [
+  {id:'p1', name:'Cire coiffante mate',  cat:'CIRE',    price:1490, stock:40, em:'🫙', g:G[0]},
+  {id:'p2', name:'Pommade brillante',    cat:'POMMADE', price:1690, stock:25, em:'🧴', g:G[1]},
+  {id:'p3', name:'Huile à barbe cèdre',  cat:'HUILE',   price:1990, stock:30, em:'🛢️', g:G[2]},
+  {id:'p4', name:'Shampoing fortifiant', cat:'SHAMP',   price:1290, stock:50, em:'🧴', g:G[3]},
+  {id:'p5', name:'Peigne en bois',       cat:'ACC',     price:990,  stock:60, em:'🪮', g:G[0]},
+  {id:'p6', name:'Tondeuse de finition', cat:'ACC',     price:4990, stock:8,  em:'✂️', g:G[1]},
+];
+
+const history = [
+  {date:'12/04/2026', barber:'Enzo Moreau', servs:'Coupe + Barbe', price:3500,
+   photos:[['Face','💇🏻‍♂️',G[0]],['Profil gauche','🧑🏻',''+G[1]],['Profil droit','🧑🏻',G[2]],['Arrière','👤',G[3]]]},
+  {date:'02/03/2026', barber:'Marco V.', servs:'Hair Design', price:4500,
+   photos:[['Face','💇🏻‍♂️',G[2]],['Arrière','👤',G[1]]]},
+];
+
+/* ───────── État de l'application ───────── */
+const state = {
+  role:'client', tab:'home', view:null,
+  booking:{service:null, barber:'any', slot:null, done:null},
+  cat:'ALL', cart:0, points:86, upcoming:[],
+  reviewSettings:{showReviews:true, showRating:true, showPhotos:true},
+};
+
+/* ───────── Moteur de tarification dynamique (PRD §4) ───────── */
+function computePrice(base, slotDate, now){
+  let price = base; const rules = [];
+  const h = slotDate.getHours();
+  if (h >= 22)      { price = base + 2500; rules.push('Tarif nuit (après 22h)'); }
+  else if (h >= 20) { price = base + 1000; rules.push('Tarif soirée (après 20h)'); }
+  const d = slotDate.getDay();
+  if (d === 0 || d === 6) { price = Math.round(price * 1.15); rules.push('Week-end +15 %'); }
+  if ((slotDate - now) / 60000 < 120 && slotDate > now) { price = Math.round(price * 1.20); rules.push('Urgence < 2h +20 %'); }
+  return {price, rules};
+}
+const fmt = c => (c/100).toFixed(2).replace('.', ',') + ' €';
+
+/* ───────── Helpers ───────── */
+const $ = id => document.getElementById(id);
+function toast(msg){
+  const t = $('toast'); t.innerHTML = msg; t.classList.add('show');
+  clearTimeout(t._h); t._h = setTimeout(()=>t.classList.remove('show'), 3200);
+}
+function badge(status){
+  const d = DELAY[status];
+  return `<span class="badge"><span class="dot" style="background:${d.dot}"></span>${d.label}</span>`;
+}
+function stars(n){ return '★'.repeat(n) + '☆'.repeat(5-n); }
+
+/* ───────── Rôles & onglets ───────── */
+const TABS = {
+  client:[['home','💈','Accueil'],['book','📅','Réserver'],['cuts','📸','Mes Coupes'],['shop','🛍️','Boutique'],['me','👤','Profil']],
+  barber:[['planning','🗓️','Planning'],['status','⏱️','Mon statut'],['bstats','📊','Mes stats']],
+  admin: [['dash','📈','Dashboard'],['pricing','💶','Tarifs'],['reviews','⭐','Avis'],['stock','📦','Produits']],
+};
+function setRole(r){ state.role = r; state.tab = TABS[r][0][0]; state.view = null; render(); }
+function setTab(t){ state.tab = t; state.view = null; render(); }
+
+/* ───────── Écrans CLIENT ───────── */
+function barberCard(b){
+  return `<div class="card row" style="cursor:pointer" onclick="openBarber('${b.id}')">
+    <div class="avatar" style="background:${b.g}">${b.em}</div>
+    <div class="grow">
+      <div class="bname">${b.name}</div>
+      <div class="btags">${b.tags.join(' · ')}</div>
+      <div class="row" style="gap:8px">${badge(b.delay)}<span class="star">★ ${b.rating}</span></div>
+    </div>
+    <div class="chev">›</div>
+  </div>`;
+}
+function openBarber(id){ state.view = {type:'barber', id}; render(); }
+
+function vHome(){
+  return `<h1 class="app">Barber<span>Pro</span></h1>
+  <p class="caption">Réservez votre barber, suivez son statut en temps réel.</p>
+  <div class="note">💡 Démo : Sofiane est en retard — passez en vue <b>Barber</b> ou <b>Admin</b> en haut de l'écran pour piloter l'app.</div>
+  <h2 class="sec">Nos barbiers</h2>
+  ${barbers.map(barberCard).join('')}`;
+}
+
+function vBarberProfile(id){
+  const b = barbers.find(x=>x.id===id);
+  const rs = state.reviewSettings;
+  let reviews = '';
+  if (rs.showReviews){
+    reviews = `<h2 class="sec">Avis clients</h2><div class="card">` +
+      b.reviews.map(r=>`<div class="review">
+        <div class="row"><span class="who grow">${r.who}</span>${rs.showRating?`<span class="star">${stars(r.note)}</span>`:''}</div>
+        <div class="txt">${r.txt}</div>
+      </div>`).join('') + `</div>`;
+  }
+  return `<button class="back" onclick="state.view=null;render()">‹ Retour</button>
+  <div class="row" style="gap:14px">
+    <div class="avatar" style="width:84px;height:84px;font-size:40px;background:${b.g}">${b.em}</div>
+    <div class="grow">
+      <div class="bname" style="font-size:19px">${b.name}</div>
+      <div class="caption" style="margin:2px 0 8px">${b.years} ans d'expérience</div>
+      ${badge(b.delay)}
+    </div>
+  </div>
+  <p style="font-size:13.5px;color:#ccc;line-height:1.5">${b.bio}</p>
+  <div class="chips" style="margin-bottom:16px">${b.tags.map(t=>`<span class="chip" style="cursor:default">${t}</span>`).join('')}</div>
+  <div class="stats">
+    <div class="stat"><div class="v">${b.clients.toLocaleString('fr-FR')}</div><div class="l">Clients</div></div>
+    <div class="stat"><div class="v">${b.prestations.toLocaleString('fr-FR')}</div><div class="l">Prestations</div></div>
+    <div class="stat"><div class="v">${rs.showRating?'★ '+b.rating:'—'}</div><div class="l">Note</div></div>
+    <div class="stat"><div class="v">${b.ponct} %</div><div class="l">Ponctualité</div></div>
+  </div>
+  <h2 class="sec">Galerie</h2>
+  <div class="photos">${rs.showPhotos
+      ? G.map((g,i)=>`<div class="photo" style="background:${g}">💈</div>`).join('')
+      : '<p class="caption">Photos masquées par l’administrateur.</p>'}</div>
+  ${reviews}
+  <button class="btn" onclick="startBooking('${b.id}')">Réserver avec ${b.name.split(' ')[0]}</button>`;
+}
+function startBooking(id){ state.booking = {service:null, barber:id, slot:null, done:null}; state.tab='book'; state.view=null; render(); }
+
+function genSlots(service){
+  const now = new Date(); const out = [];
+  for (let h=9; h<=22; h++) for (let m of [0,30]){
+    if (h===22 && m===30) continue;
+    const d = new Date(); d.setHours(h,m,0,0);
+    if (d < now) continue;
+    const list = state.booking.barber==='any' ? barbers : barbers.filter(b=>b.id===state.booking.barber);
+    const idx = h*2 + m/30;
+    const b = list[idx % list.length];
+    if ((idx + b.id.length) % 3 === 0) continue;            // créneaux déjà pris (simulation)
+    const q = computePrice(service.price, d, now);
+    out.push({time:`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`, date:d, barber:b, ...q});
+  }
+  return out.slice(0, 14);
+}
+
+function vBook(){
+  const bk = state.booking;
+  if (bk.done){
+    const d = bk.done;
+    return `<h1 class="app">Confirmé <span>✓</span></h1>
+    <p class="caption">Votre rendez-vous est réservé.</p>
+    <div class="card">
+      <div class="bname" style="margin-bottom:6px">${d.serv} — ${d.time}</div>
+      <div class="caption" style="margin:0 0 8px">avec ${d.barber} · aujourd'hui</div>
+      ${d.rules.length?`<div class="slot-rule" style="color:var(--orange);font-size:12px;margin-bottom:6px">${d.rules.join(' + ')}</div>`:''}
+      <div class="price" style="font-size:20px">${fmt(d.price)}</div>
+    </div>
+    <div class="card row"><span style="font-size:20px">🔔</span><span style="font-size:13px;color:#ccc">Rappels automatiques : la veille (J-1) et 1h avant le rendez-vous.</span></div>
+    <div class="card row"><span style="font-size:20px">🎁</span><span style="font-size:13px;color:#ccc">+${Math.floor(d.price/100)} points fidélité crédités (1 € = 1 point).</span></div>
+    <button class="btn ghost" onclick="state.booking={service:null,barber:'any',slot:null,done:null};render()">Nouvelle réservation</button>`;
+  }
+  let step2 = '';
+  if (bk.service){
+    const s = services.find(x=>x.id===bk.service);
+    step2 = `<h2 class="sec">2. Avec qui ?</h2>
+    <div class="chips">
+      <button class="chip ${bk.barber==='any'?'on':''}" onclick="state.booking.barber='any';render()">⚡ Premier disponible</button>
+      ${barbers.map(b=>`<button class="chip ${bk.barber===b.id?'on':''}" onclick="state.booking.barber='${b.id}';render()">${b.em} ${b.name.split(' ')[0]}</button>`).join('')}
+    </div>
+    <h2 class="sec">3. Choisissez un créneau <span style="color:var(--muted);font-weight:400;font-size:12px">— aujourd'hui</span></h2>
+    ${genSlots(s).map((sl,i)=>`<div class="slot" onclick="confirmSlot(${i})" id="slot${i}">
+        <div class="t">${sl.time}</div>
+        <div class="grow"><div class="who">${sl.barber.em} ${sl.barber.name}</div>
+        ${sl.rules.length?`<div class="rule">${sl.rules.join(' + ')}</div>`:''}</div>
+        <div class="price">${fmt(sl.price)}</div>
+      </div>`).join('')}
+    <p class="caption" style="text-align:center">💶 Les prix varient selon l'heure : soirée après 20h, nuit après 22h, week-end, urgence…</p>`;
+  }
+  return `<h1 class="app">Réserver</h1>
+  <p class="caption">Prestation → barber → créneau. Prix dynamique affiché en direct.</p>
+  <h2 class="sec">1. Choisissez votre prestation</h2>
+  <div class="chips">${services.map(s=>
+    `<button class="chip ${bk.service===s.id?'on':''}" onclick="state.booking.service='${s.id}';render()">${s.name} · ${fmt(s.price)}</button>`).join('')}
+  </div>${step2}`;
+}
+function confirmSlot(i){
+  const s = services.find(x=>x.id===state.booking.service);
+  const sl = genSlots(s)[i];
+  state.booking.done = {serv:s.name, time:sl.time, barber:sl.barber.name, price:sl.price, rules:sl.rules};
+  state.points += Math.floor(sl.price/100);
+  state.upcoming.push({serv:s.name, time:sl.time, barber:sl.barber.name, price:sl.price});
+  toast(`✂️ Réservation confirmée — ${sl.time} avec ${sl.barber.name.split(' ')[0]} · ${fmt(sl.price)}`);
+  render();
+}
+
+function vCuts(){
+  return `<h1 class="app">Mes <span>Coupes</span></h1>
+  <p class="caption">Votre historique visuel : le barber prend 1 à 10 photos après chaque prestation.</p>
+  ${history.map(h=>`<div class="card">
+    <div class="bname">${h.servs} du ${h.date}</div>
+    <div class="caption" style="margin:2px 0 10px">${h.barber} · ${fmt(h.price)}</div>
+    <div class="photos">${h.photos.map(p=>`<div class="photo" style="background:${p[2]}">${p[1]}<small>${p[0]}</small></div>`).join('')}</div>
+    <div class="row" style="gap:8px;margin-top:10px">
+      <button class="chip" onclick="toast('📥 Photos téléchargées')">📥 Télécharger</button>
+      <button class="chip" onclick="toast('🔗 Lien de partage copié')">↗ Partager</button>
+      <button class="chip" onclick="toast('👀 À montrer à votre prochain barber !')">💈 Montrer</button>
+    </div>
+  </div>`).join('')}`;
+}
+
+function vShop(){
+  const list = products.filter(p=> state.cat==='ALL' || p.cat===state.cat);
+  return `<h1 class="app">Boutique</h1>
+  <p class="caption">Les produits du salon, livrés ou à récupérer sur place.</p>
+  <div class="chips" style="margin-bottom:14px">${CATS.map(([k,l])=>
+    `<button class="chip ${state.cat===k?'on':'gray'}" onclick="state.cat='${k}';render()">${l}</button>`).join('')}
+  </div>
+  <div class="grid2">${list.map(p=>`<div class="pcard">
+    <div class="pimg" style="background:${p.g}">${p.em}</div>
+    <div class="pname">${p.name}</div>
+    <div class="price" style="margin:0">${fmt(p.price)}</div>
+    <div class="pstock">${p.stock>0 ? p.stock+' en stock' : 'Rupture'}</div>
+    <button class="add" onclick="state.cart++;toast('🛒 ${p.name} ajouté au panier ('+state.cart+')')">Ajouter au panier</button>
+  </div>`).join('')}</div>
+  ${state.cart>0?`<button class="btn" onclick="toast('💳 Paiement Stripe : CB, Apple Pay, Google Pay')">Payer le panier (${state.cart})</button>`:''}`;
+}
+
+function vMe(){
+  return `<h1 class="app">Mon profil</h1>
+  <p class="caption">Mathéo · matheo59150@icloud.com</p>
+  <div class="card">
+    <div class="bname">Programme fidélité</div>
+    <div class="price" style="font-size:30px;margin:6px 0">${state.points} points</div>
+    <div class="caption" style="margin:0">1 € dépensé = 1 point. Échangez vos points contre une réduction, un produit ou une coupe offerte.</div>
+  </div>
+  <h2 class="sec">Rendez-vous à venir</h2>
+  ${state.upcoming.length ? state.upcoming.map(u=>`<div class="card row">
+      <span style="font-size:22px">📅</span>
+      <div class="grow"><div class="bname" style="font-size:14px">${u.serv} — ${u.time}</div>
+      <div class="caption" style="margin:0">avec ${u.barber}</div></div>
+      <div class="price">${fmt(u.price)}</div>
+    </div>`).join('')
+    : `<div class="empty">Aucun rendez-vous à venir.<br>Faites une réservation dans l'onglet 📅 !</div>`}
+  <h2 class="sec">Paiement</h2>
+  <div class="card row"><span style="font-size:20px">💳</span><span style="font-size:13px;color:#ccc">Carte bancaire, Apple Pay, Google Pay ou paiement sur place. Acompte selon prestation.</span></div>`;
+}
+
+/* ───────── Écrans BARBER (connecté en tant qu'Enzo) ───────── */
+function vPlanning(){
+  const me = barbers[0];
+  const rdv = [
+    ['09:30','Karim D.','Coupe Homme',2500],['10:30','Lucas B.','Coupe + Barbe',3500],
+    ['11:30','Mehdi A.','Barbe seule',1500],['14:00','Sacha L.','Hair Design',4500],
+    ['16:00','Noah P.','Coupe enfant',1800],['20:30','Tom R.','Coupe Homme',3500],
+  ];
+  return `<h1 class="app">Mon <span>planning</span></h1>
+  <p class="caption">Vue Barber — connecté : ${me.em} ${me.name} ${badge(me.delay)}</p>
+  <h2 class="sec">Aujourd'hui · ${rdv.length} rendez-vous</h2>
+  ${rdv.map(r=>`<div class="slot" style="cursor:default">
+    <div class="t">${r[0]}</div>
+    <div class="grow"><div style="font-weight:600;font-size:13.5px">${r[1]}</div><div class="who">${r[2]}</div></div>
+    <div class="price">${fmt(r[3])}</div>
+  </div>`).join('')}
+  <button class="btn ghost" onclick="toast('📸 Appareil photo : 1 à 10 photos attachées à la prestation')">📸 Photos fin de prestation</button>`;
+}
+
+function vStatus(){
+  const me = barbers[0];
+  return `<h1 class="app">Mon <span>statut</span></h1>
+  <p class="caption">Les clients du jour sont notifiés automatiquement à chaque changement.</p>
+  ${Object.entries(DELAY).map(([k,v])=>`
+    <button class="delaybtn ${me.delay===k?'on':''}" onclick="setDelay('${k}')">
+      <span class="dot" style="background:${v.dot};width:11px;height:11px"></span>
+      ${v.label} ${me.delay===k?'<span style="margin-left:auto;color:var(--gold)">✓ actif</span>':''}
+    </button>`).join('')}`;
+}
+function setDelay(k){
+  barbers[0].delay = k;
+  toast(`🔔 6 clients notifiés : « Enzo — ${DELAY[k].label} »`);
+  render();
+}
+
+function vBStats(){
+  return `<h1 class="app">Mes <span>stats</span></h1>
+  <p class="caption">Tableau de bord Barber (PRD §13)</p>
+  <div class="kpis">
+    <div class="kpi"><div class="v">173 €</div><div class="l">CA du jour</div></div>
+    <div class="kpi"><div class="v">1 240 €</div><div class="l">CA semaine</div></div>
+    <div class="kpi"><div class="v">4 980 €</div><div class="l">CA mois</div></div>
+    <div class="kpi"><div class="v">87 %</div><div class="l">Taux de remplissage</div></div>
+    <div class="kpi"><div class="v">6</div><div class="l">RDV aujourd'hui</div></div>
+    <div class="kpi"><div class="v">★ 4,9</div><div class="l">Note moyenne</div></div>
+  </div>
+  <h2 class="sec">Prestations les plus demandées</h2>
+  <div class="card">
+    ${[['Coupe + Barbe','46 %'],['Coupe Homme','31 %'],['Hair Design','14 %'],['Barbe seule','9 %']].map(x=>
+      `<div class="row" style="padding:6px 0"><span class="grow" style="font-size:13.5px">${x[0]}</span><span class="star">${x[1]}</span></div>`).join('')}
+  </div>`;
+}
+
+/* ───────── Écrans ADMIN ───────── */
+function vDash(){
+  return `<h1 class="app">Dashboard <span>admin</span></h1>
+  <p class="caption">CA global, tops et activité du salon (PRD §14)</p>
+  <div class="kpis">
+    <div class="kpi"><div class="v">18 430 €</div><div class="l">CA global (mois)</div></div>
+    <div class="kpi"><div class="v">412</div><div class="l">Réservations (mois)</div></div>
+    <div class="kpi"><div class="v">Coupe + Barbe</div><div class="l">Prestation populaire</div></div>
+    <div class="kpi"><div class="v">Huile cèdre</div><div class="l">Produit le + vendu</div></div>
+    <div class="kpi"><div class="v">Enzo M.</div><div class="l">Barber le + réservé</div></div>
+    <div class="kpi"><div class="v">★ 4,8</div><div class="l">Note moyenne salon</div></div>
+  </div>
+  <h2 class="sec">Barbiers</h2>
+  ${barbers.map(b=>`<div class="card row">
+    <div class="avatar" style="width:44px;height:44px;font-size:22px;background:${b.g}">${b.em}</div>
+    <div class="grow"><div class="bname" style="font-size:14px">${b.name}</div>${badge(b.delay)}</div>
+    <span class="star">★ ${b.rating}</span>
+  </div>`).join('')}`;
+}
+
+function vPricing(){
+  const rules = [
+    ['Tarif normal','Base','Coupe homme 25 €','🟢'],
+    ['Tarif soirée','Après 20h','35 € (prix fixe)','🟢'],
+    ['Tarif nuit','Après 22h','50 € (prix fixe)','🟢'],
+    ['Week-end','Sam. & dim.','+15 %','🟢'],
+    ['Jours fériés','Calendrier FR','+25 %','🟢'],
+    ['Urgence','Résa < 2h avant','+20 %','🟢'],
+    ['Prix VIP','Client privilège','Personnalisé','⚪'],
+  ];
+  return `<h1 class="app">Tarifs <span>dynamiques</span></h1>
+  <p class="caption">Ces règles sont appliquées en direct dans l'onglet Réserver du client.</p>
+  <div class="card"><table>
+    <tr><th>Règle</th><th>Condition</th><th>Effet</th><th></th></tr>
+    ${rules.map(r=>`<tr><td><b>${r[0]}</b></td><td style="color:var(--muted)">${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td></tr>`).join('')}
+  </table></div>
+  <div class="note">💡 Essayez : en vue Client, réservez une Coupe Homme sur un créneau après 20h → 35 €, après 22h → 50 €.</div>`;
+}
+
+function vReviews(){
+  const rs = state.reviewSettings;
+  const sw = (key,label) => `<div class="switchrow"><span style="font-size:14px">${label}</span>
+    <button class="sw ${rs[key]?'on':''}" onclick="state.reviewSettings.${key}=!state.reviewSettings.${key};toast('⚙️ Réglage appliqué côté client');render()"></button></div>`;
+  return `<h1 class="app">Avis <span>clients</span></h1>
+  <p class="caption">Contrôle total de la visibilité — l'effet est immédiat sur les profils barbiers côté client.</p>
+  ${sw('showReviews','Afficher les avis')}
+  ${sw('showRating','Afficher la note')}
+  ${sw('showPhotos','Afficher les photos')}
+  <div class="note">💡 Désactivez un réglage puis allez voir un profil barber en vue Client : la section disparaît.</div>`;
+}
+
+function vStock(){
+  return `<h1 class="app">Produits</h1>
+  <p class="caption">Catalogue & stocks de la boutique intégrée.</p>
+  <div class="card"><table>
+    <tr><th>Produit</th><th>Prix</th><th>Stock</th></tr>
+    ${products.map(p=>`<tr><td>${p.em} ${p.name}</td><td class="price" style="font-size:12.5px">${fmt(p.price)}</td>
+      <td style="color:${p.stock<10?'var(--red)':'var(--muted)'}">${p.stock}</td></tr>`).join('')}
+  </table></div>`;
+}
+
+/* ───────── Rendu ───────── */
+const VIEWS = {home:vHome, book:vBook, cuts:vCuts, shop:vShop, me:vMe,
+               planning:vPlanning, status:vStatus, bstats:vBStats,
+               dash:vDash, pricing:vPricing, reviews:vReviews, stock:vStock};
+
+function render(){
+  $('roles').innerHTML = [['client','👤 Client'],['barber','💈 Barber'],['admin','🛠️ Admin']]
+    .map(([r,l])=>`<button class="${state.role===r?'on':''}" onclick="setRole('${r}')">${l}</button>`).join('');
+  $('tabbar').innerHTML = TABS[state.role]
+    .map(([k,ic,l])=>`<button class="${state.tab===k?'on':''}" onclick="setTab('${k}')"><span class="ic">${ic}</span>${l}</button>`).join('');
+  const screen = $('screen');
+  screen.innerHTML = (state.view && state.view.type==='barber') ? vBarberProfile(state.view.id) : VIEWS[state.tab]();
+  screen.scrollTop = 0;
+}
+render();
+</script>
+</body>
+</html>
