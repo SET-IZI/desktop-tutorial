@@ -62,13 +62,18 @@ const STYLES = [
   'Coupe afro', 'Locks', 'Barbe', 'Rasage traditionnel', 'Hair Design', 'Coloration',
 ];
 
+// Lieu d'exercice — affiché en badge sur les fiches
+const VENUES = { salon: 'En salon', studio: 'Studio privé', domicile: 'À domicile' };
+
 const BARBERS = [
   {
     id: 'enzo', name: 'Enzo Moreau', ini: 'EM', tex: 0, years: 8, rating: '4,9',
-    salon: 'BarberPro — Le Salon', dist: 0.8,
+    salon: 'BarberPro — Le Salon', city: 'Lille Centre', dist: 0.8,
+    venue: 'salon', address: '12 rue Nationale, 59000 Lille',
     clients: '1 240', prestations: '3 680', ponct: 97, delay: 'ON_TIME',
     tags: ['Burst Fade', 'Fade', 'Dégradé américain', 'Barbe'],
     bio: 'Spécialiste du burst fade et du dégradé américain depuis huit ans. Précision du trait, finitions au rasoir.',
+    story: 'Tout a commencé à 16 ans, une tondeuse à la main, dans le garage familial. Après un CAP coiffure et cinq ans dans les salons du Vieux-Lille, j’ai rejoint BarberPro pour y imposer ma signature : des dégradés au millimètre, jamais pressés, toujours finis au rasoir. Chaque client repart avec des conseils d’entretien personnalisés.',
     reviews: [
       { who: 'Karim', note: 5, txt: 'Le meilleur burst fade de la ville. Je ne vais plus nulle part ailleurs.' },
       { who: 'Lucas', note: 5, txt: 'Toujours à l’heure, toujours impeccable.' },
@@ -77,10 +82,12 @@ const BARBERS = [
   },
   {
     id: 'sofiane', name: 'Sofiane Kaci', ini: 'SK', tex: 1, years: 6, rating: '4,7',
-    salon: 'BarberPro — Le Salon', dist: 0.8,
+    salon: 'BarberPro — Le Salon', city: 'Lille Centre', dist: 0.8,
+    venue: 'salon', address: '12 rue Nationale, 59000 Lille',
     clients: '860', prestations: '2 210', ponct: 91, delay: 'DELAY_10',
     tags: ['Rasage traditionnel', 'Barbe', 'Coloration'],
     bio: 'Maître du rasage à l’ancienne : serviette chaude, coupe-chou et soins. Un rituel plus qu’une prestation.',
+    story: 'Formé à Istanbul auprès des maîtres barbiers du Grand Bazar, je perpétue un rituel qui se perd : serviette chaude, blaireau, coupe-chou et soin final. Trente minutes hors du temps. La barbe est un art de patience — la mienne et la vôtre.',
     reviews: [
       { who: 'Antoine', note: 5, txt: 'Le rasage serviette chaude est une expérience à part.' },
       { who: 'Yanis', note: 4, txt: 'Excellent, juste un peu d’attente parfois.' },
@@ -88,45 +95,53 @@ const BARBERS = [
   },
   {
     id: 'marco', name: 'Marco Vitale', ini: 'MV', tex: 2, years: 5, rating: '4,8',
-    salon: 'BarberPro — Le Salon', dist: 0.8,
+    salon: 'Se déplace chez vous', city: 'Lille & alentours', dist: 1.5,
+    venue: 'domicile', address: 'Lille, La Madeleine, Lambersart',
     clients: '540', prestations: '1 490', ponct: 95, delay: 'ON_TIME',
     tags: ['Hair Design', 'Taper', 'Coupe enfant'],
-    bio: 'Hair design et motifs sur mesure. Chaque coupe est traitée comme une pièce unique.',
-    reviews: [{ who: 'Sacha', note: 5, txt: 'Le motif était exactement celui que j’imaginais.' }],
+    bio: 'Hair design et motifs sur mesure, directement chez vous. Chaque coupe est traitée comme une pièce unique.',
+    story: 'J’ai choisi le domicile pour une raison simple : c’est chez vous que vous êtes le plus détendu. J’arrive avec tout mon matériel, une bâche, et trente minutes plus tard votre salon redevient un salon. Spécialiste des motifs et des coupes enfant — même les plus remuants.',
+    reviews: [{ who: 'Sacha', note: 5, txt: 'Le motif était exactement celui que j’imaginais. Et sans bouger de chez moi.' }],
   },
   {
     id: 'ibra', name: 'Ibrahim Diallo', ini: 'ID', tex: 3, years: 7, rating: '4,9',
-    salon: 'Kings Cut', dist: 2.1,
+    salon: 'Kings Cut', city: 'Wazemmes', dist: 2.1,
+    venue: 'studio', address: '4 rue des Sarrazins, 59000 Lille',
     clients: '980', prestations: '2 870', ponct: 94, delay: 'ON_TIME',
     tags: ['Coupe afro', 'Burst Fade', 'Locks', 'Transformation'],
     bio: 'Référence coupe afro et locks. Les transformations complètes sont sa signature — avant/après garantis.',
+    story: 'Kings Cut, c’est mon studio privé : un fauteuil, un client à la fois, zéro attente. Dix ans à travailler le cheveu texturé m’ont appris une chose — il n’y a pas une coupe afro, il y en a mille. Les transformations sont mes préférées : on prend le temps, on photographie l’avant, et l’après parle tout seul.',
     reviews: [{ who: 'Moussa', note: 5, txt: 'Transformation totale, je ne me reconnaissais plus. Incroyable.' }],
   },
   {
     id: 'lucas', name: 'Lucas Brun', ini: 'LB', tex: 1, years: 4, rating: '4,6',
-    salon: 'Le Comptoir du Barbier', dist: 3.4,
+    salon: 'Le Comptoir du Barbier', city: 'Roubaix', dist: 3.4,
+    venue: 'salon', address: '28 Grande Rue, 59100 Roubaix',
     clients: '410', prestations: '1 120', ponct: 92, delay: 'ON_TIME',
     tags: ['Taper', 'Fade', 'Barbe'],
     bio: 'Taper et fade au cordeau, dans un comptoir à l’ancienne. Simple, net, précis.',
+    story: 'Le Comptoir, c’est carrelage d’époque, fauteuils en cuir et café offert. Pas de chichis : un taper net, un fade propre, une barbe dessinée. Je préfère faire trois choses parfaitement que dix à moitié.',
     reviews: [{ who: 'Hugo', note: 5, txt: 'Mon taper n’a jamais été aussi propre.' }],
   },
   {
     id: 'yanis', name: 'Yanis Cohen', ini: 'YC', tex: 2, years: 9, rating: '4,8',
-    salon: 'Studio Y', dist: 5.2,
+    salon: 'Studio Y', city: 'Villeneuve-d’Ascq', dist: 5.2,
+    venue: 'studio', address: '2 allée des Lilas, 59650 Villeneuve-d’Ascq',
     clients: '1 150', prestations: '3 240', ponct: 96, delay: 'ON_TIME',
     tags: ['Transformation', 'Coloration', 'Hair Design'],
     bio: 'Studio dédié aux métamorphoses : coloration, hair design et transformations complètes sur rendez-vous long.',
+    story: 'Studio Y est pensé comme un atelier d’artiste : lumière contrôlée, miroirs sans concession, playlists choisies. On y vient pour changer — de couleur, de style, de tête. Apportez une photo d’inspiration, repartez avec mieux.',
     reviews: [{ who: 'Théo', note: 5, txt: 'Coloration + design parfaits, le résultat dépasse la photo d’inspiration.' }],
   },
 ];
 
 const SERVICES = [
-  { id: 's1', name: 'Coupe Homme', price: 2500 },
-  { id: 's2', name: 'Coupe + Barbe', price: 3500 },
-  { id: 's3', name: 'Barbe seule', price: 1500 },
-  { id: 's4', name: 'Coupe enfant', price: 1800 },
-  { id: 's5', name: 'Hair Design', price: 4500 },
-  { id: 's6', name: 'Premium Package', price: 7000 },
+  { id: 's1', name: 'Coupe Homme', dur: 30, price: 2500 },
+  { id: 's2', name: 'Coupe + Barbe', dur: 45, price: 3500 },
+  { id: 's3', name: 'Barbe seule', dur: 20, price: 1500 },
+  { id: 's4', name: 'Coupe enfant', dur: 25, price: 1800 },
+  { id: 's5', name: 'Hair Design', dur: 60, price: 4500 },
+  { id: 's6', name: 'Premium Package', dur: 90, price: 7000 },
 ];
 
 /* Formules de rendez-vous — créées et activées par le barber */
@@ -403,25 +418,61 @@ function WelcomeScreen({ choose }) {
 }
 
 /* ───────── Espace CLIENT ───────── */
-function ExploreScreen({ barbers, openBarber }) {
+const FADE_TAGS = ['Fade', 'Burst Fade', 'Taper'];
+
+function BigCard({ b, onPress }) {
+  return (
+    <TouchableOpacity style={s.bigCard} onPress={onPress} activeOpacity={0.85}>
+      <View style={[s.bigArt, { backgroundColor: TEX[b.tex] }]}>
+        <Text style={s.bigIni}>{b.ini}</Text>
+        <View style={s.bigVenue}>
+          <Text style={s.bigVenueText}>{VENUES[b.venue]}</Text>
+        </View>
+        <View style={s.bigShade} />
+        <View style={s.bigInfo}>
+          <Text style={[s.bname, { fontSize: 14.5 }]} numberOfLines={1}>{b.name}</Text>
+          <Text style={s.btags} numberOfLines={1}>{b.city} · {String(b.dist).replace('.', ',')} km</Text>
+          <Text style={[s.rate, { marginTop: 3 }]}>★ {b.rating}</Text>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+function ExploreScreen({ barbers, openBarber, toast }) {
   const [query, setQuery] = useState('');
   const [style, setStyle] = useState(null);
 
   const q = query.trim().toLowerCase();
-  const list = barbers
-    .filter((b) => {
-      const hay = `${b.name} ${b.salon} ${b.tags.join(' ')}`.toLowerCase();
-      const okQ = !q || hay.includes(q);
-      const okS = !style || b.tags.includes(style);
-      return okQ && okS;
-    })
-    .sort((a, b) => a.dist - b.dist);
+  const filtering = q !== '' || style != null;
+  const sorted = [...barbers].sort((a, b) => a.dist - b.dist);
+  const list = sorted.filter((b) => {
+    const hay = `${b.name} ${b.salon} ${b.city} ${b.tags.join(' ')}`.toLowerCase();
+    return (!q || hay.includes(q)) && (!style || b.tags.includes(style));
+  });
 
+  const Row = ({ title, note, data }) =>
+    data.length === 0 ? null : (
+      <>
+        <Section note={note}>{title}</Section>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}
+          style={{ marginHorizontal: -PAD }} contentContainerStyle={{ paddingHorizontal: PAD }}>
+          {data.map((b) => <BigCard key={b.id} b={b} onPress={() => openBarber(b)} />)}
+        </ScrollView>
+      </>
+    );
+
+  const hello = new Date().getHours() >= 18 ? 'BONSOIR' : 'BONJOUR';
   return (
     <ScrollView style={s.screen} contentContainerStyle={s.screenPad} keyboardShouldPersistTaps="handled">
-      <Kicker>AUTOUR DE VOUS · LILLE (POSITION SIMULÉE)</Kicker>
-      <Title em="artiste">Trouvez votre </Title>
-      <Lead>Par salon, par nom ou par style — du burst fade à la transformation complète.</Lead>
+      <Kicker>{hello}</Kicker>
+      <Title>Mathéo</Title>
+      <TouchableOpacity style={s.locRow} activeOpacity={0.7}
+        onPress={() => toast('La géolocalisation précise arrive avec la version connectée.')}>
+        <Feather name="map-pin" size={13} color={C.gold} />
+        <Text style={s.locText}>Lille, France</Text>
+        <Text style={s.locEdit}>Modifier</Text>
+      </TouchableOpacity>
 
       <View style={s.search}>
         <Feather name="search" size={16} color={C.muted} />
@@ -449,91 +500,193 @@ function ExploreScreen({ barbers, openBarber }) {
         </View>
       </ScrollView>
 
-      <Section note={`${list.length} artiste${list.length > 1 ? 's' : ''} · du plus proche au plus loin`}>
-        Résultats
-      </Section>
-      {list.length === 0 ? (
-        <Text style={s.footnote}>Aucun artiste ne correspond.{'\n'}Essayez un autre style ou effacez la recherche.</Text>
+      {filtering ? (
+        <>
+          <Section note={`${list.length} artiste${list.length > 1 ? 's' : ''} · du plus proche au plus loin`}>
+            Résultats
+          </Section>
+          {list.length === 0 ? (
+            <Text style={s.footnote}>Aucun artiste ne correspond.{'\n'}Essayez un autre style ou effacez la recherche.</Text>
+          ) : (
+            list.map((b) => (
+              <TouchableOpacity key={b.id} style={s.card} onPress={() => openBarber(b)} activeOpacity={0.85}>
+                <View style={s.row}>
+                  <Ava b={b} />
+                  <View style={s.grow}>
+                    <Text style={s.bname}>{b.name}</Text>
+                    <View style={[s.row, { gap: 5, marginTop: 2 }]}>
+                      <Feather name="map-pin" size={10} color={C.gold} />
+                      <Text style={s.btags}>{b.salon} · {String(b.dist).replace('.', ',')} km</Text>
+                    </View>
+                    <View style={[s.row, { gap: 12, marginTop: 6 }]}>
+                      <Badge status={b.delay} />
+                      <Text style={s.rate}>★ {b.rating}</Text>
+                    </View>
+                  </View>
+                  <Feather name="chevron-right" size={18} color="#56534E" />
+                </View>
+                <View style={[s.wrap, { marginTop: 11, gap: 6 }]}>
+                  {b.tags.map((t) => <Tag key={t} label={t} />)}
+                </View>
+              </TouchableOpacity>
+            ))
+          )}
+        </>
       ) : (
-        list.map((b) => (
-          <TouchableOpacity key={b.id} style={s.card} onPress={() => openBarber(b)} activeOpacity={0.85}>
-            <View style={s.row}>
-              <Ava b={b} />
-              <View style={s.grow}>
-                <Text style={s.bname}>{b.name}</Text>
-                <View style={[s.row, { gap: 5, marginTop: 2 }]}>
-                  <Feather name="map-pin" size={10} color={C.gold} />
-                  <Text style={s.btags}>{b.salon} · {String(b.dist).replace('.', ',')} km</Text>
-                </View>
-                <View style={[s.row, { gap: 12, marginTop: 6 }]}>
-                  <Badge status={b.delay} />
-                  <Text style={s.rate}>★ {b.rating}</Text>
-                </View>
-              </View>
-              <Feather name="chevron-right" size={18} color="#56534E" />
-            </View>
-            <View style={[s.wrap, { marginTop: 11, gap: 6 }]}>
-              {b.tags.map((t) => <Tag key={t} label={t} />)}
-            </View>
-          </TouchableOpacity>
-        ))
+        <>
+          <Row title="Autour de vous" note="du plus proche au plus loin" data={sorted} />
+          <Row title="Studios privés" note="un client à la fois" data={sorted.filter((b) => b.venue === 'studio')} />
+          <Row title="À domicile" note="ils se déplacent" data={sorted.filter((b) => b.venue === 'domicile')} />
+          <Row title="Spécialistes fade" note="burst, taper, dégradés"
+            data={sorted.filter((b) => b.tags.some((t) => FADE_TAGS.includes(t)))} />
+        </>
       )}
     </ScrollView>
   );
 }
 
-function BarberDetailScreen({ barber, onBack, onBook }) {
+function BarberDetailScreen({ barber, onBack, onBook, toast }) {
+  const [dtab, setDtab] = useState('about');
+  const [more, setMore] = useState(false);
+
   return (
-    <ScrollView style={s.screen} contentContainerStyle={s.screenPad}>
-      <TouchableOpacity onPress={onBack} style={{ marginBottom: 18, alignSelf: 'flex-start' }} hitSlop={10}>
-        <Text style={s.back}>‹  RETOUR</Text>
-      </TouchableOpacity>
-      <View style={[s.row, { gap: 18, marginBottom: 14 }]}>
-        <Ava b={barber} lg />
-        <View style={s.grow}>
-          <Text style={[s.title, { fontSize: 25, lineHeight: 29, marginBottom: 3 }]}>{barber.name}</Text>
-          <View style={[s.row, { gap: 5, marginBottom: 8 }]}>
-            <Feather name="map-pin" size={11} color={C.gold} />
-            <Text style={s.btags}>{barber.salon} · {String(barber.dist).replace('.', ',')} km</Text>
+    <View style={{ flex: 1 }}>
+      <ScrollView style={s.screen} contentContainerStyle={{ paddingBottom: 120 }}>
+        {/* Hero */}
+        <View style={[s.heroArt, { backgroundColor: TEX[barber.tex] }]}>
+          <Text style={s.heroIni}>{barber.ini}</Text>
+          <View style={s.heroTop}>
+            <TouchableOpacity style={s.circleBtn} onPress={onBack} hitSlop={8}>
+              <Feather name="chevron-left" size={19} color={C.text} />
+            </TouchableOpacity>
+            <View style={{ flex: 1 }} />
+            {[['instagram', 'Instagram'], ['music', 'TikTok'], ['share-2', 'Partage du profil']].map(([ic, label]) => (
+              <TouchableOpacity key={ic} style={s.circleBtn} hitSlop={6}
+                onPress={() => toast(`${label} de ${barber.name.split(' ')[0]} — relié dans la version connectée.`)}>
+                <Feather name={ic} size={16} color={C.text} />
+              </TouchableOpacity>
+            ))}
           </View>
-          <Badge status={barber.delay} />
         </View>
-      </View>
-      <Text style={s.bio}>{barber.bio}</Text>
-      <View style={[s.wrap, { marginBottom: 18, gap: 6 }]}>
-        {barber.tags.map((t) => <Tag key={t} label={t} />)}
-      </View>
-      <View style={s.stats}>
-        {[
-          [barber.clients, 'CLIENTS'],
-          [barber.prestations, 'COUPES'],
-          ['★ ' + barber.rating, 'NOTE'],
-          [barber.ponct + ' %', 'PONCTUEL'],
-        ].map(([v, l], i) => (
-          <View key={l} style={[s.stat, i > 0 && { borderLeftWidth: 1, borderLeftColor: C.line }]}>
-            <Text style={s.statV}>{v}</Text>
-            <Text style={s.statL}>{l}</Text>
-          </View>
-        ))}
-      </View>
-      <Section>Galerie</Section>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        {[0, 1, 2, 3].map((i) => <Photo key={i} tex={i} />)}
-      </ScrollView>
-      <Section>Avis</Section>
-      <View style={s.card}>
-        {barber.reviews.map((r, i) => (
-          <View key={r.who} style={[s.review, i > 0 && { borderTopWidth: 1, borderTopColor: C.line }]}>
-            <View style={s.row}>
-              <Text style={[s.bname, s.grow, { fontSize: 13 }]}>{r.who}</Text>
-              <Stars n={r.note} />
+
+        {/* Identité */}
+        <View style={{ paddingHorizontal: PAD, paddingTop: 16 }}>
+          <View style={[s.row, { gap: 10, alignItems: 'flex-start' }]}>
+            <Text style={[s.title, { fontSize: 26, lineHeight: 30, marginBottom: 0, flex: 1 }]}>{barber.name}</Text>
+            <View style={[s.tag, { marginTop: 6 }]}>
+              <Text style={s.tagText}>{VENUES[barber.venue]}</Text>
             </View>
-            <Text style={s.reviewTxt}>« {r.txt} »</Text>
           </View>
-        ))}
+          <View style={[s.row, { gap: 12, marginTop: 8 }]}>
+            <Text style={s.rate}>★ {barber.rating}</Text>
+            <Badge status={barber.delay} />
+          </View>
+          <View style={[s.row, { gap: 6, marginTop: 7 }]}>
+            <Feather name="map-pin" size={11} color={C.gold} />
+            <Text style={s.btags}>{barber.address} · {String(barber.dist).replace('.', ',')} km</Text>
+          </View>
+        </View>
+
+        {/* Onglets */}
+        <View style={s.dtabs}>
+          {[['about', 'À propos'], ['prest', 'Prestations'], ['avis', 'Avis']].map(([k, l]) => (
+            <TouchableOpacity key={k} style={[s.dtab, dtab === k && s.dtabOn]} onPress={() => setDtab(k)}>
+              <Text style={[s.dtabText, dtab === k && { color: C.gold2 }]}>{l}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <View style={{ paddingHorizontal: PAD }}>
+          {dtab === 'about' && (
+            <>
+              <Section>Son histoire</Section>
+              <Text style={s.bio}>
+                {barber.bio}{more ? '\n\n' + barber.story : ''}
+              </Text>
+              <TouchableOpacity onPress={() => setMore(!more)} hitSlop={8} style={{ marginTop: -8, marginBottom: 4 }}>
+                <Text style={s.moreLink}>{more ? 'Voir moins' : 'Voir plus'}</Text>
+              </TouchableOpacity>
+
+              <Section>Réalisations</Section>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                {[0, 1, 2, 3].map((i) => <Photo key={i} tex={i} />)}
+              </ScrollView>
+
+              <Section>Lieu de coupe</Section>
+              <View style={[s.place, { backgroundColor: TEX[(barber.tex + 1) % 4] }]}>
+                <Feather name={barber.venue === 'domicile' ? 'home' : 'image'} size={26} color="rgba(200,169,106,0.45)" />
+                <Text style={s.placeLabel}>
+                  {barber.venue === 'domicile' ? 'Chez vous — il apporte tout' : barber.salon}
+                </Text>
+              </View>
+              <View style={[s.place, { height: 96, backgroundColor: TEX[(barber.tex + 2) % 4] }]}>
+                <Feather name="image" size={22} color="rgba(200,169,106,0.45)" />
+              </View>
+
+              <Section>Compétences</Section>
+              <View style={[s.wrap, { gap: 6 }]}>
+                {barber.tags.map((t) => <Tag key={t} label={t} />)}
+              </View>
+
+              <Section>En chiffres</Section>
+              <View style={s.stats}>
+                {[
+                  [barber.clients, 'CLIENTS'],
+                  [barber.prestations, 'COUPES'],
+                  [barber.years + ' ans', 'MÉTIER'],
+                  [barber.ponct + ' %', 'PONCTUEL'],
+                ].map(([v, l], i) => (
+                  <View key={l} style={[s.stat, i > 0 && { borderLeftWidth: 1, borderLeftColor: C.line }]}>
+                    <Text style={s.statV}>{v}</Text>
+                    <Text style={s.statL}>{l}</Text>
+                  </View>
+                ))}
+              </View>
+            </>
+          )}
+
+          {dtab === 'prest' && (
+            <>
+              <Section note="tarif de base — varie selon l’horaire">Prestations</Section>
+              {SERVICES.map((sv) => (
+                <View key={sv.id} style={[s.card, s.row]}>
+                  <View style={s.grow}>
+                    <Text style={[s.bname, { fontSize: 14 }]}>{sv.name}</Text>
+                    <Text style={[s.btags, { marginTop: 2 }]}>{sv.dur} min</Text>
+                  </View>
+                  <Text style={s.price}>{fmt(sv.price)}</Text>
+                </View>
+              ))}
+              <Text style={s.footnote}>
+                Soirée après 20 h, nuit après 22 h, week-end et urgence : le prix exact s’affiche sur chaque créneau au moment de réserver.
+              </Text>
+            </>
+          )}
+
+          {dtab === 'avis' && (
+            <>
+              <Section note={`note moyenne ★ ${barber.rating}`}>Avis</Section>
+              <View style={s.card}>
+                {barber.reviews.map((r, i) => (
+                  <View key={r.who} style={[s.review, i > 0 && { borderTopWidth: 1, borderTopColor: C.line }]}>
+                    <View style={s.row}>
+                      <Text style={[s.bname, s.grow, { fontSize: 13 }]}>{r.who}</Text>
+                      <Stars n={r.note} />
+                    </View>
+                    <Text style={s.reviewTxt}>« {r.txt} »</Text>
+                  </View>
+                ))}
+              </View>
+            </>
+          )}
+        </View>
+      </ScrollView>
+
+      {/* Réservation — toujours visible */}
+      <View style={s.cta}>
+        <Btn label="RÉSERVER L’ARTISTE" onPress={() => onBook(barber.id)} />
       </View>
-      <Btn label={`RÉSERVER AVEC ${barber.name.split(' ')[0].toUpperCase()}`} onPress={() => onBook(barber.id)} />
-    </ScrollView>
+    </View>
   );
 }
 
@@ -1291,6 +1444,7 @@ export default function App() {
       content = (
         <BarberDetailScreen
           barber={barbersLive.find((b) => b.id === barberDetail.id)}
+          toast={toast}
           onBack={() => setBarberDetail(null)}
           onBook={(id) => {
             setBooking({ barber: id, formula: null, service: null, done: null });
@@ -1299,7 +1453,7 @@ export default function App() {
           }}
         />
       );
-    } else if (tab === 'explore') content = <ExploreScreen barbers={barbersLive} openBarber={setBarberDetail} />;
+    } else if (tab === 'explore') content = <ExploreScreen barbers={barbersLive} openBarber={setBarberDetail} toast={toast} />;
     else if (tab === 'book') content = (
       <BookScreen agenda={agenda} formulas={formulas} booking={booking} setBooking={setBooking}
         dayIdx={clientDay} setDayIdx={setClientDay} onConfirm={confirmBooking} />
@@ -1419,6 +1573,58 @@ const s = StyleSheet.create({
     marginBottom: 12,
   },
   searchInput: { flex: 1, color: C.text, fontSize: 13.5, padding: 0 },
+
+  locRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: -2, marginBottom: 18 },
+  locText: { color: C.soft, fontSize: 12.5 },
+  locEdit: { color: C.gold, fontSize: 11.5, marginLeft: 6, textDecorationLine: 'underline' },
+
+  /* Cartes carrousel (Explorer) */
+  bigCard: { width: Math.floor(Math.min(SCREEN_W, 500) * 0.58), marginRight: 12 },
+  bigArt: {
+    height: 190, borderRadius: 20, borderWidth: 1, borderColor: C.line,
+    alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+  },
+  bigIni: { fontFamily: SERIF, fontSize: 52, fontWeight: '600', color: 'rgba(230,207,160,0.5)', marginTop: -44 },
+  bigVenue: {
+    position: 'absolute', top: 10, left: 10, backgroundColor: 'rgba(10,10,11,0.75)',
+    borderWidth: 1, borderColor: C.lineGold, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 4,
+  },
+  bigVenueText: { color: C.gold2, fontSize: 9, letterSpacing: 0.8 },
+  bigShade: {
+    position: 'absolute', left: 0, right: 0, bottom: 0, height: 90,
+    backgroundColor: 'rgba(8,8,9,0.62)',
+  },
+  bigInfo: { position: 'absolute', left: 12, right: 12, bottom: 11 },
+
+  /* Fiche barber */
+  heroArt: { height: 210, alignItems: 'center', justifyContent: 'center' },
+  heroIni: { fontFamily: SERIF, fontSize: 84, fontWeight: '600', color: 'rgba(230,207,160,0.4)' },
+  heroTop: {
+    position: 'absolute', top: 12, left: PAD - 6, right: PAD - 6,
+    flexDirection: 'row', alignItems: 'center', gap: 9,
+  },
+  circleBtn: {
+    width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(10,10,11,0.7)',
+    borderWidth: 1, borderColor: C.line, alignItems: 'center', justifyContent: 'center',
+  },
+  dtabs: {
+    flexDirection: 'row', marginTop: 20, marginHorizontal: PAD,
+    borderBottomWidth: 1, borderBottomColor: C.line,
+  },
+  dtab: { flex: 1, alignItems: 'center', paddingBottom: 11 },
+  dtabOn: { borderBottomWidth: 2, borderBottomColor: C.gold, marginBottom: -1 },
+  dtabText: { color: C.muted, fontSize: 13, letterSpacing: 0.3 },
+  moreLink: { color: C.gold, fontSize: 12, fontStyle: 'italic', fontFamily: SERIF },
+  place: {
+    height: 140, borderRadius: 18, borderWidth: 1, borderColor: C.line,
+    alignItems: 'center', justifyContent: 'center', marginBottom: 10, gap: 8,
+  },
+  placeLabel: { color: C.soft, fontSize: 11, letterSpacing: 1 },
+  cta: {
+    position: 'absolute', left: 0, right: 0, bottom: 0,
+    paddingHorizontal: PAD, paddingBottom: 12, paddingTop: 24,
+    backgroundColor: 'rgba(10,10,11,0.0)',
+  },
 
   card: {
     backgroundColor: C.surface, borderWidth: 1, borderColor: C.line,
