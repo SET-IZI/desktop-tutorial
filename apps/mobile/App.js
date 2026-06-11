@@ -901,6 +901,7 @@ function ExploreScreen({ barbers, user, openBarber, toast }) {
 function BarberDetailScreen({ barber, services, onBack, onBook, toast }) {
   const [dtab, setDtab] = useState('about');
   const [more, setMore] = useState(false);
+  const [viewer, setViewer] = useState(null);
 
   return (
     <View style={{ flex: 1 }}>
@@ -963,10 +964,12 @@ function BarberDetailScreen({ barber, services, onBack, onBook, toast }) {
                 <Text style={s.moreLink}>{more ? 'Voir moins' : 'Voir plus'}</Text>
               </TouchableOpacity>
 
-              <Section>Réalisations</Section>
+              <Section note="appuyez pour agrandir">Réalisations</Section>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 {(barber.photos || [{tex:0},{tex:1},{tex:2},{tex:3}]).map((ph, i) => (
-                  <Photo key={ph.id || i} label={ph.label} tex={ph.tex} uri={ph.uri} />
+                  <TouchableOpacity key={ph.id || i} activeOpacity={0.85} onPress={() => setViewer(ph)}>
+                    <Photo label={ph.label} tex={ph.tex} uri={ph.uri} />
+                  </TouchableOpacity>
                 ))}
               </ScrollView>
 
@@ -982,6 +985,15 @@ function BarberDetailScreen({ barber, services, onBack, onBook, toast }) {
                   <Text style={[s.placeLabel, { opacity: 0.7 }]}>{barber.address}</Text>
                 )}
               </View>
+              {(barber.salonPhotos || []).length > 0 && (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 10 }}>
+                  {barber.salonPhotos.map((ph) => (
+                    <TouchableOpacity key={ph.id} activeOpacity={0.85} onPress={() => setViewer(ph)}>
+                      <Photo label={ph.label} tex={ph.tex} uri={ph.uri} />
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              )}
 
               <Section>Compétences</Section>
               <View style={[s.wrap, { gap: 6 }]}>
@@ -1046,6 +1058,26 @@ function BarberDetailScreen({ barber, services, onBack, onBook, toast }) {
       <View style={s.cta}>
         <Btn label="RÉSERVER L’ARTISTE" onPress={() => onBook(barber.id)} />
       </View>
+
+      {/* Visionneuse photo plein écran */}
+      {viewer && (
+        <View style={[s.modalOverlay, { justifyContent: 'center', padding: 26 }]}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setViewer(null)} />
+          <View style={s.viewerBox}>
+            {viewer.uri ? (
+              <Image source={{ uri: viewer.uri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+            ) : (
+              <View style={[StyleSheet.absoluteFill, { backgroundColor: TEX[viewer.tex] || '#1C1B18', alignItems: 'center', justifyContent: 'center' }]}>
+                <Feather name="scissors" size={52} color="rgba(200,169,106,0.45)" />
+              </View>
+            )}
+          </View>
+          {viewer.label ? <Text style={s.viewerLabel}>{viewer.label}</Text> : null}
+          <TouchableOpacity style={s.viewerClose} onPress={() => setViewer(null)} hitSlop={10}>
+            <Feather name="x" size={20} color={C.text} />
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 }
@@ -1936,6 +1968,10 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, onPreview, to
   const [ini, setIni] = useState(enzo.ini);
   const [zone, setZone] = useState(enzo.address);
   const [tagInput, setTagInput] = useState('');
+  const [stClients, setStClients] = useState(String(enzo.clients));
+  const [stCuts, setStCuts] = useState(String(enzo.prestations));
+  const [stYears, setStYears] = useState(String(enzo.years));
+  const [stPonct, setStPonct] = useState(String(enzo.ponct));
   const [addingProduct, setAddingProduct] = useState(false);
   const [pName, setPName] = useState('');
   const [pCat, setPCat] = useState('CIRE');
@@ -1979,6 +2015,37 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, onPreview, to
       photos: [...(b.photos || []), { id, label: 'Prestation ' + (count + 1), tex: count % 4, uri: result.assets[0].uri }],
     }));
     toast('Photo ajoutée.');
+  };
+
+  const addSalonPhoto = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') { toast('Permission refusée — accès à la galerie requis.'); return; }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true, aspect: [3, 4], quality: 0.85,
+    });
+    if (result.canceled) return;
+    const id = 'sp' + Date.now();
+    const count = (enzo.salonPhotos || []).length;
+    updateEnzo((b) => ({
+      salonPhotos: [...(b.salonPhotos || []), { id, label: 'Salon ' + (count + 1), tex: (count + 2) % 4, uri: result.assets[0].uri }],
+    }));
+    toast('Photo du salon ajoutée.');
+  };
+
+  const renamePhoto = (key, pid, label) =>
+    updateEnzo((b) => ({ [key]: (b[key] || []).map((p) => (p.id === pid ? { ...p, label } : p)) }));
+
+  const saveStats = () => {
+    const years = parseInt(stYears, 10);
+    const ponct = parseInt(stPonct, 10);
+    updateEnzo(() => ({
+      clients: stClients.trim() || '0',
+      prestations: stCuts.trim() || '0',
+      years: isNaN(years) ? enzo.years : years,
+      ponct: isNaN(ponct) ? enzo.ponct : Math.min(100, Math.max(0, ponct)),
+    }));
+    toast('Chiffres mis à jour.');
   };
 
   const updateProductLocal = (pid, changes) =>
@@ -2110,13 +2177,16 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, onPreview, to
       </View>
 
       {/* ── Photos de prestations ── */}
-      <Section note="résultats de coupes — appuyez sur ✕ pour supprimer">Photos de prestations</Section>
+      <Section note="résultats de coupes — titre modifiable sous chaque photo">Photos de prestations</Section>
       <ScrollView horizontal showsHorizontalScrollIndicator={false}
         style={{ marginBottom: 6, overflow: 'visible' }}
         contentContainerStyle={{ paddingTop: 10, paddingBottom: 4 }}>
         {(enzo.photos || []).map((ph) => (
           <View key={ph.id} style={{ position: 'relative', marginRight: 12 }}>
-            <Photo label={ph.label} tex={ph.tex} uri={ph.uri} />
+            <Photo tex={ph.tex} uri={ph.uri} />
+            <TextInput style={s.photoTitleInput} value={ph.label} placeholder="Titre"
+              placeholderTextColor="#5A5852"
+              onChangeText={(t) => renamePhoto('photos', ph.id, t)} />
             <TouchableOpacity style={s.photoRemove}
               onPress={() => { updateEnzo((b) => ({ photos: b.photos.filter((p) => p.id !== ph.id) })); toast('Photo supprimée.'); }}
               hitSlop={8}>
@@ -2129,6 +2199,50 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, onPreview, to
           <Text style={[s.btags, { marginTop: 6, textAlign: 'center' }]}>Ajouter</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      {/* ── Photos du salon ── */}
+      <Section note="votre lieu de coupe vu par les clients">Photos du salon</Section>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}
+        style={{ marginBottom: 6, overflow: 'visible' }}
+        contentContainerStyle={{ paddingTop: 10, paddingBottom: 4 }}>
+        {(enzo.salonPhotos || []).map((ph) => (
+          <View key={ph.id} style={{ position: 'relative', marginRight: 12 }}>
+            <Photo tex={ph.tex} uri={ph.uri} />
+            <TextInput style={s.photoTitleInput} value={ph.label} placeholder="Titre"
+              placeholderTextColor="#5A5852"
+              onChangeText={(t) => renamePhoto('salonPhotos', ph.id, t)} />
+            <TouchableOpacity style={s.photoRemove}
+              onPress={() => { updateEnzo((b) => ({ salonPhotos: b.salonPhotos.filter((p) => p.id !== ph.id) })); toast('Photo du salon supprimée.'); }}
+              hitSlop={8}>
+              <Feather name="x" size={12} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        ))}
+        <TouchableOpacity style={s.photoAdd} onPress={addSalonPhoto} activeOpacity={0.8}>
+          <Feather name="plus" size={22} color={C.gold} />
+          <Text style={[s.btags, { marginTop: 6, textAlign: 'center' }]}>Ajouter</Text>
+        </TouchableOpacity>
+      </ScrollView>
+
+      {/* ── En chiffres ── */}
+      <Section note="affichés en bas de votre fiche client">En chiffres</Section>
+      <View style={[s.row, { gap: 10 }]}>
+        <View style={s.grow}>
+          <Field label="CLIENTS" value={stClients} onChangeText={setStClients} keyboardType="numeric" placeholder="1 240" />
+        </View>
+        <View style={s.grow}>
+          <Field label="COUPES" value={stCuts} onChangeText={setStCuts} keyboardType="numeric" placeholder="3 680" />
+        </View>
+      </View>
+      <View style={[s.row, { gap: 10 }]}>
+        <View style={s.grow}>
+          <Field label="ANNÉES DE MÉTIER" value={stYears} onChangeText={setStYears} keyboardType="numeric" placeholder="8" />
+        </View>
+        <View style={s.grow}>
+          <Field label="PONCTUALITÉ (%)" value={stPonct} onChangeText={setStPonct} keyboardType="numeric" placeholder="97" />
+        </View>
+      </View>
+      <Btn ghost label="ENREGISTRER LES CHIFFRES" onPress={saveStats} />
 
       {/* ── Boutique ── */}
       <Section note="modifiez le prix ou supprimez">Boutique — mes produits</Section>
@@ -2615,8 +2729,14 @@ const s = StyleSheet.create({
   photo: {
     width: 104, height: 126, borderRadius: 14, marginRight: 9,
     borderWidth: 1, borderColor: C.line, alignItems: 'center', justifyContent: 'center',
+    overflow: 'hidden',
   },
   photoLabel: { position: 'absolute', bottom: 7, color: '#D8D5CE', fontSize: 9, letterSpacing: 1.5 },
+  photoTitleInput: {
+    width: 104, marginTop: 6, paddingVertical: 5, paddingHorizontal: 8,
+    backgroundColor: C.surface2, borderWidth: 1, borderColor: C.line, borderRadius: 8,
+    color: C.text, fontSize: 10.5, textAlign: 'center',
+  },
 
   stats: {
     flexDirection: 'row', backgroundColor: C.surface, borderWidth: 1, borderColor: C.line,
@@ -2776,4 +2896,21 @@ const s = StyleSheet.create({
     marginBottom: 6,
   },
   clientRowOn: { borderColor: C.gold, backgroundColor: 'rgba(200,169,106,0.07)' },
+
+  /* Visionneuse photo plein écran */
+  viewerBox: {
+    width: '100%', aspectRatio: 3 / 4, maxHeight: '68%',
+    borderRadius: 22, overflow: 'hidden',
+    borderWidth: 1, borderColor: C.lineGold,
+  },
+  viewerLabel: {
+    fontFamily: SERIF, color: C.text, fontSize: 16, textAlign: 'center',
+    marginTop: 16, letterSpacing: 0.5,
+  },
+  viewerClose: {
+    position: 'absolute', top: 56, right: 24,
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: 'rgba(20,20,22,0.85)', borderWidth: 1, borderColor: C.lineGold,
+    alignItems: 'center', justifyContent: 'center',
+  },
 });
