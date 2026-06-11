@@ -182,11 +182,15 @@ const HISTORY = [
 
 /* ───────── Jours & créneaux ───────── */
 const WD = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
-const TIMES = [];
-for (let h = 9; h <= 22; h++) for (const m of [0, 30]) {
-  if (h === 22 && m === 30) continue;
-  TIMES.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+/* Grille horaire 9h → 23h, au pas choisi par le barber (15 à 60 min) */
+function timesFor(step) {
+  const out = [];
+  for (let t = 9 * 60; t + step <= 23 * 60; t += step) {
+    out.push(`${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`);
+  }
+  return out;
 }
+const TIMES = timesFor(30); // grille par défaut
 function makeDays() {
   const out = [];
   for (let i = 0; i < 7; i++) {
@@ -533,25 +537,25 @@ function BarberDetailScreen({ barber, onBack, onBook }) {
   );
 }
 
-/* Créneaux ouverts, filtrés par fenêtre horaire de la formule */
+/* Créneaux ouverts, filtrés par fenêtre horaire de la formule.
+   On lit directement l'agenda : chaque barber peut avoir sa propre grille. */
 function openSlotsFor(agenda, dayIdx, barberId, window) {
   const day = DAYS[dayIdx];
   const now = new Date();
   const list = barberId === 'any' ? BARBERS : BARBERS.filter((b) => b.id === barberId);
+  const seen = {};
   const out = [];
-  for (const time of TIMES) {
-    if (!inWindow(time, window)) continue;
-    const date = timeToDate(day, time);
-    if (date < now) continue;
-    for (const b of list) {
-      const slot = agenda[b.id]?.[day.key]?.[time];
-      if (slot && slot.status === 'open') {
-        out.push({ time, date, barber: b });
-        break;
-      }
+  for (const b of list) {
+    const slots = agenda[b.id]?.[day.key] || {};
+    for (const [time, sl] of Object.entries(slots)) {
+      if (sl.status !== 'open' || !inWindow(time, window) || seen[time]) continue;
+      const date = timeToDate(day, time);
+      if (date < now) continue;
+      seen[time] = true;
+      out.push({ time, date, barber: b });
     }
   }
-  return out;
+  return out.sort((a, b) => a.time.localeCompare(b.time));
 }
 
 function BookScreen({ agenda, formulas, booking, setBooking, dayIdx, setDayIdx, onConfirm }) {
@@ -807,10 +811,18 @@ function MeScreen({ points, upcoming, onLogout }) {
 }
 
 /* ───────── Espace BARBER (connecté : Enzo Moreau) ───────── */
-function SlotsScreen({ agenda, setAgenda, dayIdx, setDayIdx, toast }) {
+const STEP_CHOICES = [15, 20, 30, 45, 60];
+
+function SlotsScreen({ agenda, setAgenda, daycfg, setDaycfg, dayIdx, setDayIdx, toast }) {
   const day = DAYS[dayIdx];
+  const step = daycfg[day.key] || 30;
   const slots = agenda.enzo[day.key] || {};
+  const gridTimes = timesFor(step);
+  // Les réservations prises sur une ancienne grille restent visibles
+  const offGrid = Object.keys(slots).filter((t) => slots[t].status === 'booked' && !gridTimes.includes(t));
+  const allTimes = [...gridTimes, ...offGrid].sort();
   const nOpen = Object.values(slots).filter((x) => x.status === 'open').length;
+  const nPause = Object.values(slots).filter((x) => x.status === 'pause').length;
   const nBooked = Object.values(slots).filter((x) => x.status === 'booked').length;
 
   const update = (fn) => {
@@ -820,23 +832,44 @@ function SlotsScreen({ agenda, setAgenda, dayIdx, setDayIdx, toast }) {
       return { ...a, enzo: { ...a.enzo, [day.key]: copy } };
     });
   };
-  const toggle = (time) => {
+
+  // Touchez : fermé → ouvert → pause → fermé. Les réservations sont verrouillées.
+  const cycle = (time) => {
     const cur = slots[time];
     if (cur && cur.status === 'booked') {
       toast(`${time} — déjà réservé par ${cur.who}.`);
       return;
     }
     update((d) => {
-      if (d[time]) delete d[time];
-      else d[time] = { status: 'open' };
+      if (!d[time]) d[time] = { status: 'open' };
+      else if (d[time].status === 'open') d[time] = { status: 'pause' };
+      else delete d[time];
     });
   };
-  const bulk = (label, predicate, open) => {
+
+  // Changement de durée : les réservations sont conservées, les créneaux
+  // ouverts/pauses alignés sur la nouvelle grille aussi.
+  const changeStep = (v) => {
+    setDaycfg((c) => ({ ...c, [day.key]: v }));
+    setAgenda((a) => {
+      const old = a.enzo[day.key] || {};
+      const next = {};
+      Object.entries(old).forEach(([time, sl]) => {
+        const [h, m] = time.split(':').map(Number);
+        const mins = h * 60 + m;
+        if (sl.status === 'booked' || ((mins - 540) % v === 0 && mins + v <= 23 * 60)) next[time] = sl;
+      });
+      return { ...a, enzo: { ...a.enzo, [day.key]: next } };
+    });
+    toast(`Créneaux de ${v} min — ${day.label.toLowerCase()}.`);
+  };
+
+  const bulk = (label, predicate, mode) => {
     update((d) => {
-      TIMES.forEach((time) => {
+      gridTimes.forEach((time) => {
         if (!predicate(Number(time.slice(0, 2)))) return;
         if (d[time] && d[time].status === 'booked') return;
-        if (open) d[time] = { status: 'open' };
+        if (mode) d[time] = { status: mode };
         else delete d[time];
       });
     });
@@ -847,23 +880,43 @@ function SlotsScreen({ agenda, setAgenda, dayIdx, setDayIdx, toast }) {
     <ScrollView style={s.screen} contentContainerStyle={s.screenPad}>
       <Kicker>ESPACE BARBER · ENZO MOREAU</Kicker>
       <Title em="créneaux">Mes </Title>
-      <Lead>Touchez un créneau pour l’ouvrir ou le fermer. Les clients ne voient que vos créneaux ouverts.</Lead>
+      <Lead>
+        Votre journée, vos règles : choisissez la durée de vos créneaux, ouvrez, fermez, posez des pauses.
+        Touchez une case pour passer de fermé → ouvert → pause.
+      </Lead>
       <DaysBar sel={dayIdx} onSel={setDayIdx} />
-      <View style={[s.row, { marginTop: 12, marginBottom: 14, gap: 16 }]}>
+
+      <Text style={s.fieldLabel}>DURÉE PAR CRÉNEAU — SELON VOTRE RYTHME</Text>
+      <View style={s.wrap}>
+        {STEP_CHOICES.map((v) => (
+          <Chip key={v} mini label={`${v} min`} on={step === v} onPress={() => changeStep(v)} />
+        ))}
+      </View>
+
+      <View style={[s.row, { marginTop: 16, marginBottom: 12, gap: 13, flexWrap: 'wrap' }]}>
         <View style={s.row}><View style={[s.dot, { backgroundColor: '#3A3A40' }]} /><Text style={s.legend}>Fermé</Text></View>
         <View style={s.row}><View style={[s.dot, { backgroundColor: C.gold }]} /><Text style={s.legend}>Ouvert</Text></View>
+        <View style={s.row}><View style={[s.dot, { backgroundColor: C.orange }]} /><Text style={s.legend}>Pause</Text></View>
         <View style={s.row}><View style={[s.dot, { backgroundColor: C.green }]} /><Text style={s.legend}>Réservé</Text></View>
-        <Text style={[s.btags, { marginLeft: 'auto' }]}>{nOpen} ouverts · {nBooked} réservés</Text>
       </View>
+      <Text style={[s.btags, { marginBottom: 12 }]}>
+        {nOpen} ouvert{nOpen > 1 ? 's' : ''} · {nPause} pause{nPause > 1 ? 's' : ''} · {nBooked} réservé{nBooked > 1 ? 's' : ''}
+      </Text>
+
       <View style={s.slotGrid}>
-        {TIMES.map((time) => {
+        {allTimes.map((time) => {
           const sl = slots[time];
           const st = sl ? sl.status : 'closed';
           return (
             <TouchableOpacity
               key={time}
-              style={[s.slotCell, st === 'open' && s.slotOpen, st === 'booked' && s.slotBooked]}
-              onPress={() => toggle(time)}
+              style={[
+                s.slotCell,
+                st === 'open' && s.slotOpen,
+                st === 'pause' && s.slotPause,
+                st === 'booked' && s.slotBooked,
+              ]}
+              onPress={() => cycle(time)}
               activeOpacity={0.75}
             >
               <Text style={[s.slotCellTime, st === 'closed' && { color: '#5A5852' }, st === 'booked' && { color: C.ink }]}>
@@ -872,22 +925,29 @@ function SlotsScreen({ agenda, setAgenda, dayIdx, setDayIdx, toast }) {
               {st === 'booked' ? (
                 <Text style={s.slotCellWho} numberOfLines={1}>{sl.who}</Text>
               ) : (
-                <Text style={[s.slotCellState, st === 'open' && { color: C.gold }]}>
-                  {st === 'open' ? 'ouvert' : 'fermé'}
+                <Text style={[
+                  s.slotCellState,
+                  st === 'open' && { color: C.gold },
+                  st === 'pause' && { color: C.orange },
+                ]}>
+                  {st === 'open' ? 'ouvert' : st === 'pause' ? 'pause' : 'fermé'}
                 </Text>
               )}
             </TouchableOpacity>
           );
         })}
       </View>
+
       <Section>Actions rapides</Section>
       <View style={s.wrap}>
-        <Chip mini label="Ouvrir la journée (9h–18h)" onPress={() => bulk('Journée ouverte — 9h à 18h.', (h) => h >= 9 && h < 18, true)} />
-        <Chip mini label="Ouvrir la soirée (20h–23h)" onPress={() => bulk('Soirée ouverte — tarifs soirée/nuit appliqués.', (h) => h >= 20, true)} />
-        <Chip mini label="Tout fermer" onPress={() => bulk('Tous les créneaux libres ont été fermés.', () => true, false)} />
+        <Chip mini label="Ouvrir la journée (9h–18h)" onPress={() => bulk('Journée ouverte — 9h à 18h.', (h) => h >= 9 && h < 18, 'open')} />
+        <Chip mini label="Ouvrir la soirée (20h–23h)" onPress={() => bulk('Soirée ouverte — tarifs soirée/nuit appliqués.', (h) => h >= 20, 'open')} />
+        <Chip mini label="Pause déjeuner (12h–14h)" onPress={() => bulk('Pause déjeuner posée — 12h à 14h.', (h) => h >= 12 && h < 14, 'pause')} />
+        <Chip mini label="Tout fermer" onPress={() => bulk('Tous les créneaux libres ont été fermés.', () => true, null)} />
       </View>
       <Text style={s.footnote}>
-        Les créneaux réservés ne peuvent pas être fermés. Les créneaux du soir appliquent automatiquement les tarifs soirée et nuit.
+        La durée se règle jour par jour — 20 min pour les coupes rapides, 60 min pour les transformations.
+        Les pauses et les créneaux fermés sont invisibles côté client ; les réservations existantes sont toujours conservées.
       </Text>
     </ScrollView>
   );
@@ -1157,6 +1217,7 @@ export default function App() {
   const [tab, setTab] = useState('explore');
   const [barberDetail, setBarberDetail] = useState(null);
   const [agenda, setAgenda] = useState(initAgenda);
+  const [daycfg, setDaycfg] = useState({}); // durée des créneaux par jour (Enzo)
   const [formulas, setFormulas] = useState(initFormulas);
   const [booking, setBooking] = useState({ barber: 'any', formula: null, service: null, done: null });
   const [clientDay, setClientDay] = useState(0);
@@ -1248,7 +1309,8 @@ export default function App() {
     else content = <MeScreen points={points} upcoming={upcoming} onLogout={() => setRole(null)} />;
   } else if (role === 'barber') {
     if (tab === 'slots') content = (
-      <SlotsScreen agenda={agenda} setAgenda={setAgenda} dayIdx={barberDay} setDayIdx={setBarberDay} toast={toast} />
+      <SlotsScreen agenda={agenda} setAgenda={setAgenda} daycfg={daycfg} setDaycfg={setDaycfg}
+        dayIdx={barberDay} setDayIdx={setBarberDay} toast={toast} />
     );
     else if (tab === 'formulas') content = (
       <FormulasScreen formulas={formulas} setFormulas={setFormulas} toast={toast} />
@@ -1428,6 +1490,7 @@ const s = StyleSheet.create({
     backgroundColor: C.surface, borderWidth: 1, borderColor: C.line,
   },
   slotOpen: { borderColor: C.gold, backgroundColor: 'rgba(200,169,106,0.07)' },
+  slotPause: { borderColor: 'rgba(217,160,91,0.45)', backgroundColor: 'rgba(217,160,91,0.07)' },
   slotBooked: { backgroundColor: C.gold, borderColor: C.gold },
   slotCellTime: { fontFamily: SERIF, fontSize: 15, fontWeight: '600', color: C.text },
   slotCellState: { fontSize: 9, letterSpacing: 1, color: '#5A5852', marginTop: 3, textTransform: 'uppercase' },
