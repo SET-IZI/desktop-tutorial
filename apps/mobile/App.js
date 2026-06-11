@@ -1,9 +1,10 @@
 // BarberPro — application mobile (démo autonome, sans serveur)
+// Deux interfaces : Espace Client et Espace Barber.
 // Design premium : noir profond, or champagne, serif élégante.
-// La version connectée à l'API NestJS viendra remplacer les données embarquées.
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   Animated,
+  Dimensions,
   Platform,
   SafeAreaView,
   ScrollView,
@@ -21,7 +22,7 @@ const C = {
   surface: '#131316',
   surface2: '#1B1B20',
   line: 'rgba(255,255,255,0.08)',
-  lineGold: 'rgba(200,169,106,0.30)',
+  lineGold: 'rgba(200,169,106,0.32)',
   gold: '#C8A96A',
   gold2: '#E6CFA0',
   ink: '#0E0D0B',
@@ -34,13 +35,21 @@ const C = {
   gray: '#76736D',
 };
 const SERIF = Platform.select({ ios: 'Georgia', default: 'serif' });
+const SCREEN_W = Dimensions.get('window').width;
+const PAD = 20;
+const PCARD_W = Math.floor((Math.min(SCREEN_W, 500) - PAD * 2 - 11) / 2);
+const SMALL = SCREEN_W < 370;
 
 /* ───────── Données de démonstration ───────── */
 const TEX = ['#211D15', '#181B20', '#1F1715', '#161B17'];
 
 const DELAY = {
   ON_TIME: { dot: C.green, label: 'À l’heure' },
+  DELAY_5: { dot: C.orange, label: '5 min de retard' },
   DELAY_10: { dot: C.orange, label: '10 min de retard' },
+  DELAY_15: { dot: C.red, label: '15 min de retard' },
+  DELAY_15_PLUS: { dot: C.red, label: 'Plus de 15 min' },
+  ABSENT: { dot: C.gray, label: 'Absent' },
 };
 
 const BARBERS = [
@@ -107,6 +116,15 @@ const HISTORY = [
   },
 ];
 
+const TODAY_RDV = [
+  { time: '09:30', who: 'Karim D.', serv: 'Coupe Homme', price: 2500, done: true },
+  { time: '10:30', who: 'Lucas B.', serv: 'Coupe + Barbe', price: 3500, done: true },
+  { time: '11:30', who: 'Mehdi A.', serv: 'Barbe seule', price: 1500, done: false },
+  { time: '14:00', who: 'Sacha L.', serv: 'Hair Design', price: 4500, done: false },
+  { time: '16:00', who: 'Noah P.', serv: 'Coupe enfant', price: 1800, done: false },
+  { time: '20:30', who: 'Tom R.', serv: 'Coupe Homme', price: 3500, done: false },
+];
+
 /* ───────── Tarification dynamique (PRD §4) ───────── */
 function computePrice(base, slotDate, now) {
   let price = base;
@@ -155,9 +173,10 @@ const Title = ({ children, em }) => (
 );
 const Lead = ({ children }) => <Text style={s.lead}>{children}</Text>;
 
-const Section = ({ children }) => (
+const Section = ({ children, note }) => (
   <View style={s.secRow}>
     <Text style={s.secText}>{children}</Text>
+    {note ? <Text style={s.secNote}>{note}</Text> : null}
     <View style={s.secLine} />
   </View>
 );
@@ -180,6 +199,7 @@ const Chip = ({ label, price, on, onPress, mini }) => (
     style={[s.chip, mini && s.chipMini, on && s.chipOn]}
     onPress={onPress}
     activeOpacity={0.8}
+    disabled={!onPress}
   >
     <Text style={[s.chipText, on && s.chipTextOn]}>
       {label}
@@ -202,8 +222,46 @@ const Stars = ({ n }) => (
   </Text>
 );
 
-/* ───────── Écrans ───────── */
-function HomeScreen({ openBarber }) {
+const Btn = ({ label, ghost, onPress, icon }) => (
+  <TouchableOpacity style={[s.btn, ghost && s.btnGhost]} onPress={onPress} activeOpacity={0.85}>
+    {icon ? <Feather name={icon} size={15} color={ghost ? C.gold : C.ink} style={{ marginRight: 8 }} /> : null}
+    <Text style={[s.btnText, ghost && { color: C.gold }]}>{label}</Text>
+  </TouchableOpacity>
+);
+
+/* ───────── Écran d'entrée : choix de l'espace ───────── */
+function WelcomeScreen({ choose }) {
+  return (
+    <View style={s.welcome}>
+      <View style={{ alignItems: 'center', marginBottom: 40 }}>
+        <Text style={s.welcomeMark}>
+          Barber<Text style={{ color: C.gold, fontStyle: 'italic' }}>Pro</Text>
+        </Text>
+        <View style={s.welcomeRule} />
+        <Text style={s.welcomeTag}>L’art de la coupe, à l’heure juste.</Text>
+      </View>
+      {[
+        ['client', 'user', 'Espace Client', 'Réserver un artiste, suivre son statut,\nretrouver toutes vos coupes.'],
+        ['barber', 'scissors', 'Espace Barber', 'Votre planning, votre statut,\nvotre activité du jour.'],
+      ].map(([role, icon, title, sub]) => (
+        <TouchableOpacity key={role} style={s.welcomeCard} onPress={() => choose(role)} activeOpacity={0.85}>
+          <View style={s.welcomeIcon}>
+            <Feather name={icon} size={21} color={C.gold2} />
+          </View>
+          <View style={s.grow}>
+            <Text style={s.welcomeCardTitle}>{title}</Text>
+            <Text style={s.welcomeCardSub}>{sub}</Text>
+          </View>
+          <Feather name="arrow-right" size={18} color={C.gold} />
+        </TouchableOpacity>
+      ))}
+      <Text style={s.welcomeFoot}>Démo — aucune connexion requise</Text>
+    </View>
+  );
+}
+
+/* ───────── Espace CLIENT ───────── */
+function HomeScreen({ barbers, openBarber }) {
   return (
     <ScrollView style={s.screen} contentContainerStyle={s.screenPad}>
       <Kicker>LE SALON</Kicker>
@@ -214,7 +272,7 @@ function HomeScreen({ openBarber }) {
         <Text style={s.heroSub}>Ouvert aujourd’hui · 9h — 23h</Text>
       </View>
       <Section>Nos artistes</Section>
-      {BARBERS.map((b) => (
+      {barbers.map((b) => (
         <TouchableOpacity key={b.id} style={[s.card, s.row]} onPress={() => openBarber(b)} activeOpacity={0.85}>
           <Ava b={b} />
           <View style={s.grow}>
@@ -232,16 +290,16 @@ function HomeScreen({ openBarber }) {
   );
 }
 
-function BarberScreen({ barber, onBack, onBook }) {
+function BarberDetailScreen({ barber, onBack, onBook }) {
   return (
     <ScrollView style={s.screen} contentContainerStyle={s.screenPad}>
-      <TouchableOpacity onPress={onBack} style={{ marginBottom: 18 }}>
+      <TouchableOpacity onPress={onBack} style={{ marginBottom: 18, alignSelf: 'flex-start' }} hitSlop={10}>
         <Text style={s.back}>‹  LE SALON</Text>
       </TouchableOpacity>
       <View style={[s.row, { gap: 18, marginBottom: 16 }]}>
         <Ava b={barber} lg />
         <View style={s.grow}>
-          <Text style={[s.title, { fontSize: 26, marginBottom: 3 }]}>{barber.name}</Text>
+          <Text style={[s.title, { fontSize: 25, lineHeight: 29, marginBottom: 3 }]}>{barber.name}</Text>
           <Text style={[s.btags, { marginBottom: 9 }]}>{barber.years} ans d’expérience</Text>
           <Badge status={barber.delay} />
         </View>
@@ -249,17 +307,15 @@ function BarberScreen({ barber, onBack, onBook }) {
       <Text style={s.bio}>{barber.bio}</Text>
       <View style={[s.wrap, { marginBottom: 18 }]}>
         {barber.tags.map((t) => (
-          <View key={t} style={[s.chip, s.chipMini]}>
-            <Text style={s.chipText}>{t}</Text>
-          </View>
+          <Chip key={t} mini label={t} />
         ))}
       </View>
       <View style={s.stats}>
         {[
           [barber.clients, 'CLIENTS'],
-          [barber.prestations, 'PRESTATIONS'],
+          [barber.prestations, 'COUPES'],
           ['★ ' + barber.rating, 'NOTE'],
-          [barber.ponct + ' %', 'PONCTUALITÉ'],
+          [barber.ponct + ' %', 'PONCTUEL'],
         ].map(([v, l], i) => (
           <View key={l} style={[s.stat, i > 0 && { borderLeftWidth: 1, borderLeftColor: C.line }]}>
             <Text style={s.statV}>{v}</Text>
@@ -283,9 +339,7 @@ function BarberScreen({ barber, onBack, onBook }) {
           </View>
         ))}
       </View>
-      <TouchableOpacity style={s.btn} onPress={() => onBook(barber.id)} activeOpacity={0.85}>
-        <Text style={s.btnText}>RÉSERVER AVEC {barber.name.split(' ')[0].toUpperCase()}</Text>
-      </TouchableOpacity>
+      <Btn label={`RÉSERVER AVEC ${barber.name.split(' ')[0].toUpperCase()}`} onPress={() => onBook(barber.id)} />
     </ScrollView>
   );
 }
@@ -298,7 +352,7 @@ function BookScreen({ booking, setBooking, onConfirm }) {
         <Kicker>CONFIRMATION</Kicker>
         <Title em="réservé">C’est </Title>
         <Lead>Nous vous attendons. Un rappel sera envoyé la veille et une heure avant.</Lead>
-        <View style={s.card}>
+        <View style={[s.card, { borderColor: C.lineGold }]}>
           <Text style={[s.bname, { fontSize: 17 }]}>{d.serv}</Text>
           <Text style={[s.btags, { marginVertical: 6 }]}>Aujourd’hui à {d.time} · avec {d.barber}</Text>
           {d.rules.length > 0 && <Text style={s.ruleText}>{d.rules.join('  +  ')}</Text>}
@@ -313,12 +367,8 @@ function BookScreen({ booking, setBooking, onConfirm }) {
             <Text style={[s.softText, s.grow]}>{txt}</Text>
           </View>
         ))}
-        <TouchableOpacity
-          style={[s.btn, s.btnGhost]}
-          onPress={() => setBooking({ service: null, barber: 'any', done: null })}
-        >
-          <Text style={[s.btnText, { color: C.gold }]}>NOUVELLE RÉSERVATION</Text>
-        </TouchableOpacity>
+        <Btn ghost label="NOUVELLE RÉSERVATION"
+          onPress={() => setBooking({ service: null, barber: 'any', done: null })} />
       </ScrollView>
     );
   }
@@ -349,7 +399,7 @@ function BookScreen({ booking, setBooking, onConfirm }) {
                 onPress={() => setBooking({ ...booking, barber: b.id })} />
             ))}
           </View>
-          <Section>Le créneau — aujourd’hui</Section>
+          <Section note="aujourd’hui">Le créneau</Section>
           {genSlots(service, booking.barber).map((sl, i) => (
             <TouchableOpacity key={i} style={[s.card, s.row]} onPress={() => onConfirm(service, sl)} activeOpacity={0.8}>
               <Text style={s.slotTime}>{sl.time}</Text>
@@ -413,7 +463,7 @@ function ShopScreen({ cat, setCat, cart, addCart, toast }) {
             <View style={[s.pimg, { backgroundColor: TEX[p.tex] }]}>
               <Feather name={p.ic} size={26} color="rgba(200,169,106,0.5)" />
             </View>
-            <Text style={s.pname}>{p.name}</Text>
+            <Text style={s.pname} numberOfLines={2}>{p.name}</Text>
             <Text style={s.pprice}>{fmt(p.price)}</Text>
             <Text style={s.pstock}>{p.stock > 0 ? `${p.stock} en stock` : 'Épuisé'}</Text>
             <TouchableOpacity style={s.add} onPress={() => addCart(p)} activeOpacity={0.8}>
@@ -423,15 +473,14 @@ function ShopScreen({ cat, setCat, cart, addCart, toast }) {
         ))}
       </View>
       {cart > 0 && (
-        <TouchableOpacity style={s.btn} onPress={() => toast('Paiement Stripe — CB, Apple Pay, Google Pay.')}>
-          <Text style={s.btnText}>COMMANDER · {cart} ARTICLE{cart > 1 ? 'S' : ''}</Text>
-        </TouchableOpacity>
+        <Btn label={`COMMANDER · ${cart} ARTICLE${cart > 1 ? 'S' : ''}`}
+          onPress={() => toast('Paiement Stripe — CB, Apple Pay, Google Pay.')} />
       )}
     </ScrollView>
   );
 }
 
-function MeScreen({ points, upcoming }) {
+function MeScreen({ points, upcoming, onLogout }) {
   return (
     <ScrollView style={s.screen} contentContainerStyle={s.screenPad}>
       <Kicker>ESPACE PERSONNEL</Kicker>
@@ -476,41 +525,161 @@ function MeScreen({ points, upcoming }) {
           Carte bancaire, Apple Pay, Google Pay ou sur place. Acompte selon la prestation.
         </Text>
       </View>
+      <Btn ghost icon="repeat" label="CHANGER D’ESPACE" onPress={onLogout} />
+    </ScrollView>
+  );
+}
+
+/* ───────── Espace BARBER (connecté : Enzo Moreau) ───────── */
+function PlanningScreen({ delay, toast }) {
+  const next = TODAY_RDV.filter((r) => !r.done);
+  const ca = TODAY_RDV.filter((r) => r.done).reduce((sum, r) => sum + r.price, 0);
+  return (
+    <ScrollView style={s.screen} contentContainerStyle={s.screenPad}>
+      <Kicker>ESPACE BARBER · ENZO MOREAU</Kicker>
+      <Title>Aujourd’hui</Title>
+      <View style={[s.row, { gap: 14, marginBottom: 20 }]}>
+        <Badge status={delay} />
+        <Text style={s.btags}>{next.length} rendez-vous restants · {fmt(ca)} encaissés</Text>
+      </View>
+      {TODAY_RDV.map((r) => (
+        <View key={r.time} style={[s.card, s.row, r.done && { opacity: 0.45 }]}>
+          <Text style={s.slotTime}>{r.time}</Text>
+          <View style={s.grow}>
+            <Text style={[s.bname, { fontSize: 14 }]}>{r.who}</Text>
+            <Text style={[s.btags, { marginTop: 2 }]}>{r.serv}</Text>
+          </View>
+          {r.done ? (
+            <Feather name="check" size={17} color={C.green} />
+          ) : (
+            <Text style={[s.price, { fontSize: 15 }]}>{fmt(r.price)}</Text>
+          )}
+        </View>
+      ))}
+      <Btn ghost icon="camera" label="PHOTOS DE FIN DE PRESTATION"
+        onPress={() => toast('Appareil photo — 1 à 10 photos attachées à la prestation.')} />
+    </ScrollView>
+  );
+}
+
+function StatusScreen({ delay, setDelay, toast }) {
+  return (
+    <ScrollView style={s.screen} contentContainerStyle={s.screenPad}>
+      <Kicker>ESPACE BARBER</Kicker>
+      <Title em="statut">Mon </Title>
+      <Lead>Vos clients du jour sont prévenus automatiquement à chaque changement.</Lead>
+      {Object.entries(DELAY).map(([k, v]) => {
+        const on = delay === k;
+        return (
+          <TouchableOpacity
+            key={k}
+            style={[s.opt, on && s.optOn]}
+            activeOpacity={0.8}
+            onPress={() => {
+              setDelay(k);
+              toast(`${TODAY_RDV.filter((r) => !r.done).length} clients notifiés — « Enzo · ${v.label} »`);
+            }}
+          >
+            <View style={[s.dotLg, { backgroundColor: v.dot }]} />
+            <Text style={[s.optText, s.grow]}>{v.label}</Text>
+            {on && <Text style={s.optActive}>ACTIF</Text>}
+          </TouchableOpacity>
+        );
+      })}
+      <Text style={s.footnote}>
+        Votre statut est visible en direct sur le profil que voient les clients.
+      </Text>
+    </ScrollView>
+  );
+}
+
+function ActivityScreen() {
+  const top = [['Coupe + Barbe', 46], ['Coupe Homme', 31], ['Hair Design', 14], ['Barbe seule', 9]];
+  return (
+    <ScrollView style={s.screen} contentContainerStyle={s.screenPad}>
+      <Kicker>ESPACE BARBER</Kicker>
+      <Title>Activité</Title>
+      <Lead>Vos chiffres, en un coup d’œil.</Lead>
+      <View style={s.kpis}>
+        {[
+          ['173 €', 'CA DU JOUR'], ['1 240 €', 'CA SEMAINE'], ['4 980 €', 'CA MOIS'],
+          ['87 %', 'REMPLISSAGE'], ['6', 'RDV AUJOURD’HUI'], ['★ 4,9', 'NOTE MOYENNE'],
+        ].map(([v, l]) => (
+          <View key={l} style={s.kpi}>
+            <Text style={s.kpiV}>{v}</Text>
+            <Text style={s.kpiL}>{l}</Text>
+          </View>
+        ))}
+      </View>
+      <Section>Prestations demandées</Section>
+      <View style={s.card}>
+        {top.map(([name, pct]) => (
+          <View key={name} style={{ paddingVertical: 8 }}>
+            <View style={[s.row, { marginBottom: 7 }]}>
+              <Text style={[s.softText, s.grow, { color: C.text }]}>{name}</Text>
+              <Text style={s.rate}>{pct} %</Text>
+            </View>
+            <View style={s.barBg}>
+              <View style={[s.barFill, { width: `${pct}%` }]} />
+            </View>
+          </View>
+        ))}
+      </View>
     </ScrollView>
   );
 }
 
 /* ───────── Racine ───────── */
-const TABS = [
+const CLIENT_TABS = [
   ['home', 'home', 'Salon'],
   ['book', 'calendar', 'Réserver'],
   ['cuts', 'image', 'Mes coupes'],
   ['shop', 'shopping-bag', 'Boutique'],
   ['me', 'user', 'Profil'],
 ];
+const BARBER_TABS = [
+  ['planning', 'calendar', 'Planning'],
+  ['status', 'clock', 'Statut'],
+  ['activity', 'bar-chart-2', 'Activité'],
+];
 
 export default function App() {
+  const [role, setRole] = useState(null); // null | 'client' | 'barber'
   const [tab, setTab] = useState('home');
-  const [barber, setBarber] = useState(null);
+  const [barberDetail, setBarberDetail] = useState(null);
   const [booking, setBooking] = useState({ service: null, barber: 'any', done: null });
   const [cat, setCat] = useState('ALL');
   const [cart, setCart] = useState(0);
   const [points, setPoints] = useState(86);
   const [upcoming, setUpcoming] = useState([]);
+  const [enzoDelay, setEnzoDelay] = useState('ON_TIME');
   const [toastMsg, setToastMsg] = useState(null);
   const toastAnim = useRef(new Animated.Value(0)).current;
+  const toastTimer = useRef(null);
+
+  // Le statut d'Enzo (modifié côté Barber) est visible en direct côté Client
+  const barbersLive = BARBERS.map((b) => (b.id === 'enzo' ? { ...b, delay: enzoDelay } : b));
 
   const toast = (msg) => {
     setToastMsg(msg);
     Animated.timing(toastAnim, { toValue: 1, duration: 220, useNativeDriver: true }).start();
-    clearTimeout(toast._h);
-    toast._h = setTimeout(() => {
+    clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => {
       Animated.timing(toastAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start();
     }, 3200);
   };
 
+  const choose = (r) => {
+    setRole(r);
+    setTab(r === 'client' ? 'home' : 'planning');
+    setBarberDetail(null);
+  };
+
   const confirmBooking = (service, slot) => {
-    setBooking({ ...booking, done: { serv: service.name, time: slot.time, barber: slot.barber.name, price: slot.price, rules: slot.rules } });
+    setBooking({
+      ...booking,
+      done: { serv: service.name, time: slot.time, barber: slot.barber.name, price: slot.price, rules: slot.rules },
+    });
     setPoints((p) => p + Math.floor(slot.price / 100));
     setUpcoming((u) => [...u, { serv: service.name, time: slot.time, barber: slot.barber.name, price: slot.price }]);
     toast(`Réservation confirmée — ${slot.time} avec ${slot.barber.name.split(' ')[0]} · ${fmt(slot.price)}`);
@@ -523,38 +692,60 @@ export default function App() {
     });
   };
 
-  let content;
-  if (barber) {
-    content = (
-      <BarberScreen
-        barber={barber}
-        onBack={() => setBarber(null)}
-        onBook={(id) => { setBooking({ service: null, barber: id, done: null }); setBarber(null); setTab('book'); }}
-      />
-    );
-  } else if (tab === 'home') content = <HomeScreen openBarber={setBarber} />;
-  else if (tab === 'book') content = <BookScreen booking={booking} setBooking={setBooking} onConfirm={confirmBooking} />;
-  else if (tab === 'cuts') content = <CutsScreen toast={toast} />;
-  else if (tab === 'shop') content = <ShopScreen cat={cat} setCat={setCat} cart={cart} addCart={addCart} toast={toast} />;
-  else content = <MeScreen points={points} upcoming={upcoming} />;
+  let content = null;
+  if (role === 'client') {
+    if (barberDetail) {
+      content = (
+        <BarberDetailScreen
+          barber={barbersLive.find((b) => b.id === barberDetail.id)}
+          onBack={() => setBarberDetail(null)}
+          onBook={(id) => { setBooking({ service: null, barber: id, done: null }); setBarberDetail(null); setTab('book'); }}
+        />
+      );
+    } else if (tab === 'home') content = <HomeScreen barbers={barbersLive} openBarber={setBarberDetail} />;
+    else if (tab === 'book') content = <BookScreen booking={booking} setBooking={setBooking} onConfirm={confirmBooking} />;
+    else if (tab === 'cuts') content = <CutsScreen toast={toast} />;
+    else if (tab === 'shop') content = <ShopScreen cat={cat} setCat={setCat} cart={cart} addCart={addCart} toast={toast} />;
+    else content = <MeScreen points={points} upcoming={upcoming} onLogout={() => setRole(null)} />;
+  } else if (role === 'barber') {
+    if (tab === 'planning') content = <PlanningScreen delay={enzoDelay} toast={toast} />;
+    else if (tab === 'status') content = <StatusScreen delay={enzoDelay} setDelay={setEnzoDelay} toast={toast} />;
+    else content = <ActivityScreen />;
+  }
+
+  const tabs = role === 'client' ? CLIENT_TABS : BARBER_TABS;
 
   return (
     <SafeAreaView style={s.root}>
       <StatusBar barStyle="light-content" backgroundColor={C.bg} />
-      <View style={s.header}>
-        <Text style={s.wordmark}>
-          Barber<Text style={{ color: C.gold, fontStyle: 'italic' }}>Pro</Text>
-        </Text>
-      </View>
-      {content}
-      <View style={s.tabbar}>
-        {TABS.map(([k, ic, l]) => (
-          <TouchableOpacity key={k} style={s.tabBtn} onPress={() => { setTab(k); setBarber(null); }} activeOpacity={0.7}>
-            <Feather name={ic} size={20} color={tab === k && !barber ? C.gold2 : '#6E6B65'} />
-            <Text style={[s.tabLabel, tab === k && !barber && { color: C.gold2 }]}>{l}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+      {role === null ? (
+        <WelcomeScreen choose={choose} />
+      ) : (
+        <>
+          <View style={s.header}>
+            <View style={{ width: 34 }} />
+            <Text style={s.wordmark}>
+              Barber<Text style={{ color: C.gold, fontStyle: 'italic' }}>Pro</Text>
+            </Text>
+            <TouchableOpacity style={s.switchBtn} onPress={() => setRole(null)} hitSlop={10}>
+              <Feather name="repeat" size={15} color={C.muted} />
+            </TouchableOpacity>
+          </View>
+          {content}
+          <View style={s.tabbar}>
+            {tabs.map(([k, ic, l]) => {
+              const on = tab === k && !barberDetail;
+              return (
+                <TouchableOpacity key={k} style={s.tabBtn}
+                  onPress={() => { setTab(k); setBarberDetail(null); }} activeOpacity={0.7}>
+                  <Feather name={ic} size={20} color={on ? C.gold2 : '#6E6B65'} />
+                  <Text style={[s.tabLabel, on && { color: C.gold2 }]}>{l}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </>
+      )}
       {toastMsg && (
         <Animated.View style={[s.toast, { opacity: toastAnim }]} pointerEvents="none">
           <Text style={s.toastText}>{toastMsg}</Text>
@@ -566,21 +757,57 @@ export default function App() {
 
 /* ───────── Styles ───────── */
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.bg },
-  header: { alignItems: 'center', paddingTop: Platform.OS === 'android' ? 14 : 6, paddingBottom: 4 },
-  wordmark: { fontFamily: SERIF, fontSize: 24, fontWeight: '600', color: C.text, letterSpacing: 1 },
+  root: {
+    flex: 1, backgroundColor: C.bg,
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight || 24 : 0,
+  },
+  header: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: PAD, paddingTop: 8, paddingBottom: 6,
+  },
+  wordmark: { fontFamily: SERIF, fontSize: 22, fontWeight: '600', color: C.text, letterSpacing: 1 },
+  switchBtn: {
+    width: 34, height: 34, borderRadius: 17, borderWidth: 1, borderColor: C.line,
+    alignItems: 'center', justifyContent: 'center',
+  },
+
+  /* Accueil / choix d'espace */
+  welcome: { flex: 1, justifyContent: 'center', padding: 26 },
+  welcomeMark: { fontFamily: SERIF, fontSize: SMALL ? 38 : 44, fontWeight: '600', color: C.text, letterSpacing: 1 },
+  welcomeRule: { width: 54, height: 1, backgroundColor: C.gold, marginVertical: 16, opacity: 0.7 },
+  welcomeTag: { fontFamily: SERIF, fontStyle: 'italic', color: C.soft, fontSize: 15 },
+  welcomeCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 16,
+    backgroundColor: C.surface, borderWidth: 1, borderColor: C.line,
+    borderRadius: 22, padding: 20, marginBottom: 14,
+  },
+  welcomeIcon: {
+    width: 50, height: 50, borderRadius: 25, backgroundColor: C.surface2,
+    borderWidth: 1, borderColor: C.lineGold, alignItems: 'center', justifyContent: 'center',
+  },
+  welcomeCardTitle: { fontFamily: SERIF, fontSize: 19, fontWeight: '600', color: C.text, marginBottom: 4 },
+  welcomeCardSub: { color: C.muted, fontSize: 11.5, lineHeight: 17 },
+  welcomeFoot: { color: '#56534E', fontSize: 10, letterSpacing: 2, textAlign: 'center', marginTop: 22 },
 
   screen: { flex: 1 },
-  screenPad: { padding: 20, paddingBottom: 36 },
+  screenPad: { padding: PAD, paddingBottom: 40 },
 
-  kicker: { color: C.gold, fontSize: 10, letterSpacing: 4, marginBottom: 8, fontWeight: '500' },
-  title: { fontFamily: SERIF, fontSize: 32, fontWeight: '600', color: C.text, marginBottom: 6, lineHeight: 36 },
+  kicker: { color: C.gold, fontSize: 10, letterSpacing: 3.5, marginBottom: 8, fontWeight: '500' },
+  title: { fontFamily: SERIF, fontSize: SMALL ? 28 : 32, fontWeight: '600', color: C.text, marginBottom: 6, lineHeight: SMALL ? 32 : 36 },
   titleEm: { fontStyle: 'italic', color: C.gold2, fontWeight: '500' },
   lead: { color: C.muted, fontSize: 13, lineHeight: 20, marginBottom: 20 },
 
   secRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 24, marginBottom: 12 },
   secText: { fontFamily: SERIF, fontSize: 19, fontWeight: '600', color: C.text },
+  secNote: { color: C.muted, fontSize: 11 },
   secLine: { flex: 1, height: 1, backgroundColor: C.line },
+
+  hero: {
+    borderWidth: 1, borderColor: C.lineGold, borderRadius: 22, padding: 20,
+    backgroundColor: C.surface, marginBottom: 6,
+  },
+  heroQuote: { fontFamily: SERIF, fontStyle: 'italic', fontSize: 19, lineHeight: 26, color: C.text, marginBottom: 8 },
+  heroSub: { color: C.muted, fontSize: 12, letterSpacing: 0.5 },
 
   card: {
     backgroundColor: C.surface, borderWidth: 1, borderColor: C.line,
@@ -603,6 +830,7 @@ const s = StyleSheet.create({
 
   badge: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   dot: { width: 6, height: 6, borderRadius: 3 },
+  dotLg: { width: 9, height: 9, borderRadius: 4.5 },
   badgeText: { color: '#CFCCC4', fontSize: 11 },
   rate: { color: C.gold, fontSize: 12, letterSpacing: 0.5 },
 
@@ -624,7 +852,8 @@ const s = StyleSheet.create({
   footnoteLeft: { color: C.muted, fontSize: 11.5, lineHeight: 18 },
 
   btn: {
-    backgroundColor: C.gold, borderRadius: 16, padding: 15, alignItems: 'center', marginTop: 14,
+    flexDirection: 'row', backgroundColor: C.gold, borderRadius: 16, padding: 15,
+    alignItems: 'center', justifyContent: 'center', marginTop: 14,
   },
   btnGhost: { backgroundColor: 'transparent', borderWidth: 1, borderColor: C.lineGold },
   btnText: { color: C.ink, fontSize: 12, fontWeight: '700', letterSpacing: 2 },
@@ -634,24 +863,22 @@ const s = StyleSheet.create({
     width: 104, height: 126, borderRadius: 14, marginRight: 9,
     borderWidth: 1, borderColor: C.line, alignItems: 'center', justifyContent: 'center',
   },
-  photoLabel: {
-    position: 'absolute', bottom: 7, color: '#D8D5CE', fontSize: 9, letterSpacing: 1.5,
-  },
+  photoLabel: { position: 'absolute', bottom: 7, color: '#D8D5CE', fontSize: 9, letterSpacing: 1.5 },
 
   stats: {
     flexDirection: 'row', backgroundColor: C.surface, borderWidth: 1, borderColor: C.line,
     borderRadius: 20, paddingVertical: 16,
   },
-  stat: { flex: 1, alignItems: 'center' },
-  statV: { fontFamily: SERIF, color: C.gold2, fontWeight: '700', fontSize: 17 },
-  statL: { color: C.muted, fontSize: 8.5, letterSpacing: 1.6, marginTop: 5 },
+  stat: { flex: 1, alignItems: 'center', paddingHorizontal: 2 },
+  statV: { fontFamily: SERIF, color: C.gold2, fontWeight: '700', fontSize: SMALL ? 15 : 17 },
+  statL: { color: C.muted, fontSize: 8, letterSpacing: 1.4, marginTop: 5 },
 
   review: { paddingVertical: 12 },
   reviewTxt: { fontFamily: SERIF, fontStyle: 'italic', color: '#A5A29B', fontSize: 14, lineHeight: 21, marginTop: 4 },
 
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 11 },
   pcard: {
-    width: '47.5%', backgroundColor: C.surface, borderWidth: 1, borderColor: C.line,
+    width: PCARD_W, backgroundColor: C.surface, borderWidth: 1, borderColor: C.line,
     borderRadius: 18, padding: 11,
   },
   pimg: {
@@ -670,15 +897,35 @@ const s = StyleSheet.create({
   points: { fontFamily: SERIF, fontSize: 32, fontWeight: '700', color: C.gold2, marginTop: 4 },
   divider: { height: 1, backgroundColor: C.line, marginVertical: 13 },
 
+  opt: {
+    flexDirection: 'row', alignItems: 'center', gap: 13,
+    backgroundColor: C.surface, borderWidth: 1, borderColor: C.line,
+    borderRadius: 16, paddingVertical: 16, paddingHorizontal: 17, marginBottom: 9,
+  },
+  optOn: { borderColor: C.lineGold, backgroundColor: C.surface2 },
+  optText: { color: C.text, fontSize: 14 },
+  optActive: { color: C.gold, fontSize: 10, letterSpacing: 2, fontWeight: '600' },
+
+  kpis: { flexDirection: 'row', flexWrap: 'wrap', gap: 11 },
+  kpi: {
+    width: PCARD_W, backgroundColor: C.surface, borderWidth: 1, borderColor: C.line,
+    borderRadius: 18, padding: 15,
+  },
+  kpiV: { fontFamily: SERIF, color: C.gold2, fontSize: 21, fontWeight: '700' },
+  kpiL: { color: C.muted, fontSize: 8.5, letterSpacing: 1.5, marginTop: 6 },
+
+  barBg: { height: 3, backgroundColor: C.surface2, borderRadius: 2 },
+  barFill: { height: 3, backgroundColor: C.gold, borderRadius: 2 },
+
   tabbar: {
     flexDirection: 'row', backgroundColor: '#0E0E10', borderTopWidth: 1, borderTopColor: C.line,
-    paddingTop: 8, paddingBottom: Platform.OS === 'ios' ? 4 : 10,
+    paddingTop: 9, paddingBottom: Platform.OS === 'ios' ? 4 : 12,
   },
-  tabBtn: { flex: 1, alignItems: 'center', gap: 4 },
-  tabLabel: { color: '#6E6B65', fontSize: 9, letterSpacing: 0.5 },
+  tabBtn: { flex: 1, alignItems: 'center', gap: 4, paddingVertical: 2 },
+  tabLabel: { color: '#6E6B65', fontSize: 9.5, letterSpacing: 0.4 },
 
   toast: {
-    position: 'absolute', bottom: 86, left: 20, right: 20,
+    position: 'absolute', bottom: 92, left: PAD, right: PAD,
     backgroundColor: '#17161A', borderWidth: 1, borderColor: C.lineGold,
     borderRadius: 14, paddingVertical: 13, paddingHorizontal: 18,
   },
