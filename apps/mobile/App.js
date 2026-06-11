@@ -197,6 +197,9 @@ const HISTORY = [
 
 /* ───────── Jours & créneaux ───────── */
 const WD = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
+const MO = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+const MO_SHORT = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+const HORIZON = 60; // jours réservables / ouvrables à l'avance
 /* Grille horaire 9h → 23h, au pas choisi par le barber (15 à 60 min) */
 function timesFor(step) {
   const out = [];
@@ -208,16 +211,19 @@ function timesFor(step) {
 const TIMES = timesFor(30); // grille par défaut
 function makeDays() {
   const out = [];
-  for (let i = 0; i < 7; i++) {
+  for (let i = 0; i < HORIZON; i++) {
     const d = new Date();
     d.setDate(d.getDate() + i);
     d.setHours(0, 0, 0, 0);
-    const label = i === 0 ? 'Aujourd’hui' : i === 1 ? 'Demain' : `${WD[d.getDay()]} ${d.getDate()}`;
+    const label = i === 0 ? 'Aujourd’hui' : i === 1 ? 'Demain'
+      : `${WD[d.getDay()]} ${d.getDate()} ${MO_SHORT[d.getMonth()]}`;
     out.push({ key: d.toDateString(), label, date: d });
   }
   return out;
 }
 const DAYS = makeDays();
+const DAY_INDEX = {};
+DAYS.forEach((d, i) => { DAY_INDEX[d.key] = i; });
 const timeToDate = (day, time) => {
   const [h, m] = time.split(':').map(Number);
   const d = new Date(day.date);
@@ -349,15 +355,65 @@ const Chip = ({ label, price, on, onPress, mini }) => (
   </TouchableOpacity>
 );
 
-const DaysBar = ({ sel, onSel }) => (
-  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 4 }}>
-    <View style={[s.wrap, { flexWrap: 'nowrap' }]}>
-      {DAYS.map((d, i) => (
-        <Chip key={d.key} mini label={d.label} on={sel === i} onPress={() => onSel(i)} />
-      ))}
+/* Calendrier mensuel — sélection d'une date sur 2 mois, points de statut par jour */
+function Calendar({ sel, onSel, markFor }) {
+  const now = new Date();
+  const [mOff, setMOff] = useState(0);
+  const base = new Date(now.getFullYear(), now.getMonth() + mOff, 1);
+  const year = base.getFullYear();
+  const month = base.getMonth();
+  const firstDow = (base.getDay() + 6) % 7; // semaine qui démarre lundi
+  const nDays = new Date(year, month + 1, 0).getDate();
+  const cells = [];
+  for (let i = 0; i < firstDow; i++) cells.push(null);
+  for (let d = 1; d <= nDays; d++) cells.push(d);
+
+  return (
+    <View style={s.cal}>
+      <View style={s.calHead}>
+        <TouchableOpacity disabled={mOff === 0} onPress={() => setMOff(mOff - 1)}
+          hitSlop={12} style={{ opacity: mOff === 0 ? 0.25 : 1 }}>
+          <Feather name="chevron-left" size={19} color={C.gold} />
+        </TouchableOpacity>
+        <Text style={s.calMonth}>{MO[month]} {year}</Text>
+        <TouchableOpacity disabled={mOff >= 2} onPress={() => setMOff(mOff + 1)}
+          hitSlop={12} style={{ opacity: mOff >= 2 ? 0.25 : 1 }}>
+          <Feather name="chevron-right" size={19} color={C.gold} />
+        </TouchableOpacity>
+      </View>
+      <View style={s.calGrid}>
+        {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((w, i) => (
+          <View key={'w' + i} style={s.calCell}>
+            <Text style={s.calWd}>{w}</Text>
+          </View>
+        ))}
+        {cells.map((d, i) => {
+          if (d === null) return <View key={'b' + i} style={s.calCell} />;
+          const key = new Date(year, month, d).toDateString();
+          const idx = DAY_INDEX[key];
+          const enabled = idx != null;
+          const on = enabled && sel === idx;
+          const mark = enabled && markFor ? markFor(key) : null;
+          return (
+            <TouchableOpacity key={key} style={s.calCell} disabled={!enabled}
+              onPress={() => onSel(idx)} activeOpacity={0.7}>
+              <View style={[s.calNumWrap, on && s.calNumOn]}>
+                <Text style={[s.calNum, !enabled && { color: '#3E3C38' }, on && { color: C.ink, fontWeight: '700' }]}>
+                  {d}
+                </Text>
+              </View>
+              <View style={[
+                s.calDot,
+                mark === 'open' && { backgroundColor: C.gold },
+                mark === 'booked' && { backgroundColor: C.green },
+              ]} />
+            </TouchableOpacity>
+          );
+        })}
+      </View>
     </View>
-  </ScrollView>
-);
+  );
+}
 
 const Photo = ({ label, tex }) => (
   <View style={[s.photo, { backgroundColor: TEX[tex] }]}>
@@ -545,7 +601,7 @@ function ExploreScreen({ barbers, openBarber, toast }) {
   );
 }
 
-function BarberDetailScreen({ barber, onBack, onBook, toast }) {
+function BarberDetailScreen({ barber, services, onBack, onBook, toast }) {
   const [dtab, setDtab] = useState('about');
   const [more, setMore] = useState(false);
 
@@ -648,7 +704,7 @@ function BarberDetailScreen({ barber, onBack, onBook, toast }) {
           {dtab === 'prest' && (
             <>
               <Section note="tarif de base — varie selon l’horaire">Prestations</Section>
-              {SERVICES.map((sv) => (
+              {services.map((sv) => (
                 <View key={sv.id} style={[s.card, s.row]}>
                   <View style={s.grow}>
                     <Text style={[s.bname, { fontSize: 14 }]}>{sv.name}</Text>
@@ -711,7 +767,7 @@ function openSlotsFor(agenda, dayIdx, barberId, window) {
   return out.sort((a, b) => a.time.localeCompare(b.time));
 }
 
-function BookScreen({ agenda, formulas, booking, setBooking, dayIdx, setDayIdx, onConfirm }) {
+function BookScreen({ agenda, formulas, services, booking, setBooking, dayIdx, setDayIdx, onConfirm }) {
   if (booking.done) {
     const d = booking.done;
     return (
@@ -756,7 +812,7 @@ function BookScreen({ agenda, formulas, booking, setBooking, dayIdx, setDayIdx, 
       : initFormulas().filter((f) => f.active);
   const formula = available.find((f) => f.id === booking.formula) || null;
   const needService = formula && formula.fixed == null;
-  const service = SERVICES.find((x) => x.id === booking.service);
+  const service = services.find((x) => x.id === booking.service);
   const ready = formula && (!needService || service);
   const slots = ready ? openSlotsFor(agenda, dayIdx, booking.barber, formula.window) : [];
   const now = new Date();
@@ -801,7 +857,7 @@ function BookScreen({ agenda, formulas, booking, setBooking, dayIdx, setDayIdx, 
         <>
           <Section>La prestation</Section>
           <View style={s.wrap}>
-            {SERVICES.map((sv) => (
+            {services.map((sv) => (
               <Chip key={sv.id} label={sv.name} price={fmt(sv.price)} on={booking.service === sv.id}
                 onPress={() => setBooking({ ...booking, service: sv.id })} />
             ))}
@@ -811,9 +867,18 @@ function BookScreen({ agenda, formulas, booking, setBooking, dayIdx, setDayIdx, 
 
       {ready && (
         <>
-          <Section>Le jour</Section>
-          <DaysBar sel={dayIdx} onSel={setDayIdx} />
-          <Section note={`${slots.length} créneau${slots.length > 1 ? 'x' : ''} ouvert${slots.length > 1 ? 's' : ''}`}>
+          <Section note="point doré = disponibilités">Le jour</Section>
+          <Calendar sel={dayIdx} onSel={setDayIdx} markFor={(key) => {
+            const list = booking.barber === 'any' ? BARBERS : BARBERS.filter((b) => b.id === booking.barber);
+            for (const b of list) {
+              const d = agenda[b.id]?.[key] || {};
+              for (const [time, sl] of Object.entries(d)) {
+                if (sl.status === 'open' && inWindow(time, formula.window)) return 'open';
+              }
+            }
+            return null;
+          }} />
+          <Section note={`${DAYS[dayIdx].label} · ${slots.length} créneau${slots.length > 1 ? 'x' : ''} ouvert${slots.length > 1 ? 's' : ''}`}>
             Le créneau
           </Section>
           {slots.length === 0 ? (
@@ -1034,10 +1099,16 @@ function SlotsScreen({ agenda, setAgenda, daycfg, setDaycfg, dayIdx, setDayIdx, 
       <Kicker>ESPACE BARBER · ENZO MOREAU</Kicker>
       <Title em="créneaux">Mes </Title>
       <Lead>
-        Votre journée, vos règles : choisissez la durée de vos créneaux, ouvrez, fermez, posez des pauses.
-        Touchez une case pour passer de fermé → ouvert → pause.
+        Votre agenda, vos règles : choisissez une date sur le calendrier — jusqu’à deux mois à l’avance —
+        puis ouvrez, fermez ou posez des pauses. Touchez une case : fermé → ouvert → pause.
       </Lead>
-      <DaysBar sel={dayIdx} onSel={setDayIdx} />
+      <Calendar sel={dayIdx} onSel={setDayIdx} markFor={(key) => {
+        const vals = Object.values(agenda.enzo[key] || {});
+        if (vals.some((v) => v.status === 'booked')) return 'booked';
+        if (vals.some((v) => v.status === 'open')) return 'open';
+        return null;
+      }} />
+      <Text style={[s.btags, { marginTop: 10 }]}>{DAYS[dayIdx].label}</Text>
 
       <Text style={s.fieldLabel}>DURÉE PAR CRÉNEAU — SELON VOTRE RYTHME</Text>
       <View style={s.wrap}>
@@ -1107,17 +1178,35 @@ function SlotsScreen({ agenda, setAgenda, daycfg, setDaycfg, dayIdx, setDayIdx, 
 }
 
 const DUR_CHOICES = [30, 45, 60, 90, 120];
-const PRICE_CHOICES = [
-  ['dyn', 'Tarif dynamique'], ['3500', '35 €'], ['4500', '45 €'], ['6000', '60 €'], ['9000', '90 €'],
-];
 const ICON_FOR_WINDOW = { all: 'tag', day: 'sun', evening: 'sunset', night: 'moon' };
 
-function FormulasScreen({ formulas, setFormulas, toast }) {
+/* Champ prix en euros, libre */
+function PriceField({ cents, onChange }) {
+  const [txt, setTxt] = useState(String(cents / 100).replace('.', ','));
+  return (
+    <View style={s.priceField}>
+      <TextInput
+        style={s.priceInput}
+        keyboardType="numeric"
+        value={txt}
+        onChangeText={(t) => {
+          setTxt(t);
+          const v = parseFloat(t.replace(',', '.'));
+          if (!isNaN(v) && v > 0) onChange(Math.round(v * 100));
+        }}
+      />
+      <Text style={{ color: C.gold, fontFamily: SERIF, fontSize: 15, fontWeight: '700' }}>€</Text>
+    </View>
+  );
+}
+
+function FormulasScreen({ formulas, setFormulas, services, setServices, toast }) {
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState('');
   const [dur, setDur] = useState(45);
   const [windowSel, setWindowSel] = useState('all');
-  const [priceSel, setPriceSel] = useState('dyn');
+  const [priceMode, setPriceMode] = useState('dyn');
+  const [priceTxt, setPriceTxt] = useState('');
   const [recur, setRecur] = useState(false);
 
   const toggleActive = (id) => {
@@ -1134,6 +1223,15 @@ function FormulasScreen({ formulas, setFormulas, toast }) {
       toast('Donnez un nom à votre formule.');
       return;
     }
+    let fixed = null;
+    if (priceMode === 'fixed') {
+      const v = parseFloat(priceTxt.replace(',', '.'));
+      if (isNaN(v) || v <= 0) {
+        toast('Indiquez un prix valide pour votre formule.');
+        return;
+      }
+      fixed = Math.round(v * 100);
+    }
     setFormulas((fs) => [
       ...fs,
       {
@@ -1142,17 +1240,18 @@ function FormulasScreen({ formulas, setFormulas, toast }) {
         icon: recur ? 'refresh-cw' : ICON_FOR_WINDOW[windowSel],
         dur,
         window: windowSel,
-        fixed: priceSel === 'dyn' ? null : Number(priceSel),
+        fixed,
         recur,
         active: true,
-        desc: `${dur} min · ${WINDOWS[windowSel]}${recur ? ' · chaque semaine' : ''}${priceSel === 'dyn' ? ' · tarif dynamique' : ''}`,
+        desc: `${dur} min · ${WINDOWS[windowSel]}${recur ? ' · chaque semaine' : ''}${fixed == null ? ' · tarif dynamique' : ''}`,
       },
     ]);
     setCreating(false);
     setName('');
     setDur(45);
     setWindowSel('all');
-    setPriceSel('dyn');
+    setPriceMode('dyn');
+    setPriceTxt('');
     setRecur(false);
     toast(`Formule « ${label} » créée — vos clients peuvent la réserver.`);
   };
@@ -1165,6 +1264,20 @@ function FormulasScreen({ formulas, setFormulas, toast }) {
         Créez vos types de rendez-vous — nocturne, transformation, hebdomadaire… Vos clients réservent dans le cadre que vous fixez.
       </Lead>
 
+      <Section>Mes tarifs</Section>
+      {services.map((sv) => (
+        <View key={sv.id} style={[s.card, s.row]}>
+          <View style={s.grow}>
+            <Text style={[s.bname, { fontSize: 14 }]}>{sv.name}</Text>
+            <Text style={[s.btags, { marginTop: 2 }]}>{sv.dur} min</Text>
+          </View>
+          <PriceField cents={sv.price} onChange={(v) =>
+            setServices((ss) => ss.map((x) => x.id === sv.id ? { ...x, price: v } : x))
+          } />
+        </View>
+      ))}
+
+      <Section>Mes formules</Section>
       {formulas.map((f) => (
         <View key={f.id} style={[s.card, !f.active && { opacity: 0.55 }]}>
           <View style={s.row}>
@@ -1208,10 +1321,22 @@ function FormulasScreen({ formulas, setFormulas, toast }) {
           </View>
           <Text style={s.fieldLabel}>TARIF</Text>
           <View style={s.wrap}>
-            {PRICE_CHOICES.map(([k, l]) => (
-              <Chip key={k} mini label={l} on={priceSel === k} onPress={() => setPriceSel(k)} />
-            ))}
+            <Chip mini label="Tarif dynamique" on={priceMode === 'dyn'} onPress={() => setPriceMode('dyn')} />
+            <Chip mini label="Prix fixe" on={priceMode === 'fixed'} onPress={() => setPriceMode('fixed')} />
           </View>
+          {priceMode === 'fixed' && (
+            <View style={[s.row, { marginTop: 10 }]}>
+              <TextInput
+                style={[s.input, { flex: 1 }]}
+                keyboardType="numeric"
+                placeholder="Votre prix, ex. 50"
+                placeholderTextColor="#5A5852"
+                value={priceTxt}
+                onChangeText={setPriceTxt}
+              />
+              <Text style={{ color: C.gold, fontFamily: SERIF, fontSize: 17, fontWeight: '700' }}>€</Text>
+            </View>
+          )}
           <Text style={s.fieldLabel}>RÉCURRENCE</Text>
           <View style={s.wrap}>
             <Chip mini label="Ponctuel" on={!recur} onPress={() => setRecur(false)} />
@@ -1247,8 +1372,11 @@ function PlanningScreen({ agenda, dayIdx, setDayIdx, delay, toast }) {
         <Badge status={delay} />
         <Text style={s.btags}>{todo} à venir{ca > 0 ? ` · ${fmt(ca)} encaissés` : ''}</Text>
       </View>
-      <DaysBar sel={dayIdx} onSel={setDayIdx} />
-      <View style={{ height: 14 }} />
+      <Calendar sel={dayIdx} onSel={setDayIdx} markFor={(key) => {
+        const vals = Object.values(agenda.enzo[key] || {});
+        return vals.some((v) => v.status === 'booked') ? 'booked' : null;
+      }} />
+      <Text style={[s.btags, { marginVertical: 12 }]}>{DAYS[dayIdx].label}</Text>
       {rdv.length === 0 ? (
         <Text style={s.footnote}>
           Aucune réservation ce jour.{'\n'}Ouvrez des créneaux dans l’onglet Créneaux pour recevoir des clients.
@@ -1372,6 +1500,7 @@ export default function App() {
   const [agenda, setAgenda] = useState(initAgenda);
   const [daycfg, setDaycfg] = useState({}); // durée des créneaux par jour (Enzo)
   const [formulas, setFormulas] = useState(initFormulas);
+  const [services, setServices] = useState(() => [...SERVICES]);
   const [booking, setBooking] = useState({ barber: 'any', formula: null, service: null, done: null });
   const [clientDay, setClientDay] = useState(0);
   const [barberDay, setBarberDay] = useState(0);
@@ -1444,6 +1573,7 @@ export default function App() {
       content = (
         <BarberDetailScreen
           barber={barbersLive.find((b) => b.id === barberDetail.id)}
+          services={services}
           toast={toast}
           onBack={() => setBarberDetail(null)}
           onBook={(id) => {
@@ -1455,7 +1585,7 @@ export default function App() {
       );
     } else if (tab === 'explore') content = <ExploreScreen barbers={barbersLive} openBarber={setBarberDetail} toast={toast} />;
     else if (tab === 'book') content = (
-      <BookScreen agenda={agenda} formulas={formulas} booking={booking} setBooking={setBooking}
+      <BookScreen agenda={agenda} formulas={formulas} services={services} booking={booking} setBooking={setBooking}
         dayIdx={clientDay} setDayIdx={setClientDay} onConfirm={confirmBooking} />
     );
     else if (tab === 'cuts') content = <CutsScreen toast={toast} />;
@@ -1467,7 +1597,7 @@ export default function App() {
         dayIdx={barberDay} setDayIdx={setBarberDay} toast={toast} />
     );
     else if (tab === 'formulas') content = (
-      <FormulasScreen formulas={formulas} setFormulas={setFormulas} toast={toast} />
+      <FormulasScreen formulas={formulas} setFormulas={setFormulas} services={services} setServices={setServices} toast={toast} />
     );
     else if (tab === 'planning') content = (
       <PlanningScreen agenda={agenda} dayIdx={barberDay} setDayIdx={setBarberDay} delay={enzoDelay} toast={toast} />
@@ -1781,4 +1911,28 @@ const s = StyleSheet.create({
     borderRadius: 14, paddingVertical: 13, paddingHorizontal: 18,
   },
   toastText: { color: C.text, fontSize: 12.5, textAlign: 'center' },
+
+  /* Calendrier mensuel */
+  cal: {
+    backgroundColor: C.surface, borderWidth: 1, borderColor: C.line,
+    borderRadius: 20, padding: 16, marginBottom: 16,
+  },
+  calHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  calMonth: { fontFamily: SERIF, fontSize: 15, fontWeight: '600', color: C.text, letterSpacing: 0.5 },
+  calGrid: { flexDirection: 'row', flexWrap: 'wrap' },
+  calCell: { width: '14.2857%', alignItems: 'center', paddingVertical: 3 },
+  calNumWrap: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  calNumOn: { backgroundColor: C.gold },
+  calNum: { fontSize: 12.5, color: C.text },
+  calWd: { fontSize: 10, color: C.muted, fontWeight: '500' },
+  calDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: 'transparent', marginTop: 2 },
+
+  /* Champ prix libre */
+  priceField: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: C.surface2, borderWidth: 1, borderColor: C.lineGold,
+    borderRadius: 12, paddingHorizontal: 12, paddingVertical: Platform.OS === 'ios' ? 10 : 7,
+    minWidth: 90,
+  },
+  priceInput: { color: C.text, fontSize: 14, padding: 0, minWidth: 50, textAlign: 'right' },
 });
