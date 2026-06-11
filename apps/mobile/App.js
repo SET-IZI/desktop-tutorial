@@ -1355,31 +1355,43 @@ function FormulasScreen({ formulas, setFormulas, services, setServices, toast })
   );
 }
 
-function PlanningScreen({ agenda, dayIdx, setDayIdx, delay, toast }) {
+function PlanningScreen({ agenda, setAgenda, dayIdx, setDayIdx, delay, toast }) {
   const day = DAYS[dayIdx];
   const slots = agenda.enzo[day.key] || {};
   const rdv = Object.entries(slots)
-    .filter(([, v]) => v.status === 'booked')
+    .filter(([, v]) => v.status === ‘booked’)
     .map(([time, v]) => ({ time, ...v }))
     .sort((a, b) => a.time.localeCompare(b.time));
   const ca = rdv.filter((r) => r.done).reduce((sum, r) => sum + r.price, 0);
   const todo = rdv.filter((r) => !r.done).length;
+
+  const cancel = (time, who) => {
+    setAgenda((a) => ({
+      ...a,
+      enzo: {
+        ...a.enzo,
+        [day.key]: { ...a.enzo[day.key], [time]: { status: ‘open’ } },
+      },
+    }));
+    toast(`Réservation de ${who} annulée — créneau ${time} réouvert.`);
+  };
+
   return (
     <ScrollView style={s.screen} contentContainerStyle={s.screenPad}>
       <Kicker>ESPACE BARBER · ENZO MOREAU</Kicker>
       <Title>Planning</Title>
       <View style={[s.row, { gap: 14, marginBottom: 16 }]}>
         <Badge status={delay} />
-        <Text style={s.btags}>{todo} à venir{ca > 0 ? ` · ${fmt(ca)} encaissés` : ''}</Text>
+        <Text style={s.btags}>{todo} à venir{ca > 0 ? ` · ${fmt(ca)} encaissés` : ‘’}</Text>
       </View>
       <Calendar sel={dayIdx} onSel={setDayIdx} markFor={(key) => {
         const vals = Object.values(agenda.enzo[key] || {});
-        return vals.some((v) => v.status === 'booked') ? 'booked' : null;
+        return vals.some((v) => v.status === ‘booked’) ? ‘booked’ : null;
       }} />
       <Text style={[s.btags, { marginVertical: 12 }]}>{DAYS[dayIdx].label}</Text>
       {rdv.length === 0 ? (
         <Text style={s.footnote}>
-          Aucune réservation ce jour.{'\n'}Ouvrez des créneaux dans l’onglet Créneaux pour recevoir des clients.
+          Aucune réservation ce jour.{‘\n’}Ouvrez des créneaux dans l’onglet Créneaux pour recevoir des clients.
         </Text>
       ) : (
         rdv.map((r) => (
@@ -1392,13 +1404,18 @@ function PlanningScreen({ agenda, dayIdx, setDayIdx, delay, toast }) {
             {r.done ? (
               <Feather name="check" size={17} color={C.green} />
             ) : (
-              <Text style={[s.price, { fontSize: 15 }]}>{fmt(r.price)}</Text>
+              <View style={[s.row, { gap: 12 }]}>
+                <Text style={[s.price, { fontSize: 15 }]}>{fmt(r.price)}</Text>
+                <TouchableOpacity onPress={() => cancel(r.time, r.who)} hitSlop={10}>
+                  <Feather name="x-circle" size={20} color={C.red} />
+                </TouchableOpacity>
+              </View>
             )}
           </View>
         ))
       )}
       <Btn ghost icon="camera" label="PHOTOS DE FIN DE PRESTATION"
-        onPress={() => toast('Appareil photo — 1 à 10 photos attachées à la prestation.')} />
+        onPress={() => toast(‘Appareil photo — 1 à 10 photos attachées à la prestation.’)} />
     </ScrollView>
   );
 }
@@ -1600,7 +1617,7 @@ export default function App() {
       <FormulasScreen formulas={formulas} setFormulas={setFormulas} services={services} setServices={setServices} toast={toast} />
     );
     else if (tab === 'planning') content = (
-      <PlanningScreen agenda={agenda} dayIdx={barberDay} setDayIdx={setBarberDay} delay={enzoDelay} toast={toast} />
+      <PlanningScreen agenda={agenda} setAgenda={setAgenda} dayIdx={barberDay} setDayIdx={setBarberDay} delay={enzoDelay} toast={toast} />
     );
     else if (tab === 'status') content = (
       <StatusScreen agenda={agenda} delay={enzoDelay} setDelay={setEnzoDelay} toast={toast} />
