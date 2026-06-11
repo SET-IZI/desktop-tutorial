@@ -470,8 +470,229 @@ function WelcomeScreen({ choose }) {
           <Feather name="arrow-right" size={18} color={C.gold} />
         </TouchableOpacity>
       ))}
-      <Text style={s.welcomeFoot}>Démo — aucune connexion requise</Text>
+      <Text style={s.welcomeFoot}>Démo — comptes fictifs, aucune donnée envoyée</Text>
     </View>
+  );
+}
+
+/* ───────── Authentification ───────── */
+function Field({ label, ...props }) {
+  return (
+    <>
+      <Text style={s.fieldLabel}>{label}</Text>
+      <TextInput style={s.input} placeholderTextColor="#5A5852" {...props} />
+    </>
+  );
+}
+
+function AuthScreen({ role, onSuccess, onBack }) {
+  const [mode, setMode] = useState('login');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState(null);
+  const signup = mode === 'signup';
+
+  const submit = () => {
+    if (!email.trim() || !password) {
+      setError('Renseignez votre e-mail et votre mot de passe.');
+      return;
+    }
+    if (signup && (!firstName.trim() || !lastName.trim())) {
+      setError('Renseignez votre prénom et votre nom.');
+      return;
+    }
+    if (signup && role === 'barber' && !phone.trim()) {
+      setError('Le téléphone est requis — vos clients doivent pouvoir vous joindre.');
+      return;
+    }
+    setError(null);
+    onSuccess(
+      {
+        firstName: firstName.trim() || 'Mathéo',
+        lastName: lastName.trim() || 'D.',
+        email: email.trim(),
+        role,
+        plan: null,
+      },
+      { isNew: signup },
+    );
+  };
+
+  return (
+    <ScrollView style={s.screen} contentContainerStyle={[s.screenPad, { paddingTop: 8 }]} keyboardShouldPersistTaps="handled">
+      <TouchableOpacity style={[s.circleBtn, { marginBottom: 22 }]} onPress={onBack} hitSlop={8}>
+        <Feather name="arrow-left" size={18} color={C.text} />
+      </TouchableOpacity>
+      <Kicker>{role === 'barber' ? 'ESPACE BARBER' : 'ESPACE CLIENT'}</Kicker>
+      <Title em={signup ? 'compte' : null}>{signup ? 'Créer un ' : 'Connexion'}</Title>
+      <Lead>
+        {signup
+          ? role === 'barber'
+            ? 'Quelques informations, votre abonnement, et vos premiers clients arrivent.'
+            : 'Une minute suffit — votre prochaine coupe vous attend.'
+          : 'Heureux de vous revoir.'}
+      </Lead>
+
+      {signup && (
+        <>
+          <Field label="PRÉNOM" placeholder="Mathéo" value={firstName} onChangeText={setFirstName} />
+          <Field label="NOM" placeholder="Dupont" value={lastName} onChangeText={setLastName} />
+        </>
+      )}
+      <Field label="E-MAIL" placeholder="vous@exemple.fr" autoCapitalize="none"
+        keyboardType="email-address" value={email} onChangeText={setEmail} />
+      {signup && role === 'barber' && (
+        <Field label="TÉLÉPHONE" placeholder="06 12 34 56 78" keyboardType="phone-pad"
+          value={phone} onChangeText={setPhone} />
+      )}
+      <Field label="MOT DE PASSE" placeholder="••••••••" secureTextEntry
+        value={password} onChangeText={setPassword} />
+
+      {error && <Text style={s.authError}>{error}</Text>}
+
+      <Btn label={signup ? (role === 'barber' ? 'CONTINUER — ABONNEMENT' : 'CRÉER MON COMPTE') : 'SE CONNECTER'} onPress={submit} />
+      <TouchableOpacity onPress={() => { setMode(signup ? 'login' : 'signup'); setError(null); }}
+        hitSlop={8} style={{ marginTop: 18, alignItems: 'center' }}>
+        <Text style={s.authLink}>
+          {signup ? 'Déjà inscrit ? Se connecter' : 'Pas encore de compte ? Créer un compte'}
+        </Text>
+      </TouchableOpacity>
+    </ScrollView>
+  );
+}
+
+/* Abonnement barber — l’app se rémunère sur l’outil, pas sur les coupes */
+const PLANS = [
+  {
+    id: 'starter', name: 'Starter', price: 2900, badge: null,
+    features: ['Agenda & créneaux en ligne', 'Jusqu’à 3 formules', 'Notifications clients', 'Statistiques de base'],
+  },
+  {
+    id: 'pro', name: 'Pro', price: 5900, badge: 'POPULAIRE',
+    features: ['Tout le Starter', 'Formules illimitées', 'Boutique intégrée', 'Statistiques avancées', 'Support prioritaire'],
+  },
+];
+
+function PlanScreen({ onChoose, onBack }) {
+  const [sel, setSel] = useState('pro');
+  return (
+    <ScrollView style={s.screen} contentContainerStyle={[s.screenPad, { paddingTop: 8 }]}>
+      <TouchableOpacity style={[s.circleBtn, { marginBottom: 22 }]} onPress={onBack} hitSlop={8}>
+        <Feather name="arrow-left" size={18} color={C.text} />
+      </TouchableOpacity>
+      <Kicker>ESPACE BARBER · ABONNEMENT</Kicker>
+      <Title em="formule">Votre </Title>
+      <Lead>14 jours d’essai offerts, sans engagement. Annulable à tout moment.</Lead>
+
+      {PLANS.map((p) => {
+        const on = sel === p.id;
+        return (
+          <TouchableOpacity key={p.id} style={[s.planCard, on && s.planCardOn]}
+            onPress={() => setSel(p.id)} activeOpacity={0.85}>
+            <View style={s.row}>
+              <Text style={[s.bname, { fontFamily: SERIF, fontSize: 19, fontWeight: '600' }, s.grow]}>{p.name}</Text>
+              {p.badge && (
+                <View style={s.planBadge}>
+                  <Text style={s.planBadgeText}>{p.badge}</Text>
+                </View>
+              )}
+            </View>
+            <Text style={s.planPrice}>
+              {fmt(p.price)}<Text style={{ fontSize: 13, color: C.muted }}> /mois</Text>
+            </Text>
+            <View style={{ marginTop: 10 }}>
+              {p.features.map((f) => (
+                <View key={f} style={s.planFeature}>
+                  <Feather name="check" size={13} color={on ? C.gold : C.green} />
+                  <Text style={[s.softText, { color: on ? C.text : C.soft }]}>{f}</Text>
+                </View>
+              ))}
+            </View>
+          </TouchableOpacity>
+        );
+      })}
+
+      <Btn label="CONTINUER — PAIEMENT" onPress={() => onChoose(sel)} />
+      <Text style={s.footnote}>L’abonnement finance l’outil : aucune commission sur vos prestations.</Text>
+    </ScrollView>
+  );
+}
+
+function PayScreen({ user, plan, onConfirm, onBack }) {
+  const p = PLANS.find((x) => x.id === plan);
+  const [cardNum, setCardNum] = useState('');
+  const [holder, setHolder] = useState(`${user.firstName} ${user.lastName}`);
+  const [expiry, setExpiry] = useState('');
+  const [cvv, setCvv] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const fmtCard = (t) => {
+    const digits = t.replace(/\D/g, '').slice(0, 16);
+    setCardNum(digits.replace(/(.{4})/g, '$1 ').trim());
+  };
+  const fmtExpiry = (t) => {
+    const digits = t.replace(/\D/g, '').slice(0, 4);
+    setExpiry(digits.length > 2 ? digits.slice(0, 2) + '/' + digits.slice(2) : digits);
+  };
+
+  const pay = () => {
+    if (cardNum.replace(/\D/g, '').length < 16 || expiry.length < 5 || cvv.length < 3) {
+      setError('Vérifiez les informations de votre carte.');
+      return;
+    }
+    setError(null);
+    setLoading(true);
+    setTimeout(onConfirm, 1400);
+  };
+
+  return (
+    <ScrollView style={s.screen} contentContainerStyle={[s.screenPad, { paddingTop: 8 }]} keyboardShouldPersistTaps="handled">
+      <TouchableOpacity style={[s.circleBtn, { marginBottom: 22 }]} onPress={onBack} hitSlop={8}>
+        <Feather name="arrow-left" size={18} color={C.text} />
+      </TouchableOpacity>
+      <Kicker>PAIEMENT SÉCURISÉ</Kicker>
+      <Title>Récapitulatif</Title>
+
+      <View style={[s.card, { borderColor: C.lineGold }]}>
+        <View style={s.row}>
+          <View style={s.grow}>
+            <Text style={[s.bname, { fontSize: 15 }]}>BarberPro {p.name}</Text>
+            <Text style={[s.btags, { marginTop: 3 }]}>14 jours d’essai puis {fmt(p.price)}/mois · sans engagement</Text>
+          </View>
+          <Text style={[s.price, { fontSize: 20 }]}>{fmt(p.price)}</Text>
+        </View>
+      </View>
+
+      <Section>Carte bancaire</Section>
+      <Field label="NUMÉRO DE CARTE" placeholder="4242 4242 4242 4242" keyboardType="numeric"
+        value={cardNum} onChangeText={fmtCard} />
+      <Field label="TITULAIRE" placeholder="Prénom Nom" value={holder} onChangeText={setHolder} />
+      <View style={[s.row, { gap: 11, alignItems: 'flex-start' }]}>
+        <View style={s.grow}>
+          <Field label="EXPIRATION" placeholder="MM/AA" keyboardType="numeric"
+            value={expiry} onChangeText={fmtExpiry} />
+        </View>
+        <View style={s.grow}>
+          <Field label="CVV" placeholder="123" keyboardType="numeric" secureTextEntry maxLength={4}
+            value={cvv} onChangeText={setCvv} />
+        </View>
+      </View>
+
+      {error && <Text style={s.authError}>{error}</Text>}
+
+      {loading ? (
+        <View style={[s.btn, { backgroundColor: 'transparent', borderWidth: 1, borderColor: C.lineGold }]}>
+          <ActivityIndicator size="small" color={C.gold} />
+        </View>
+      ) : (
+        <Btn icon="lock" label={`S’ABONNER · ${fmt(p.price)}/MOIS`} onPress={pay} />
+      )}
+      <Text style={s.footnote}>Démo — aucun prélèvement réel. Paiement Stripe dans la version connectée.</Text>
+    </ScrollView>
   );
 }
 
@@ -497,7 +718,7 @@ function BigCard({ b, onPress }) {
   );
 }
 
-function ExploreScreen({ barbers, openBarber, toast }) {
+function ExploreScreen({ barbers, user, openBarber, toast }) {
   const [query, setQuery] = useState('');
   const [style, setStyle] = useState(null);
   const [city, setCity] = useState('');
@@ -559,7 +780,7 @@ function ExploreScreen({ barbers, openBarber, toast }) {
   return (
     <ScrollView style={s.screen} contentContainerStyle={s.screenPad} keyboardShouldPersistTaps="handled">
       <Kicker>{hello}</Kicker>
-      <Title>Mathéo</Title>
+      <Title>{user ? user.firstName : 'Bienvenue'}</Title>
       <View style={s.locRow}>
         {editingLoc ? (
           <>
@@ -1039,12 +1260,12 @@ function ShopScreen({ cat, setCat, cart, addCart, toast }) {
   );
 }
 
-function MeScreen({ points, upcoming, onLogout }) {
+function MeScreen({ user, points, upcoming, onLogout }) {
   return (
     <ScrollView style={s.screen} contentContainerStyle={s.screenPad}>
       <Kicker>ESPACE PERSONNEL</Kicker>
-      <Title>Mathéo</Title>
-      <Lead>Membre depuis mars 2026</Lead>
+      <Title>{user ? user.firstName : 'Profil'}</Title>
+      <Lead>{user ? user.email : 'Membre depuis mars 2026'}</Lead>
       <View style={[s.card, { borderColor: C.lineGold }]}>
         <View style={s.row}>
           <View style={s.grow}>
@@ -1086,7 +1307,7 @@ function MeScreen({ points, upcoming, onLogout }) {
           Carte bancaire, Apple Pay, Google Pay ou sur place. Acompte selon la prestation.
         </Text>
       </View>
-      <Btn ghost icon="repeat" label="CHANGER D’ESPACE" onPress={onLogout} />
+      <Btn ghost icon="log-out" label="SE DÉCONNECTER" onPress={onLogout} />
     </ScrollView>
   );
 }
@@ -1575,6 +1796,9 @@ const BARBER_TABS = [
 
 export default function App() {
   const [role, setRole] = useState(null); // null | 'client' | 'barber'
+  const [user, setUser] = useState(null); // { firstName, lastName, email, role, plan }
+  const [authStep, setAuthStep] = useState(null); // null | { role } — flow connexion/inscription
+  const [authSubStep, setAuthSubStep] = useState(null); // null | 'plan' | 'pay' — abonnement barber
   const [tab, setTab] = useState('explore');
   const [barberDetail, setBarberDetail] = useState(null);
   const [agenda, setAgenda] = useState(initAgenda);
@@ -1604,9 +1828,34 @@ export default function App() {
     }, 3200);
   };
 
-  const choose = (r) => {
-    setRole(r);
-    setTab(r === 'client' ? 'explore' : 'slots');
+  const choose = (r) => setAuthStep({ role: r });
+
+  const finalizeLogin = (u) => {
+    setUser(u);
+    setRole(u.role);
+    setTab(u.role === 'client' ? 'explore' : 'slots');
+    setAuthStep(null);
+    setAuthSubStep(null);
+    setBarberDetail(null);
+    toast(u.role === 'barber'
+      ? `Bienvenue ${u.firstName} — votre espace barber est prêt.`
+      : `Bienvenue ${u.firstName} !`);
+  };
+
+  const onAuthSuccess = (u, { isNew }) => {
+    if (u.role === 'barber' && isNew) {
+      setUser(u); // en attente du choix d’abonnement
+      setAuthSubStep('plan');
+    } else {
+      finalizeLogin(u);
+    }
+  };
+
+  const logout = () => {
+    setRole(null);
+    setUser(null);
+    setAuthStep(null);
+    setAuthSubStep(null);
     setBarberDetail(null);
   };
 
@@ -1621,7 +1870,7 @@ export default function App() {
         ...a[slot.barber.id],
         [day.key]: {
           ...a[slot.barber.id][day.key],
-          [slot.time]: { status: 'booked', who: 'Mathéo', serv: servLabel, price: quote.price, done: false },
+          [slot.time]: { status: 'booked', who: user ? `${user.firstName} ${user.lastName[0]}.` : 'Client', serv: servLabel, price: quote.price, done: false },
         },
       },
     }));
@@ -1663,14 +1912,14 @@ export default function App() {
           }}
         />
       );
-    } else if (tab === 'explore') content = <ExploreScreen barbers={barbersLive} openBarber={setBarberDetail} toast={toast} />;
+    } else if (tab === 'explore') content = <ExploreScreen barbers={barbersLive} user={user} openBarber={setBarberDetail} toast={toast} />;
     else if (tab === 'book') content = (
       <BookScreen agenda={agenda} formulas={formulas} services={services} booking={booking} setBooking={setBooking}
         dayIdx={clientDay} setDayIdx={setClientDay} onConfirm={confirmBooking} />
     );
     else if (tab === 'cuts') content = <CutsScreen toast={toast} />;
     else if (tab === 'shop') content = <ShopScreen cat={cat} setCat={setCat} cart={cart} addCart={addCart} toast={toast} />;
-    else content = <MeScreen points={points} upcoming={upcoming} onLogout={() => setRole(null)} />;
+    else content = <MeScreen user={user} points={points} upcoming={upcoming} onLogout={logout} />;
   } else if (role === 'barber') {
     if (tab === 'slots') content = (
       <SlotsScreen agenda={agenda} setAgenda={setAgenda} daycfg={daycfg} setDaycfg={setDaycfg}
@@ -1693,8 +1942,23 @@ export default function App() {
   return (
     <SafeAreaView style={s.root}>
       <StatusBar barStyle="light-content" backgroundColor={C.bg} />
-      {role === null ? (
+      {role === null && authStep === null ? (
         <WelcomeScreen choose={choose} />
+      ) : authStep !== null ? (
+        authSubStep === 'plan' ? (
+          <PlanScreen
+            onChoose={(plan) => { setUser((u) => ({ ...u, plan })); setAuthSubStep('pay'); }}
+            onBack={() => setAuthSubStep(null)}
+          />
+        ) : authSubStep === 'pay' ? (
+          <PayScreen user={user} plan={user.plan}
+            onConfirm={() => finalizeLogin(user)}
+            onBack={() => setAuthSubStep('plan')}
+          />
+        ) : (
+          <AuthScreen role={authStep.role} onSuccess={onAuthSuccess}
+            onBack={() => setAuthStep(null)} />
+        )
       ) : (
         <>
           <View style={s.header}>
@@ -1702,7 +1966,7 @@ export default function App() {
             <Text style={s.wordmark}>
               Barber<Text style={{ color: C.gold, fontStyle: 'italic' }}>Pro</Text>
             </Text>
-            <TouchableOpacity style={s.switchBtn} onPress={() => setRole(null)} hitSlop={10}>
+            <TouchableOpacity style={s.switchBtn} onPress={logout} hitSlop={10}>
               <Feather name="repeat" size={15} color={C.muted} />
             </TouchableOpacity>
           </View>
@@ -2016,4 +2280,19 @@ const s = StyleSheet.create({
     minWidth: 90,
   },
   priceInput: { color: C.text, fontSize: 14, padding: 0, minWidth: 50, textAlign: 'right' },
+
+  /* Authentification & abonnement */
+  authError: { color: C.red, fontSize: 12, marginTop: 12, lineHeight: 17 },
+  authLink: { color: C.gold, fontSize: 12.5, textDecorationLine: 'underline' },
+  planCard: {
+    backgroundColor: C.surface, borderWidth: 1, borderColor: C.line,
+    borderRadius: 20, padding: 18, marginBottom: 12,
+  },
+  planCardOn: { borderColor: C.gold, backgroundColor: 'rgba(200,169,106,0.06)' },
+  planBadge: {
+    backgroundColor: C.gold, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 3.5,
+  },
+  planBadgeText: { color: C.ink, fontSize: 9, fontWeight: '700', letterSpacing: 1.2 },
+  planPrice: { fontFamily: SERIF, fontSize: 26, fontWeight: '700', color: C.gold, marginTop: 6 },
+  planFeature: { flexDirection: 'row', alignItems: 'center', gap: 9, paddingVertical: 4 },
 });
