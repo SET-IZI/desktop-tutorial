@@ -48,6 +48,11 @@ const SMALL = SCREEN_W < 370;
 
 /* ───────── Données de démonstration ───────── */
 const TEX = ['#211D15', '#181B20', '#1F1715', '#161B17'];
+const COVER_COLORS = [
+  '#211D15', '#181B20', '#1F1715', '#161B17',
+  '#1A1520', '#151A18', '#0F1520', '#1A1810',
+  '#1C1014', '#0E1518',
+];
 
 const DELAY = {
   ON_TIME: { dot: C.green, label: 'À l’heure' },
@@ -896,7 +901,7 @@ function BarberDetailScreen({ barber, services, onBack, onBook, toast }) {
     <View style={{ flex: 1 }}>
       <ScrollView style={s.screen} contentContainerStyle={{ paddingBottom: 120 }}>
         {/* Hero */}
-        <View style={[s.heroArt, { backgroundColor: TEX[barber.tex] }]}>
+        <View style={[s.heroArt, { backgroundColor: barber.coverColor || TEX[barber.tex] }]}>
           <Text style={s.heroIni}>{barber.ini}</Text>
           <View style={s.heroTop}>
             <TouchableOpacity style={s.circleBtn} onPress={onBack} hitSlop={8}>
@@ -958,14 +963,16 @@ function BarberDetailScreen({ barber, services, onBack, onBook, toast }) {
               </ScrollView>
 
               <Section>Lieu de coupe</Section>
-              <View style={[s.place, { backgroundColor: TEX[(barber.tex + 1) % 4] }]}>
-                <Feather name={barber.venue === 'domicile' ? 'home' : 'image'} size={26} color="rgba(200,169,106,0.45)" />
+              <View style={[s.place, { backgroundColor: barber.coverColor || TEX[(barber.tex + 1) % 4] }]}>
+                <Feather name={barber.venue === 'domicile' ? 'home' : barber.venue === 'studio' ? 'star' : 'scissors'} size={26} color="rgba(200,169,106,0.45)" />
                 <Text style={s.placeLabel}>
-                  {barber.venue === 'domicile' ? 'Chez vous — il apporte tout' : barber.salon}
+                  {barber.venue === 'domicile'
+                    ? `Chez vous — ${barber.address}`
+                    : `${VENUES[barber.venue] || 'En salon'} · ${barber.salon}`}
                 </Text>
-              </View>
-              <View style={[s.place, { height: 96, backgroundColor: TEX[(barber.tex + 2) % 4] }]}>
-                <Feather name="image" size={22} color="rgba(200,169,106,0.45)" />
+                {barber.address && barber.venue !== 'domicile' && (
+                  <Text style={[s.placeLabel, { opacity: 0.7 }]}>{barber.address}</Text>
+                )}
               </View>
 
               <Section>Compétences</Section>
@@ -1320,7 +1327,16 @@ function MeScreen({ user, points, upcoming, onLogout }) {
 /* ───────── Espace BARBER (connecté : Enzo Moreau) ───────── */
 const STEP_CHOICES = [15, 20, 30, 45, 60];
 
-function SlotsScreen({ agenda, setAgenda, daycfg, setDaycfg, dayIdx, setDayIdx, toast }) {
+// Base clients de démonstration — dans la version connectée, ce serait une vraie BDD
+const INIT_CLIENTS = [
+  { id: 'c1', firstName: 'Karim', lastName: 'Doukali', phone: '06 11 22 33 44', notes: 'Burst fade court sur les côtés' },
+  { id: 'c2', firstName: 'Lucas', lastName: 'Bernard', phone: '06 55 66 77 88', notes: 'Coupe classique, pas trop court' },
+  { id: 'c3', firstName: 'Mehdi', lastName: 'Ait', phone: '06 99 00 11 22', notes: 'Barbe uniquement' },
+  { id: 'c4', firstName: 'Sacha', lastName: 'Laurent', phone: '07 12 34 56 78', notes: 'Transformation — avant/après photos' },
+  { id: 'c5', firstName: 'Noah', lastName: 'Petit', phone: '07 98 76 54 32', notes: 'Coupe enfant' },
+];
+
+function SlotsScreen({ agenda, setAgenda, daycfg, setDaycfg, clients, setClients, services, dayIdx, setDayIdx, toast }) {
   const day = DAYS[dayIdx];
   const step = daycfg[day.key] || 30;
   const slots = agenda.enzo[day.key] || {};
@@ -1353,6 +1369,52 @@ function SlotsScreen({ agenda, setAgenda, daycfg, setDaycfg, dayIdx, setDayIdx, 
       else delete d[time];
     });
   };
+
+  // ── Réservation manuelle par le barber ──
+  const [bookModal, setBookModal] = useState(null); // { time } | null
+  const [clientSearch, setClientSearch] = useState('');
+  const [selectedClient, setSelectedClient] = useState(null);
+  const [selectedService, setSelectedService] = useState(null);
+  const [addingClient, setAddingClient] = useState(false);
+  const [newCFn, setNewCFn] = useState('');
+  const [newCLn, setNewCLn] = useState('');
+  const [newCPh, setNewCPh] = useState('');
+
+  const openBookModal = (time) => {
+    if (slots[time]?.status === 'booked') { toast(`${time} — déjà réservé.`); return; }
+    if (!slots[time] || slots[time].status === 'closed') {
+      toast('Ouvrez d\'abord ce créneau.'); return;
+    }
+    setBookModal({ time });
+    setClientSearch('');
+    setSelectedClient(null);
+    setSelectedService(null);
+    setAddingClient(false);
+  };
+
+  const confirmManualBook = () => {
+    if (!selectedClient || !selectedService) { toast('Choisissez un client et une prestation.'); return; }
+    const who = `${selectedClient.firstName} ${selectedClient.lastName[0]}.`;
+    update((d) => {
+      d[bookModal.time] = { status: 'booked', who, serv: selectedService.name, price: selectedService.price, done: false };
+    });
+    toast(`${who} · ${selectedService.name} · ${bookModal.time} — réservation posée.`);
+    setBookModal(null);
+  };
+
+  const saveNewClient = () => {
+    if (!newCFn.trim() || !newCLn.trim()) { toast('Prénom et nom requis.'); return; }
+    const c = { id: 'c' + Date.now(), firstName: newCFn.trim(), lastName: newCLn.trim(), phone: newCPh.trim(), notes: '' };
+    setClients((cs) => [...cs, c]);
+    setSelectedClient(c);
+    setAddingClient(false);
+    setNewCFn(''); setNewCLn(''); setNewCPh('');
+    toast(`${c.firstName} ${c.lastName} ajouté à la base clients.`);
+  };
+
+  const filteredClients = clientSearch.trim()
+    ? clients.filter((c) => `${c.firstName} ${c.lastName} ${c.phone}`.toLowerCase().includes(clientSearch.toLowerCase()))
+    : clients;
 
   // Changement de durée : les réservations sont conservées, les créneaux
   // ouverts/pauses alignés sur la nouvelle grille aussi.
@@ -1430,6 +1492,7 @@ function SlotsScreen({ agenda, setAgenda, daycfg, setDaycfg, dayIdx, setDayIdx, 
                 st === 'booked' && s.slotBooked,
               ]}
               onPress={() => cycle(time)}
+              onLongPress={() => st === 'open' && openBookModal(time)}
               activeOpacity={0.75}
             >
               <Text style={[s.slotCellTime, st === 'closed' && { color: '#5A5852' }, st === 'booked' && { color: C.ink }]}>
@@ -1450,6 +1513,9 @@ function SlotsScreen({ agenda, setAgenda, daycfg, setDaycfg, dayIdx, setDayIdx, 
           );
         })}
       </View>
+      <Text style={[s.footnote, { marginTop: 4 }]}>
+        Appui long sur un créneau ouvert pour réserver directement pour un client.
+      </Text>
 
       <Section>Actions rapides</Section>
       <View style={s.wrap}>
@@ -1462,6 +1528,75 @@ function SlotsScreen({ agenda, setAgenda, daycfg, setDaycfg, dayIdx, setDayIdx, 
         La durée se règle jour par jour — 20 min pour les coupes rapides, 60 min pour les transformations.
         Les pauses et les créneaux fermés sont invisibles côté client ; les réservations existantes sont toujours conservées.
       </Text>
+
+      {/* ── Modale réservation manuelle ── */}
+      {bookModal && (
+        <View style={s.modalOverlay}>
+          <View style={s.modal}>
+            <View style={[s.row, { marginBottom: 16 }]}>
+              <Text style={[s.bname, { fontFamily: SERIF, fontSize: 17, flex: 1 }]}>
+                Réserver · {bookModal.time}
+              </Text>
+              <TouchableOpacity onPress={() => setBookModal(null)} hitSlop={10}>
+                <Feather name="x" size={20} color={C.muted} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Sélection prestation */}
+            <Text style={s.fieldLabel}>PRESTATION</Text>
+            <View style={[s.wrap, { marginBottom: 12 }]}>
+              {services.map((sv) => (
+                <Chip key={sv.id} mini label={sv.name} price={fmt(sv.price)}
+                  on={selectedService?.id === sv.id}
+                  onPress={() => setSelectedService(sv)} />
+              ))}
+            </View>
+
+            {/* Recherche client */}
+            <Text style={s.fieldLabel}>CLIENT</Text>
+            {!addingClient ? (
+              <>
+                <View style={[s.search, { marginBottom: 8 }]}>
+                  <Feather name="search" size={14} color={C.muted} />
+                  <TextInput style={s.searchInput} placeholder="Chercher par nom ou téléphone…"
+                    placeholderTextColor="#5A5852" value={clientSearch} onChangeText={setClientSearch} />
+                </View>
+                <View style={{ maxHeight: 180 }}>
+                  <ScrollView nestedScrollEnabled>
+                    {filteredClients.map((c) => (
+                      <TouchableOpacity key={c.id}
+                        style={[s.clientRow, selectedClient?.id === c.id && s.clientRowOn]}
+                        onPress={() => setSelectedClient(c)} activeOpacity={0.8}>
+                        <View style={s.grow}>
+                          <Text style={[s.bname, { fontSize: 13.5 }]}>{c.firstName} {c.lastName}</Text>
+                          {c.phone ? <Text style={s.btags}>{c.phone}</Text> : null}
+                          {c.notes ? <Text style={[s.btags, { fontStyle: 'italic' }]} numberOfLines={1}>{c.notes}</Text> : null}
+                        </View>
+                        {selectedClient?.id === c.id && <Feather name="check-circle" size={16} color={C.gold} />}
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+                <TouchableOpacity onPress={() => setAddingClient(true)} style={{ marginTop: 8 }} hitSlop={6}>
+                  <Text style={s.authLink}>+ Nouveau client</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <View style={[s.card, { borderColor: C.lineGold, marginBottom: 0 }]}>
+                <Field label="PRÉNOM" placeholder="Prénom" value={newCFn} onChangeText={setNewCFn} />
+                <Field label="NOM" placeholder="Nom" value={newCLn} onChangeText={setNewCLn} />
+                <Field label="TÉLÉPHONE" placeholder="06 …" keyboardType="phone-pad" value={newCPh} onChangeText={setNewCPh} />
+                <Btn label="ENREGISTRER" onPress={saveNewClient} />
+                <Btn ghost label="ANNULER" onPress={() => setAddingClient(false)} />
+              </View>
+            )}
+
+            {!addingClient && (
+              <Btn label="CONFIRMER LA RÉSERVATION" onPress={confirmManualBook} />
+            )}
+          </View>
+        </View>
+      )}
     </ScrollView>
   );
 }
@@ -1790,6 +1925,8 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, onPreview, to
   const [bio, setBio] = useState(enzo.bio);
   const [address, setAddress] = useState(enzo.address);
   const [salon, setSalon] = useState(enzo.salon);
+  const [ini, setIni] = useState(enzo.ini);
+  const [zone, setZone] = useState(enzo.address);
   const [tagInput, setTagInput] = useState('');
   const [addingProduct, setAddingProduct] = useState(false);
   const [pName, setPName] = useState('');
@@ -1812,9 +1949,9 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, onPreview, to
     const id = 'ph' + Date.now();
     const count = (enzo.photos || []).length;
     updateEnzo((b) => ({
-      photos: [...(b.photos || []), { id, label: 'Photo ' + (count + 1), tex: count % 4 }],
+      photos: [...(b.photos || []), { id, label: 'Prestation ' + (count + 1), tex: count % 4 }],
     }));
-    toast('Photo ajoutée — modifiez le label en appuyant dessus.');
+    toast('Photo ajoutée.');
   };
 
   const updateProductLocal = (pid, changes) =>
@@ -1836,6 +1973,8 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, onPreview, to
     toast(`« ${pName.trim()} » ajouté à la boutique.`);
   };
 
+  const curCover = enzo.coverColor || TEX[enzo.tex];
+
   return (
     <ScrollView style={s.screen} contentContainerStyle={s.screenPad} keyboardShouldPersistTaps="handled">
       <Kicker>ESPACE BARBER · ENZO MOREAU</Kicker>
@@ -1844,37 +1983,78 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, onPreview, to
 
       <Btn icon="eye" label="APERÇU — VUE CLIENT" onPress={onPreview} />
 
-      {/* Nom du salon */}
-      <Section>Nom du salon</Section>
-      <TextInput style={s.input} value={salon} onChangeText={setSalon}
-        placeholder="Nom du salon" placeholderTextColor="#5A5852" />
-      <Btn ghost label="ENREGISTRER LE NOM" onPress={() => {
-        updateEnzo(() => ({ salon: salon.trim() }));
-        toast('Nom du salon mis à jour.');
+      {/* ── Photo de couverture ── */}
+      <Section>Photo de couverture</Section>
+      {/* mini-hero preview */}
+      <View style={[s.coverPreview, { backgroundColor: curCover }]}>
+        <Text style={s.coverPreviewIni}>{enzo.ini}</Text>
+        <View style={s.coverPreviewBadge}>
+          <Text style={s.bigVenueText}>{VENUES[enzo.venue] || 'En salon'}</Text>
+        </View>
+      </View>
+      <Text style={s.fieldLabel}>COULEUR DE FOND</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+        <View style={[s.row, { gap: 9 }]}>
+          {COVER_COLORS.map((col) => (
+            <TouchableOpacity key={col}
+              style={[s.swatch, { backgroundColor: col }, curCover === col && s.swatchOn]}
+              onPress={() => { updateEnzo(() => ({ coverColor: col })); toast('Couleur de couverture mise à jour.'); }}>
+              {curCover === col && <Feather name="check" size={14} color={C.gold} />}
+            </TouchableOpacity>
+          ))}
+        </View>
+      </ScrollView>
+      <Field label="INITIALES (2-3 lettres)" placeholder="EM" value={ini} onChangeText={(t) => setIni(t.toUpperCase().slice(0, 3))} />
+      <Btn ghost label="ENREGISTRER LES INITIALES" onPress={() => {
+        if (!ini.trim()) return;
+        updateEnzo(() => ({ ini: ini.trim() }));
+        toast('Initiales mises à jour.');
       }} />
 
-      {/* Description */}
+      {/* ── Lieu de coupe ── */}
+      <Section>Lieu de coupe</Section>
+      <View style={s.wrap}>
+        {[['salon', 'En salon', 'scissors'], ['studio', 'Studio privé', 'star'], ['domicile', 'À domicile', 'home']].map(([key, label, icon]) => (
+          <TouchableOpacity key={key}
+            style={[s.opt, enzo.venue === key && s.optOn, { flexDirection: 'row', gap: 8, paddingVertical: 12, paddingHorizontal: 14, marginBottom: 8 }]}
+            onPress={() => { updateEnzo(() => ({ venue: key })); toast(`Lieu : ${label}.`); }}
+            activeOpacity={0.8}>
+            <Feather name={icon} size={16} color={enzo.venue === key ? C.gold : C.muted} />
+            <Text style={[s.optText, { fontSize: 13 }]}>{label}</Text>
+            {enzo.venue === key && <Text style={[s.optActive, s.grow, { textAlign: 'right' }]}>ACTIF</Text>}
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* ── Nom du salon / Zone ── */}
+      {enzo.venue !== 'domicile' ? (
+        <>
+          <Section>Nom du {enzo.venue === 'studio' ? 'studio' : 'salon'}</Section>
+          <TextInput style={s.input} value={salon} onChangeText={setSalon}
+            placeholder="Nom du lieu" placeholderTextColor="#5A5852" />
+          <Btn ghost label="ENREGISTRER LE NOM" onPress={() => { updateEnzo(() => ({ salon: salon.trim() })); toast('Nom mis à jour.'); }} />
+          <Section>Adresse</Section>
+          <TextInput style={s.input} value={address} onChangeText={setAddress}
+            placeholder="Adresse complète" placeholderTextColor="#5A5852" />
+          <Btn ghost label="ENREGISTRER L’ADRESSE" onPress={() => { updateEnzo(() => ({ address: address.trim() })); toast('Adresse mise à jour.'); }} />
+        </>
+      ) : (
+        <>
+          <Section>Zone de déplacement</Section>
+          <TextInput style={s.input} value={zone} onChangeText={setZone}
+            placeholder="Ex. Lille, La Madeleine, Lambersart…" placeholderTextColor="#5A5852" />
+          <Btn ghost label="ENREGISTRER LA ZONE" onPress={() => { updateEnzo(() => ({ address: zone.trim() })); toast('Zone de déplacement mise à jour.'); }} />
+        </>
+      )}
+
+      {/* ── Description ── */}
       <Section>Description</Section>
-      <TextInput
-        style={[s.input, { height: 90, textAlignVertical: 'top', paddingTop: 10 }]}
+      <TextInput style={[s.input, { height: 90, textAlignVertical: 'top', paddingTop: 10 }]}
         multiline value={bio} onChangeText={setBio}
-        placeholder="Votre bio courte…" placeholderTextColor="#5A5852"
-      />
-      <Btn ghost label="ENREGISTRER LA BIO" onPress={() => {
-        updateEnzo(() => ({ bio: bio.trim() }));
-        toast('Bio mise à jour.');
-      }} />
+        placeholder="Votre bio courte…" placeholderTextColor="#5A5852" />
+      <Btn ghost label="ENREGISTRER LA BIO" onPress={() => { updateEnzo(() => ({ bio: bio.trim() })); toast('Bio mise à jour.'); }} />
 
-      {/* Adresse */}
-      <Section>Adresse du salon</Section>
-      <TextInput style={s.input} value={address} onChangeText={setAddress}
-        placeholder="Adresse complète" placeholderTextColor="#5A5852" />
-      <Btn ghost label="ENREGISTRER L’ADRESSE" onPress={() => {
-        updateEnzo(() => ({ address: address.trim() }));
-        toast('Adresse mise à jour.');
-      }} />
-
-      {/* Spécialités */}
+      {/* ── Spécialités ── */}
       <Section>Spécialités</Section>
       <View style={[s.wrap, { gap: 6, marginBottom: 10 }]}>
         {enzo.tags.map((t) => (
@@ -1895,13 +2075,13 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, onPreview, to
         </TouchableOpacity>
       </View>
 
-      {/* Photos */}
-      <Section note="appuyez sur ✕ pour supprimer">Photos</Section>
+      {/* ── Photos de prestations ── */}
+      <Section note="résultats de coupes — appuyez sur ✕ pour supprimer">Photos de prestations</Section>
       <ScrollView horizontal showsHorizontalScrollIndicator={false}
         style={{ marginBottom: 6, overflow: 'visible' }}
-        contentContainerStyle={{ overflow: 'visible', paddingTop: 10, paddingBottom: 4 }}>
+        contentContainerStyle={{ paddingTop: 10, paddingBottom: 4 }}>
         {(enzo.photos || []).map((ph) => (
-          <View key={ph.id} style={{ position: 'relative', marginRight: 12, overflow: 'visible' }}>
+          <View key={ph.id} style={{ position: 'relative', marginRight: 12 }}>
             <Photo label={ph.label} tex={ph.tex} />
             <TouchableOpacity style={s.photoRemove}
               onPress={() => { updateEnzo((b) => ({ photos: b.photos.filter((p) => p.id !== ph.id) })); toast('Photo supprimée.'); }}
@@ -1916,7 +2096,7 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, onPreview, to
         </TouchableOpacity>
       </ScrollView>
 
-      {/* Boutique */}
+      {/* ── Boutique ── */}
       <Section note="modifiez le prix ou supprimez">Boutique — mes produits</Section>
       {products.map((p) => (
         <View key={p.id} style={[s.card, s.row, { gap: 10 }]}>
@@ -2007,6 +2187,7 @@ export default function App() {
   const [barbers, setBarbers] = useState(() => [...BARBERS]);
   const [products, setProducts] = useState(() => [...PRODUCTS]);
   const [barberPreview, setBarberPreview] = useState(false);
+  const [clients, setClients] = useState(() => [...INIT_CLIENTS]);
 
   const barbersLive = barbers.map((b) => (b.id === 'enzo' ? { ...b, delay: enzoDelay } : b));
 
@@ -2114,6 +2295,8 @@ export default function App() {
   } else if (role === 'barber') {
     if (tab === 'slots') content = (
       <SlotsScreen agenda={agenda} setAgenda={setAgenda} daycfg={daycfg} setDaycfg={setDaycfg}
+        clients={clients} setClients={setClients}
+        services={services}
         dayIdx={barberDay} setDayIdx={setBarberDay} toast={toast} />
     );
     else if (tab === 'formulas') content = (
@@ -2523,4 +2706,40 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: C.lineGold,
     alignItems: 'center', justifyContent: 'center',
   },
+
+  /* Cover picker */
+  coverPreview: {
+    height: 120, borderRadius: 18, borderWidth: 1, borderColor: C.line,
+    alignItems: 'center', justifyContent: 'center', marginBottom: 14, overflow: 'hidden',
+  },
+  coverPreviewIni: { fontFamily: SERIF, fontSize: 52, fontWeight: '600', color: 'rgba(230,207,160,0.4)' },
+  coverPreviewBadge: {
+    position: 'absolute', top: 10, left: 10,
+    backgroundColor: 'rgba(10,10,11,0.75)', borderWidth: 1, borderColor: C.lineGold,
+    borderRadius: 999, paddingHorizontal: 9, paddingVertical: 4,
+  },
+  swatch: {
+    width: 36, height: 36, borderRadius: 18,
+    borderWidth: 2, borderColor: 'transparent',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  swatchOn: { borderColor: C.gold },
+
+  /* Modal réservation manuelle (Créneaux) */
+  modalOverlay: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.72)', zIndex: 100,
+    justifyContent: 'flex-end',
+  },
+  modal: {
+    backgroundColor: C.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    padding: 20, paddingBottom: 36, maxHeight: '80%',
+  },
+  clientRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingVertical: 10, paddingHorizontal: 12,
+    borderRadius: 12, borderWidth: 1, borderColor: C.line,
+    marginBottom: 6,
+  },
+  clientRowOn: { borderColor: C.gold, backgroundColor: 'rgba(200,169,106,0.07)' },
 });
