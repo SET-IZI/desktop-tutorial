@@ -76,6 +76,12 @@ const BARBERS = [
     tags: ['Burst Fade', 'Fade', 'Dégradé américain', 'Barbe'],
     bio: 'Spécialiste du burst fade et du dégradé américain depuis huit ans. Précision du trait, finitions au rasoir.',
     story: 'Tout a commencé à 16 ans, une tondeuse à la main, dans le garage familial. Après un CAP coiffure et cinq ans dans les salons du Vieux-Lille, j’ai rejoint BarberPro pour y imposer ma signature : des dégradés au millimètre, jamais pressés, toujours finis au rasoir. Chaque client repart avec des conseils d’entretien personnalisés.',
+    photos: [
+      { id: 'ph1', label: 'Burst Fade', tex: 0 },
+      { id: 'ph2', label: 'Dégradé', tex: 1 },
+      { id: 'ph3', label: 'Barbe', tex: 2 },
+      { id: 'ph4', label: 'Finitions', tex: 3 },
+    ],
     reviews: [
       { who: 'Karim', note: 5, txt: 'Le meilleur burst fade de la ville. Je ne vais plus nulle part ailleurs.' },
       { who: 'Lucas', note: 5, txt: 'Toujours à l’heure, toujours impeccable.' },
@@ -781,38 +787,35 @@ function ExploreScreen({ barbers, user, openBarber, toast }) {
     <ScrollView style={s.screen} contentContainerStyle={s.screenPad} keyboardShouldPersistTaps="handled">
       <Kicker>{hello}</Kicker>
       <Title>{user ? user.firstName : 'Bienvenue'}</Title>
-      <View style={s.locRow}>
-        {editingLoc ? (
-          <>
-            <Feather name="map-pin" size={13} color={C.gold} />
-            <TextInput
-              style={[s.locInput]}
-              value={locInput}
-              onChangeText={setLocInput}
-              placeholder="Entrez une ville…"
-              placeholderTextColor="#5A5852"
-              autoFocus
-              returnKeyType="done"
-              onSubmitEditing={confirmCity}
-            />
-            <TouchableOpacity onPress={confirmCity} hitSlop={8}>
-              <Text style={s.locEdit}>OK</Text>
-            </TouchableOpacity>
-          </>
-        ) : (
-          <>
-            {locLoading
-              ? <ActivityIndicator size={12} color={C.gold} />
-              : <Feather name="map-pin" size={13} color={C.gold} />}
-            <Text style={s.locText} numberOfLines={1}>
-              {locLoading ? 'Localisation…' : city}
-            </Text>
-            <TouchableOpacity onPress={() => { setLocInput(city); setEditingLoc(true); }} hitSlop={8}>
-              <Text style={s.locEdit}>Modifier</Text>
-            </TouchableOpacity>
-          </>
-        )}
-      </View>
+      {editingLoc ? (
+        <View style={s.locEditBox}>
+          <Feather name="map-pin" size={13} color={C.gold} />
+          <TextInput
+            style={s.locInput}
+            value={locInput}
+            onChangeText={setLocInput}
+            placeholder="Ville, code postal…"
+            placeholderTextColor="#5A5852"
+            autoFocus
+            returnKeyType="done"
+            onSubmitEditing={confirmCity}
+          />
+          <TouchableOpacity onPress={confirmCity} hitSlop={10}>
+            <Text style={[s.locEdit, { color: C.green }]}>OK</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setEditingLoc(false)} hitSlop={10}>
+            <Feather name="x" size={14} color={C.muted} />
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <TouchableOpacity style={s.locRow} onPress={() => { setLocInput(city); setEditingLoc(true); }} activeOpacity={0.7}>
+          {locLoading
+            ? <ActivityIndicator size={12} color={C.gold} />
+            : <Feather name="map-pin" size={13} color={C.gold} />}
+          <Text style={s.locText} numberOfLines={1}>{locLoading ? 'Localisation…' : (city || 'Définir ma position')}</Text>
+          <Feather name="edit-2" size={11} color={C.gold} style={{ marginLeft: 4 }} />
+        </TouchableOpacity>
+      )}
 
       <View style={s.search}>
         <Feather name="search" size={16} color={C.muted} />
@@ -949,7 +952,9 @@ function BarberDetailScreen({ barber, services, onBack, onBook, toast }) {
 
               <Section>Réalisations</Section>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                {[0, 1, 2, 3].map((i) => <Photo key={i} tex={i} />)}
+                {(barber.photos || [{tex:0},{tex:1},{tex:2},{tex:3}]).map((ph, i) => (
+                  <Photo key={ph.id || i} label={ph.label} tex={ph.tex} />
+                ))}
               </ScrollView>
 
               <Section>Lieu de coupe</Section>
@@ -1225,8 +1230,8 @@ function CutsScreen({ toast }) {
   );
 }
 
-function ShopScreen({ cat, setCat, cart, addCart, toast }) {
-  const list = PRODUCTS.filter((p) => cat === 'ALL' || p.cat === cat);
+function ShopScreen({ products, cat, setCat, cart, addCart, toast }) {
+  const list = products.filter((p) => cat === 'ALL' || p.cat === cat);
   return (
     <ScrollView style={s.screen} contentContainerStyle={s.screenPad}>
       <Kicker>BOUTIQUE</Kicker>
@@ -1778,6 +1783,173 @@ function ActivityScreen({ agenda }) {
   );
 }
 
+/* ───────── Gestion de la fiche barber ───────── */
+function FicheScreen({ barbers, setBarbers, products, setProducts, toast }) {
+  const enzo = barbers.find((b) => b.id === 'enzo');
+
+  const [bio, setBio] = useState(enzo.bio);
+  const [address, setAddress] = useState(enzo.address);
+  const [tagInput, setTagInput] = useState('');
+  const [addingProduct, setAddingProduct] = useState(false);
+  const [pName, setPName] = useState('');
+  const [pCat, setPCat] = useState('CIRE');
+  const [pPrice, setPPrice] = useState('');
+  const [pStock, setPStock] = useState('');
+
+  const updateEnzo = (fn) =>
+    setBarbers((bs) => bs.map((b) => (b.id === 'enzo' ? { ...b, ...fn(b) } : b)));
+
+  const addTag = () => {
+    const t = tagInput.trim();
+    if (!t || enzo.tags.includes(t)) return;
+    updateEnzo((b) => ({ tags: [...b.tags, t] }));
+    setTagInput('');
+    toast(`Spécialité « ${t} » ajoutée.`);
+  };
+
+  const addPhoto = () => {
+    const id = 'ph' + Date.now();
+    const count = (enzo.photos || []).length;
+    updateEnzo((b) => ({
+      photos: [...(b.photos || []), { id, label: 'Photo ' + (count + 1), tex: count % 4 }],
+    }));
+    toast('Photo ajoutée — modifiez le label en appuyant dessus.');
+  };
+
+  const updateProductLocal = (pid, changes) =>
+    setProducts((ps) => ps.map((p) => (p.id === pid ? { ...p, ...changes } : p)));
+
+  const saveProduct = () => {
+    const price = Math.round(parseFloat(pPrice.replace(',', '.')) * 100);
+    const stock = parseInt(pStock, 10);
+    if (!pName.trim() || isNaN(price) || price <= 0 || isNaN(stock) || stock < 0) {
+      toast('Renseignez tous les champs — prix et stock requis.');
+      return;
+    }
+    setProducts((ps) => [
+      ...ps,
+      { id: 'p' + Date.now(), name: pName.trim(), cat: pCat, price, stock, ic: 'box', tex: ps.length % 4 },
+    ]);
+    setPName(''); setPPrice(''); setPStock('');
+    setAddingProduct(false);
+    toast(`« ${pName.trim()} » ajouté à la boutique.`);
+  };
+
+  return (
+    <ScrollView style={s.screen} contentContainerStyle={s.screenPad} keyboardShouldPersistTaps="handled">
+      <Kicker>ESPACE BARBER · ENZO MOREAU</Kicker>
+      <Title em="fiche">Ma </Title>
+      <Lead>Modifiez votre fiche — les clients voient les changements en temps réel.</Lead>
+
+      {/* Description */}
+      <Section>Description</Section>
+      <TextInput
+        style={[s.input, { height: 90, textAlignVertical: 'top', paddingTop: 10 }]}
+        multiline value={bio} onChangeText={setBio}
+        placeholder="Votre bio courte…" placeholderTextColor="#5A5852"
+      />
+      <Btn ghost label="ENREGISTRER LA BIO" onPress={() => {
+        updateEnzo(() => ({ bio: bio.trim() }));
+        toast('Bio mise à jour.');
+      }} />
+
+      {/* Adresse */}
+      <Section>Adresse du salon</Section>
+      <TextInput style={s.input} value={address} onChangeText={setAddress}
+        placeholder="Adresse complète" placeholderTextColor="#5A5852" />
+      <Btn ghost label="ENREGISTRER L’ADRESSE" onPress={() => {
+        updateEnzo(() => ({ address: address.trim() }));
+        toast('Adresse mise à jour.');
+      }} />
+
+      {/* Spécialités */}
+      <Section>Spécialités</Section>
+      <View style={[s.wrap, { gap: 6, marginBottom: 10 }]}>
+        {enzo.tags.map((t) => (
+          <TouchableOpacity key={t} style={[s.tag, s.row, { gap: 5 }]}
+            onPress={() => { updateEnzo((b) => ({ tags: b.tags.filter((x) => x !== t) })); toast(`« ${t} » retiré.`); }}
+            activeOpacity={0.7}>
+            <Text style={s.tagText}>{t}</Text>
+            <Feather name="x" size={10} color={C.gold} />
+          </TouchableOpacity>
+        ))}
+      </View>
+      <View style={[s.row, { gap: 9 }]}>
+        <TextInput style={[s.input, { flex: 1 }]} placeholder="Ex. Taper, Coloration…"
+          placeholderTextColor="#5A5852" value={tagInput} onChangeText={setTagInput}
+          onSubmitEditing={addTag} returnKeyType="done" />
+        <TouchableOpacity style={s.iconBtn} onPress={addTag} hitSlop={6}>
+          <Feather name="plus" size={18} color={C.gold} />
+        </TouchableOpacity>
+      </View>
+
+      {/* Photos */}
+      <Section note="appuyez sur ✕ pour supprimer">Photos</Section>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 6 }}>
+        {(enzo.photos || []).map((ph) => (
+          <View key={ph.id} style={{ position: 'relative', marginRight: 9 }}>
+            <Photo label={ph.label} tex={ph.tex} />
+            <TouchableOpacity style={s.photoRemove}
+              onPress={() => { updateEnzo((b) => ({ photos: b.photos.filter((p) => p.id !== ph.id) })); toast('Photo supprimée.'); }}
+              hitSlop={4}>
+              <Feather name="x" size={11} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        ))}
+        <TouchableOpacity style={s.photoAdd} onPress={addPhoto} activeOpacity={0.8}>
+          <Feather name="plus" size={22} color={C.gold} />
+          <Text style={[s.btags, { marginTop: 6, textAlign: 'center' }]}>Ajouter</Text>
+        </TouchableOpacity>
+      </ScrollView>
+
+      {/* Boutique */}
+      <Section note="modifiez le prix ou supprimez">Boutique — mes produits</Section>
+      {products.map((p) => (
+        <View key={p.id} style={[s.card, s.row, { gap: 10 }]}>
+          <View style={[s.pimg, { width: 44, height: 44, borderRadius: 10, flexShrink: 0 }]}>
+            <Feather name={p.ic} size={17} color="rgba(200,169,106,0.5)" />
+          </View>
+          <View style={s.grow}>
+            <Text style={[s.bname, { fontSize: 12.5 }]} numberOfLines={1}>{p.name}</Text>
+            <Text style={s.btags}>{CATS.find(([k]) => k === p.cat)?.[1] || p.cat} · {p.stock} en stock</Text>
+          </View>
+          <PriceField cents={p.price} onChange={(v) => { updateProductLocal(p.id, { price: v }); toast(`Prix de « ${p.name} » mis à jour.`); }} />
+          <TouchableOpacity onPress={() => { setProducts((ps) => ps.filter((x) => x.id !== p.id)); toast(`« ${p.name} » retiré de la boutique.`); }} hitSlop={8}>
+            <Feather name="trash-2" size={16} color={C.red} />
+          </TouchableOpacity>
+        </View>
+      ))}
+
+      {addingProduct ? (
+        <View style={[s.card, { borderColor: C.lineGold }]}>
+          <Text style={[s.bname, { marginBottom: 10 }]}>Nouveau produit</Text>
+          <Field label="NOM" placeholder="Ex. Baume après-rasage" value={pName} onChangeText={setPName} />
+          <Text style={s.fieldLabel}>CATÉGORIE</Text>
+          <View style={s.wrap}>
+            {CATS.filter(([k]) => k !== 'ALL').map(([k, l]) => (
+              <Chip key={k} mini label={l} on={pCat === k} onPress={() => setPCat(k)} />
+            ))}
+          </View>
+          <View style={[s.row, { gap: 11, alignItems: 'flex-start' }]}>
+            <View style={s.grow}>
+              <Field label="PRIX (€)" placeholder="19,90" keyboardType="numeric" value={pPrice} onChangeText={setPPrice} />
+            </View>
+            <View style={s.grow}>
+              <Field label="STOCK" placeholder="25" keyboardType="numeric" value={pStock} onChangeText={setPStock} />
+            </View>
+          </View>
+          <Btn label="AJOUTER À LA BOUTIQUE" onPress={saveProduct} />
+          <Btn ghost label="ANNULER" onPress={() => { setAddingProduct(false); setPName(''); setPPrice(''); setPStock(''); }} />
+        </View>
+      ) : (
+        <Btn ghost icon="plus" label="NOUVEAU PRODUIT" onPress={() => setAddingProduct(true)} />
+      )}
+
+      <Text style={s.footnote}>Modifications visibles immédiatement côté client.</Text>
+    </ScrollView>
+  );
+}
+
 /* ───────── Racine ───────── */
 const CLIENT_TABS = [
   ['explore', 'search', 'Explorer'],
@@ -1792,6 +1964,7 @@ const BARBER_TABS = [
   ['planning', 'calendar', 'Planning'],
   ['status', 'clock', 'Statut'],
   ['activity', 'bar-chart-2', 'Activité'],
+  ['fiche', 'edit-3', 'Ma fiche'],
 ];
 
 export default function App() {
@@ -1817,7 +1990,10 @@ export default function App() {
   const toastAnim = useRef(new Animated.Value(0)).current;
   const toastTimer = useRef(null);
 
-  const barbersLive = BARBERS.map((b) => (b.id === 'enzo' ? { ...b, delay: enzoDelay } : b));
+  const [barbers, setBarbers] = useState(() => [...BARBERS]);
+  const [products, setProducts] = useState(() => [...PRODUCTS]);
+
+  const barbersLive = barbers.map((b) => (b.id === 'enzo' ? { ...b, delay: enzoDelay } : b));
 
   const toast = (msg) => {
     setToastMsg(msg);
@@ -1918,7 +2094,7 @@ export default function App() {
         dayIdx={clientDay} setDayIdx={setClientDay} onConfirm={confirmBooking} />
     );
     else if (tab === 'cuts') content = <CutsScreen toast={toast} />;
-    else if (tab === 'shop') content = <ShopScreen cat={cat} setCat={setCat} cart={cart} addCart={addCart} toast={toast} />;
+    else if (tab === 'shop') content = <ShopScreen products={products} cat={cat} setCat={setCat} cart={cart} addCart={addCart} toast={toast} />;
     else content = <MeScreen user={user} points={points} upcoming={upcoming} onLogout={logout} />;
   } else if (role === 'barber') {
     if (tab === 'slots') content = (
@@ -1933,6 +2109,9 @@ export default function App() {
     );
     else if (tab === 'status') content = (
       <StatusScreen agenda={agenda} delay={enzoDelay} setDelay={setEnzoDelay} toast={toast} />
+    );
+    else if (tab === 'fiche') content = (
+      <FicheScreen barbers={barbers} setBarbers={setBarbers} products={products} setProducts={setProducts} toast={toast} />
     );
     else content = <ActivityScreen agenda={agenda} />;
   }
@@ -1971,7 +2150,8 @@ export default function App() {
             </TouchableOpacity>
           </View>
           {content}
-          <View style={s.tabbar}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}
+            style={s.tabbar} contentContainerStyle={{ flexGrow: 1 }}>
             {tabs.map(([k, ic, l]) => {
               const on = tab === k && !barberDetail;
               return (
@@ -1982,7 +2162,7 @@ export default function App() {
                 </TouchableOpacity>
               );
             })}
-          </View>
+          </ScrollView>
         </>
       )}
       {toastMsg && (
@@ -2049,8 +2229,13 @@ const s = StyleSheet.create({
   searchInput: { flex: 1, color: C.text, fontSize: 13.5, padding: 0 },
 
   locRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: -2, marginBottom: 18 },
+  locEditBox: {
+    flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: -2, marginBottom: 18,
+    backgroundColor: C.surface, borderWidth: 1, borderColor: C.lineGold,
+    borderRadius: 12, paddingHorizontal: 12, paddingVertical: Platform.OS === 'ios' ? 9 : 5,
+  },
   locText: { color: C.soft, fontSize: 12.5, flex: 1 },
-  locEdit: { color: C.gold, fontSize: 11.5, marginLeft: 6, textDecorationLine: 'underline' },
+  locEdit: { color: C.gold, fontSize: 11.5, fontWeight: '600' },
   locInput: { flex: 1, color: C.text, fontSize: 12.5, padding: 0 },
 
   /* Cartes carrousel (Explorer) */
@@ -2295,4 +2480,21 @@ const s = StyleSheet.create({
   planBadgeText: { color: C.ink, fontSize: 9, fontWeight: '700', letterSpacing: 1.2 },
   planPrice: { fontFamily: SERIF, fontSize: 26, fontWeight: '700', color: C.gold, marginTop: 6 },
   planFeature: { flexDirection: 'row', alignItems: 'center', gap: 9, paddingVertical: 4 },
+
+  /* Gestion fiche barber */
+  iconBtn: {
+    width: 44, height: 44, borderRadius: 12,
+    backgroundColor: C.surface2, borderWidth: 1, borderColor: C.lineGold,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  photoRemove: {
+    position: 'absolute', top: 5, right: 14,
+    width: 20, height: 20, borderRadius: 10,
+    backgroundColor: 'rgba(0,0,0,0.75)', alignItems: 'center', justifyContent: 'center',
+  },
+  photoAdd: {
+    width: 104, height: 126, borderRadius: 14,
+    borderWidth: 1, borderColor: C.lineGold,
+    alignItems: 'center', justifyContent: 'center',
+  },
 });
