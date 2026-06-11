@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Animated,
   Dimensions,
+  Image,
   Platform,
   SafeAreaView,
   ScrollView,
@@ -19,6 +20,7 @@ import {
   View,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 
 /* ───────── Thème ───────── */
@@ -428,9 +430,12 @@ function Calendar({ sel, onSel, markFor }) {
   );
 }
 
-const Photo = ({ label, tex }) => (
-  <View style={[s.photo, { backgroundColor: TEX[tex] }]}>
-    <Feather name="scissors" size={26} color="rgba(200,169,106,0.45)" />
+const Photo = ({ label, tex, uri }) => (
+  <View style={[s.photo, { backgroundColor: TEX[tex] || '#1C1B18' }]}>
+    {uri
+      ? <Image source={{ uri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+      : <Feather name="scissors" size={26} color="rgba(200,169,106,0.45)" />
+    }
     {label ? <Text style={s.photoLabel}>{label}</Text> : null}
   </View>
 );
@@ -902,7 +907,10 @@ function BarberDetailScreen({ barber, services, onBack, onBook, toast }) {
       <ScrollView style={s.screen} contentContainerStyle={{ paddingBottom: 120 }}>
         {/* Hero */}
         <View style={[s.heroArt, { backgroundColor: barber.coverColor || TEX[barber.tex] }]}>
-          <Text style={s.heroIni}>{barber.ini}</Text>
+          {barber.coverImage
+            ? <Image source={{ uri: barber.coverImage }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+            : null}
+          <Text style={[s.heroIni, barber.coverImage && { opacity: 0 }]}>{barber.ini}</Text>
           <View style={s.heroTop}>
             <TouchableOpacity style={s.circleBtn} onPress={onBack} hitSlop={8}>
               <Feather name="chevron-left" size={19} color={C.text} />
@@ -958,7 +966,7 @@ function BarberDetailScreen({ barber, services, onBack, onBook, toast }) {
               <Section>Réalisations</Section>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 {(barber.photos || [{tex:0},{tex:1},{tex:2},{tex:3}]).map((ph, i) => (
-                  <Photo key={ph.id || i} label={ph.label} tex={ph.tex} />
+                  <Photo key={ph.id || i} label={ph.label} tex={ph.tex} uri={ph.uri} />
                 ))}
               </ScrollView>
 
@@ -1945,11 +1953,30 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, onPreview, to
     toast(`Spécialité « ${t} » ajoutée.`);
   };
 
-  const addPhoto = () => {
+  const pickCover = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') { toast('Permission refusée — accès à la galerie requis.'); return; }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true, aspect: [16, 9], quality: 0.85,
+    });
+    if (result.canceled) return;
+    updateEnzo(() => ({ coverImage: result.assets[0].uri }));
+    toast('Image de couverture mise à jour.');
+  };
+
+  const addPhoto = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') { toast('Permission refusée — accès à la galerie requis.'); return; }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true, aspect: [3, 4], quality: 0.85,
+    });
+    if (result.canceled) return;
     const id = 'ph' + Date.now();
     const count = (enzo.photos || []).length;
     updateEnzo((b) => ({
-      photos: [...(b.photos || []), { id, label: 'Prestation ' + (count + 1), tex: count % 4 }],
+      photos: [...(b.photos || []), { id, label: 'Prestation ' + (count + 1), tex: count % 4, uri: result.assets[0].uri }],
     }));
     toast('Photo ajoutée.');
   };
@@ -1987,11 +2014,18 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, onPreview, to
       <Section>Photo de couverture</Section>
       {/* mini-hero preview */}
       <View style={[s.coverPreview, { backgroundColor: curCover }]}>
-        <Text style={s.coverPreviewIni}>{enzo.ini}</Text>
+        {enzo.coverImage
+          ? <Image source={{ uri: enzo.coverImage }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+          : null}
+        <Text style={[s.coverPreviewIni, enzo.coverImage && { opacity: 0 }]}>{enzo.ini}</Text>
         <View style={s.coverPreviewBadge}>
           <Text style={s.bigVenueText}>{VENUES[enzo.venue] || 'En salon'}</Text>
         </View>
       </View>
+      <Btn icon="image" label="CHOISIR UNE PHOTO DE COUVERTURE" onPress={pickCover} />
+      {enzo.coverImage && (
+        <Btn ghost icon="trash-2" label="SUPPRIMER L’IMAGE DE COUVERTURE" onPress={() => { updateEnzo(() => ({ coverImage: null })); toast('Image de couverture supprimée.'); }} />
+      )}
       <Text style={s.fieldLabel}>COULEUR DE FOND</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
         <View style={[s.row, { gap: 9 }]}>
@@ -2082,7 +2116,7 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, onPreview, to
         contentContainerStyle={{ paddingTop: 10, paddingBottom: 4 }}>
         {(enzo.photos || []).map((ph) => (
           <View key={ph.id} style={{ position: 'relative', marginRight: 12 }}>
-            <Photo label={ph.label} tex={ph.tex} />
+            <Photo label={ph.label} tex={ph.tex} uri={ph.uri} />
             <TouchableOpacity style={s.photoRemove}
               onPress={() => { updateEnzo((b) => ({ photos: b.photos.filter((p) => p.id !== ph.id) })); toast('Photo supprimée.'); }}
               hitSlop={8}>
