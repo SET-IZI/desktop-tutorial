@@ -1,0 +1,19 @@
+{
+  "expo": {
+    "name": "BarberPro",
+    "slug": "barberpro",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "backgroundColor": "#0D0D0D"
+    },
+    "ios": {
+      "bundleIdentifier": "app.barberpro.mobile",
+      "supportsTablet": false
+    },
+    "android": {
+      "package": "app.barberpro.mobile"
+    }
+  }
+}
