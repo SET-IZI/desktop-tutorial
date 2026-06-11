@@ -3,8 +3,9 @@
 //  · Client : recherche par position & style, réservation dans les créneaux ouverts
 //  · Barber : ouverture des créneaux, formules de rendez-vous, planning, statut, activité
 // Design premium : noir profond, or champagne, serif élégante.
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Animated,
   Dimensions,
   Platform,
@@ -18,6 +19,7 @@ import {
   View,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import * as Location from 'expo-location';
 
 /* ───────── Thème ───────── */
 const C = {
@@ -62,7 +64,7 @@ const STYLES = [
   'Coupe afro', 'Locks', 'Barbe', 'Rasage traditionnel', 'Hair Design', 'Coloration',
 ];
 
-// Lieu d'exercice — affiché en badge sur les fiches
+// Lieu d’exercice — affiché en badge sur les fiches
 const VENUES = { salon: 'En salon', studio: 'Studio privé', domicile: 'À domicile' };
 
 const BARBERS = [
@@ -199,7 +201,7 @@ const HISTORY = [
 const WD = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
 const MO = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
 const MO_SHORT = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
-const HORIZON = 60; // jours réservables / ouvrables à l'avance
+const HORIZON = 60; // jours réservables / ouvrables à l’avance
 /* Grille horaire 9h → 23h, au pas choisi par le barber (15 à 60 min) */
 function timesFor(step) {
   const out = [];
@@ -355,7 +357,7 @@ const Chip = ({ label, price, on, onPress, mini }) => (
   </TouchableOpacity>
 );
 
-/* Calendrier mensuel — sélection d'une date sur 2 mois, points de statut par jour */
+/* Calendrier mensuel — sélection d’une date sur 2 mois, points de statut par jour */
 function Calendar({ sel, onSel, markFor }) {
   const now = new Date();
   const [mOff, setMOff] = useState(0);
@@ -442,7 +444,7 @@ const Toggle = ({ on, onPress }) => (
   </TouchableOpacity>
 );
 
-/* ───────── Écran d'entrée ───────── */
+/* ───────── Écran d’entrée ───────── */
 function WelcomeScreen({ choose }) {
   return (
     <View style={s.welcome}>
@@ -498,6 +500,41 @@ function BigCard({ b, onPress }) {
 function ExploreScreen({ barbers, openBarber, toast }) {
   const [query, setQuery] = useState('');
   const [style, setStyle] = useState(null);
+  const [city, setCity] = useState('');
+  const [locLoading, setLocLoading] = useState(true);
+  const [editingLoc, setEditingLoc] = useState(false);
+  const [locInput, setLocInput] = useState('');
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          setCity('Localisation refusée');
+          return;
+        }
+        const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        const [geo] = await Location.reverseGeocodeAsync({
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+        });
+        const label = [geo.city || geo.district || geo.subregion, geo.country]
+          .filter(Boolean).join(', ');
+        setCity(label || 'Position obtenue');
+      } catch {
+        setCity('Position indisponible');
+      } finally {
+        setLocLoading(false);
+      }
+    })();
+  }, []);
+
+  const confirmCity = () => {
+    const v = locInput.trim();
+    if (v) setCity(v);
+    setEditingLoc(false);
+    setLocInput('');
+  };
 
   const q = query.trim().toLowerCase();
   const filtering = q !== '' || style != null;
@@ -523,12 +560,38 @@ function ExploreScreen({ barbers, openBarber, toast }) {
     <ScrollView style={s.screen} contentContainerStyle={s.screenPad} keyboardShouldPersistTaps="handled">
       <Kicker>{hello}</Kicker>
       <Title>Mathéo</Title>
-      <TouchableOpacity style={s.locRow} activeOpacity={0.7}
-        onPress={() => toast('La géolocalisation précise arrive avec la version connectée.')}>
-        <Feather name="map-pin" size={13} color={C.gold} />
-        <Text style={s.locText}>Lille, France</Text>
-        <Text style={s.locEdit}>Modifier</Text>
-      </TouchableOpacity>
+      <View style={s.locRow}>
+        {editingLoc ? (
+          <>
+            <Feather name="map-pin" size={13} color={C.gold} />
+            <TextInput
+              style={[s.locInput]}
+              value={locInput}
+              onChangeText={setLocInput}
+              placeholder="Entrez une ville…"
+              placeholderTextColor="#5A5852"
+              autoFocus
+              returnKeyType="done"
+              onSubmitEditing={confirmCity}
+            />
+            <TouchableOpacity onPress={confirmCity} hitSlop={8}>
+              <Text style={s.locEdit}>OK</Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <>
+            {locLoading
+              ? <ActivityIndicator size={12} color={C.gold} />
+              : <Feather name="map-pin" size={13} color={C.gold} />}
+            <Text style={s.locText} numberOfLines={1}>
+              {locLoading ? 'Localisation…' : city}
+            </Text>
+            <TouchableOpacity onPress={() => { setLocInput(city); setEditingLoc(true); }} hitSlop={8}>
+              <Text style={s.locEdit}>Modifier</Text>
+            </TouchableOpacity>
+          </>
+        )}
+      </View>
 
       <View style={s.search}>
         <Feather name="search" size={16} color={C.muted} />
@@ -747,7 +810,7 @@ function BarberDetailScreen({ barber, services, onBack, onBook, toast }) {
 }
 
 /* Créneaux ouverts, filtrés par fenêtre horaire de la formule.
-   On lit directement l'agenda : chaque barber peut avoir sa propre grille. */
+   On lit directement l’agenda : chaque barber peut avoir sa propre grille. */
 function openSlotsFor(agenda, dayIdx, barberId, window) {
   const day = DAYS[dayIdx];
   const now = new Date();
@@ -1359,7 +1422,7 @@ function PlanningScreen({ agenda, setAgenda, dayIdx, setDayIdx, delay, toast }) 
   const day = DAYS[dayIdx];
   const slots = agenda.enzo[day.key] || {};
   const rdv = Object.entries(slots)
-    .filter(([, v]) => v.status === ‘booked’)
+    .filter(([, v]) => v.status === 'booked')
     .map(([time, v]) => ({ time, ...v }))
     .sort((a, b) => a.time.localeCompare(b.time));
   const ca = rdv.filter((r) => r.done).reduce((sum, r) => sum + r.price, 0);
@@ -1370,7 +1433,7 @@ function PlanningScreen({ agenda, setAgenda, dayIdx, setDayIdx, delay, toast }) 
       ...a,
       enzo: {
         ...a.enzo,
-        [day.key]: { ...a.enzo[day.key], [time]: { status: ‘open’ } },
+        [day.key]: { ...a.enzo[day.key], [time]: { status: 'open' } },
       },
     }));
     toast(`Réservation de ${who} annulée — créneau ${time} réouvert.`);
@@ -1382,16 +1445,16 @@ function PlanningScreen({ agenda, setAgenda, dayIdx, setDayIdx, delay, toast }) 
       <Title>Planning</Title>
       <View style={[s.row, { gap: 14, marginBottom: 16 }]}>
         <Badge status={delay} />
-        <Text style={s.btags}>{todo} à venir{ca > 0 ? ` · ${fmt(ca)} encaissés` : ‘’}</Text>
+        <Text style={s.btags}>{todo} à venir{ca > 0 ? ` · ${fmt(ca)} encaissés` : ''}</Text>
       </View>
       <Calendar sel={dayIdx} onSel={setDayIdx} markFor={(key) => {
         const vals = Object.values(agenda.enzo[key] || {});
-        return vals.some((v) => v.status === ‘booked’) ? ‘booked’ : null;
+        return vals.some((v) => v.status === 'booked') ? 'booked' : null;
       }} />
       <Text style={[s.btags, { marginVertical: 12 }]}>{DAYS[dayIdx].label}</Text>
       {rdv.length === 0 ? (
         <Text style={s.footnote}>
-          Aucune réservation ce jour.{‘\n’}Ouvrez des créneaux dans l’onglet Créneaux pour recevoir des clients.
+          Aucune réservation ce jour.{'\n'}Ouvrez des créneaux dans l’onglet Créneaux pour recevoir des clients.
         </Text>
       ) : (
         rdv.map((r) => (
@@ -1415,7 +1478,7 @@ function PlanningScreen({ agenda, setAgenda, dayIdx, setDayIdx, delay, toast }) 
         ))
       )}
       <Btn ghost icon="camera" label="PHOTOS DE FIN DE PRESTATION"
-        onPress={() => toast(‘Appareil photo — 1 à 10 photos attachées à la prestation.’)} />
+        onPress={() => toast('Appareil photo — 1 à 10 photos attachées à la prestation.')} />
     </ScrollView>
   );
 }
@@ -1722,8 +1785,9 @@ const s = StyleSheet.create({
   searchInput: { flex: 1, color: C.text, fontSize: 13.5, padding: 0 },
 
   locRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: -2, marginBottom: 18 },
-  locText: { color: C.soft, fontSize: 12.5 },
+  locText: { color: C.soft, fontSize: 12.5, flex: 1 },
   locEdit: { color: C.gold, fontSize: 11.5, marginLeft: 6, textDecorationLine: 'underline' },
+  locInput: { flex: 1, color: C.text, fontSize: 12.5, padding: 0 },
 
   /* Cartes carrousel (Explorer) */
   bigCard: { width: Math.floor(Math.min(SCREEN_W, 500) * 0.58), marginRight: 12 },
