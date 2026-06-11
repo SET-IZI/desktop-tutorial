@@ -1,5 +1,7 @@
 // BarberPro — application mobile (démo autonome, sans serveur)
-// Deux interfaces : Espace Client et Espace Barber.
+// Deux interfaces reliées par un agenda partagé :
+//  · Client : recherche par position & style, réservation dans les créneaux ouverts
+//  · Barber : ouverture des créneaux, formules de rendez-vous, planning, statut, activité
 // Design premium : noir profond, or champagne, serif élégante.
 import React, { useRef, useState } from 'react';
 import {
@@ -11,6 +13,7 @@ import {
   StatusBar,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -38,6 +41,7 @@ const SERIF = Platform.select({ ios: 'Georgia', default: 'serif' });
 const SCREEN_W = Dimensions.get('window').width;
 const PAD = 20;
 const PCARD_W = Math.floor((Math.min(SCREEN_W, 500) - PAD * 2 - 11) / 2);
+const SLOT_W = Math.floor((Math.min(SCREEN_W, 500) - PAD * 2 - 16) / 3);
 const SMALL = SCREEN_W < 370;
 
 /* ───────── Données de démonstration ───────── */
@@ -52,20 +56,28 @@ const DELAY = {
   ABSENT: { dot: C.gray, label: 'Absent' },
 };
 
+// Styles de coupe recherchables
+const STYLES = [
+  'Fade', 'Burst Fade', 'Taper', 'Transformation', 'Dégradé américain',
+  'Coupe afro', 'Locks', 'Barbe', 'Rasage traditionnel', 'Hair Design', 'Coloration',
+];
+
 const BARBERS = [
   {
     id: 'enzo', name: 'Enzo Moreau', ini: 'EM', tex: 0, years: 8, rating: '4,9',
+    salon: 'BarberPro — Le Salon', dist: 0.8,
     clients: '1 240', prestations: '3 680', ponct: 97, delay: 'ON_TIME',
-    tags: ['Dégradé américain', 'Coupe afro', 'Barbe', 'Hair Design'],
-    bio: 'Spécialiste du dégradé américain depuis huit ans. Précision du trait, finitions au rasoir, sens du détail.',
+    tags: ['Burst Fade', 'Fade', 'Dégradé américain', 'Barbe'],
+    bio: 'Spécialiste du burst fade et du dégradé américain depuis huit ans. Précision du trait, finitions au rasoir.',
     reviews: [
-      { who: 'Karim', note: 5, txt: 'Le meilleur dégradé de la ville. Je ne vais plus nulle part ailleurs.' },
+      { who: 'Karim', note: 5, txt: 'Le meilleur burst fade de la ville. Je ne vais plus nulle part ailleurs.' },
       { who: 'Lucas', note: 5, txt: 'Toujours à l’heure, toujours impeccable.' },
       { who: 'Mehdi', note: 4, txt: 'Très beau travail sur la barbe, salon élégant.' },
     ],
   },
   {
     id: 'sofiane', name: 'Sofiane Kaci', ini: 'SK', tex: 1, years: 6, rating: '4,7',
+    salon: 'BarberPro — Le Salon', dist: 0.8,
     clients: '860', prestations: '2 210', ponct: 91, delay: 'DELAY_10',
     tags: ['Rasage traditionnel', 'Barbe', 'Coloration'],
     bio: 'Maître du rasage à l’ancienne : serviette chaude, coupe-chou et soins. Un rituel plus qu’une prestation.',
@@ -76,10 +88,35 @@ const BARBERS = [
   },
   {
     id: 'marco', name: 'Marco Vitale', ini: 'MV', tex: 2, years: 5, rating: '4,8',
+    salon: 'BarberPro — Le Salon', dist: 0.8,
     clients: '540', prestations: '1 490', ponct: 95, delay: 'ON_TIME',
-    tags: ['Hair Design', 'Dégradé américain', 'Coupe enfant'],
+    tags: ['Hair Design', 'Taper', 'Coupe enfant'],
     bio: 'Hair design et motifs sur mesure. Chaque coupe est traitée comme une pièce unique.',
     reviews: [{ who: 'Sacha', note: 5, txt: 'Le motif était exactement celui que j’imaginais.' }],
+  },
+  {
+    id: 'ibra', name: 'Ibrahim Diallo', ini: 'ID', tex: 3, years: 7, rating: '4,9',
+    salon: 'Kings Cut', dist: 2.1,
+    clients: '980', prestations: '2 870', ponct: 94, delay: 'ON_TIME',
+    tags: ['Coupe afro', 'Burst Fade', 'Locks', 'Transformation'],
+    bio: 'Référence coupe afro et locks. Les transformations complètes sont sa signature — avant/après garantis.',
+    reviews: [{ who: 'Moussa', note: 5, txt: 'Transformation totale, je ne me reconnaissais plus. Incroyable.' }],
+  },
+  {
+    id: 'lucas', name: 'Lucas Brun', ini: 'LB', tex: 1, years: 4, rating: '4,6',
+    salon: 'Le Comptoir du Barbier', dist: 3.4,
+    clients: '410', prestations: '1 120', ponct: 92, delay: 'ON_TIME',
+    tags: ['Taper', 'Fade', 'Barbe'],
+    bio: 'Taper et fade au cordeau, dans un comptoir à l’ancienne. Simple, net, précis.',
+    reviews: [{ who: 'Hugo', note: 5, txt: 'Mon taper n’a jamais été aussi propre.' }],
+  },
+  {
+    id: 'yanis', name: 'Yanis Cohen', ini: 'YC', tex: 2, years: 9, rating: '4,8',
+    salon: 'Studio Y', dist: 5.2,
+    clients: '1 150', prestations: '3 240', ponct: 96, delay: 'ON_TIME',
+    tags: ['Transformation', 'Coloration', 'Hair Design'],
+    bio: 'Studio dédié aux métamorphoses : coloration, hair design et transformations complètes sur rendez-vous long.',
+    reviews: [{ who: 'Théo', note: 5, txt: 'Coloration + design parfaits, le résultat dépasse la photo d’inspiration.' }],
   },
 ];
 
@@ -91,6 +128,33 @@ const SERVICES = [
   { id: 's5', name: 'Hair Design', price: 4500 },
   { id: 's6', name: 'Premium Package', price: 7000 },
 ];
+
+/* Formules de rendez-vous — créées et activées par le barber */
+const WINDOWS = { all: 'Libre', day: 'Journée', evening: 'Soirée', night: 'Nuit' };
+function initFormulas() {
+  return [
+    {
+      id: 'f1', name: 'Classique', icon: 'scissors', dur: 30, window: 'all',
+      fixed: null, recur: false, active: true,
+      desc: 'Prestation au choix, tarif dynamique selon l’horaire.',
+    },
+    {
+      id: 'f2', name: 'Nocturne', icon: 'moon', dur: 45, window: 'night',
+      fixed: null, recur: false, active: true,
+      desc: 'Créneaux du soir uniquement — tarifs soirée et nuit appliqués.',
+    },
+    {
+      id: 'f3', name: 'Transformation', icon: 'star', dur: 120, window: 'day',
+      fixed: 9000, recur: false, active: true,
+      desc: 'Refonte complète du style — 2 h, photos avant/après offertes.',
+    },
+    {
+      id: 'f4', name: 'Hebdomadaire', icon: 'refresh-cw', dur: 30, window: 'all',
+      fixed: null, recur: true, active: false,
+      desc: 'Même créneau chaque semaine — fidélité récompensée : −15 %.',
+    },
+  ];
+}
 
 const CATS = [
   ['ALL', 'Tout'], ['CIRE', 'Cires'], ['POMMADE', 'Pommades'],
@@ -116,14 +180,76 @@ const HISTORY = [
   },
 ];
 
-const TODAY_RDV = [
-  { time: '09:30', who: 'Karim D.', serv: 'Coupe Homme', price: 2500, done: true },
-  { time: '10:30', who: 'Lucas B.', serv: 'Coupe + Barbe', price: 3500, done: true },
-  { time: '11:30', who: 'Mehdi A.', serv: 'Barbe seule', price: 1500, done: false },
-  { time: '14:00', who: 'Sacha L.', serv: 'Hair Design', price: 4500, done: false },
-  { time: '16:00', who: 'Noah P.', serv: 'Coupe enfant', price: 1800, done: false },
-  { time: '20:30', who: 'Tom R.', serv: 'Coupe Homme', price: 3500, done: false },
-];
+/* ───────── Jours & créneaux ───────── */
+const WD = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
+const TIMES = [];
+for (let h = 9; h <= 22; h++) for (const m of [0, 30]) {
+  if (h === 22 && m === 30) continue;
+  TIMES.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+}
+function makeDays() {
+  const out = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() + i);
+    d.setHours(0, 0, 0, 0);
+    const label = i === 0 ? 'Aujourd’hui' : i === 1 ? 'Demain' : `${WD[d.getDay()]} ${d.getDate()}`;
+    out.push({ key: d.toDateString(), label, date: d });
+  }
+  return out;
+}
+const DAYS = makeDays();
+const timeToDate = (day, time) => {
+  const [h, m] = time.split(':').map(Number);
+  const d = new Date(day.date);
+  d.setHours(h, m, 0, 0);
+  return d;
+};
+const inWindow = (time, window) => {
+  const h = Number(time.slice(0, 2));
+  if (window === 'day') return h < 20;
+  if (window === 'evening') return h >= 18;
+  if (window === 'night') return h >= 20;
+  return true;
+};
+
+/* Agenda partagé : agenda[barberId][dayKey][time] =
+   { status:'open' } ou { status:'booked', who, serv, price, done } — absent = fermé. */
+function initAgenda() {
+  const agenda = {};
+  BARBERS.forEach((b, bi) => {
+    agenda[b.id] = {};
+    DAYS.forEach((day, di) => {
+      const slots = {};
+      TIMES.forEach((time, ti) => {
+        if (b.id === 'enzo') {
+          const h = Number(time.slice(0, 2));
+          const openToday = (h >= 9 && h < 12) || (h >= 14 && h < 18) || (h >= 20 && h <= 22);
+          const openOther = h >= 9 && h < 18 && (ti + di) % 4 !== 0;
+          if (di === 0 ? openToday : openOther) slots[time] = { status: 'open' };
+        } else if ((ti + bi * 2 + di) % 3 !== 0) {
+          slots[time] = { status: 'open' };
+          if ((ti * (di + 2) + bi) % 11 === 4) {
+            slots[time] = { status: 'booked', who: 'Client', serv: 'Coupe Homme', price: 2500, done: false };
+          }
+        }
+      });
+      agenda[b.id][day.key] = slots;
+    });
+  });
+  const today = agenda.enzo[DAYS[0].key];
+  [
+    ['09:30', 'Karim D.', 'Coupe Homme', 2500, true],
+    ['10:30', 'Lucas B.', 'Coupe + Barbe', 3500, true],
+    ['11:30', 'Mehdi A.', 'Barbe seule', 1500, false],
+    ['14:00', 'Sacha L.', 'Transformation', 9000, false],
+    ['16:00', 'Noah P.', 'Coupe enfant', 1800, false],
+    ['20:30', 'Tom R.', 'Nocturne · Coupe Homme', 3500, false],
+  ].forEach(([time, who, serv, price, done]) => {
+    today[time] = { status: 'booked', who, serv, price, done };
+  });
+  return agenda;
+}
 
 /* ───────── Tarification dynamique (PRD §4) ───────── */
 function computePrice(base, slotDate, now) {
@@ -137,31 +263,21 @@ function computePrice(base, slotDate, now) {
   if ((slotDate - now) / 60000 < 120 && slotDate > now) { price = Math.round(price * 1.2); rules.push('Urgence +20 %'); }
   return { price, rules };
 }
+function quoteFor(formula, service, slotDate, now) {
+  if (formula.fixed != null) {
+    return { price: formula.fixed, rules: [`Formule ${formula.name}`] };
+  }
+  const q = computePrice(service.price, slotDate, now);
+  if (formula.recur) {
+    q.price = Math.round(q.price * 0.85);
+    q.rules = [...q.rules, 'Formule hebdomadaire −15 %'];
+  } else if (formula.id !== 'f1') {
+    q.rules = [`Formule ${formula.name}`, ...q.rules];
+  }
+  return q;
+}
 const fmt = (c) =>
   (c / 100).toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + ' €';
-
-function genSlots(service, barberId) {
-  const now = new Date();
-  const out = [];
-  for (let h = 9; h <= 22; h++) {
-    for (const m of [0, 30]) {
-      if (h === 22 && m === 30) continue;
-      const d = new Date();
-      d.setHours(h, m, 0, 0);
-      if (d < now) continue;
-      const list = barberId === 'any' ? BARBERS : BARBERS.filter((b) => b.id === barberId);
-      const idx = h * 2 + m / 30;
-      const b = list[idx % list.length];
-      if ((idx + b.id.length) % 3 === 0) continue;
-      const q = computePrice(service.price, d, now);
-      out.push({
-        time: `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`,
-        barber: b, price: q.price, rules: q.rules,
-      });
-    }
-  }
-  return out.slice(0, 12);
-}
 
 /* ───────── Petits composants ───────── */
 const Kicker = ({ children }) => <Text style={s.kicker}>{children}</Text>;
@@ -194,6 +310,12 @@ const Badge = ({ status }) => (
   </View>
 );
 
+const Tag = ({ label }) => (
+  <View style={s.tag}>
+    <Text style={s.tagText}>{label}</Text>
+  </View>
+);
+
 const Chip = ({ label, price, on, onPress, mini }) => (
   <TouchableOpacity
     style={[s.chip, mini && s.chipMini, on && s.chipOn]}
@@ -206,6 +328,16 @@ const Chip = ({ label, price, on, onPress, mini }) => (
       {price ? <Text style={[s.chipPrice, on && s.chipTextOn]}>  {price}</Text> : null}
     </Text>
   </TouchableOpacity>
+);
+
+const DaysBar = ({ sel, onSel }) => (
+  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 4 }}>
+    <View style={[s.wrap, { flexWrap: 'nowrap' }]}>
+      {DAYS.map((d, i) => (
+        <Chip key={d.key} mini label={d.label} on={sel === i} onPress={() => onSel(i)} />
+      ))}
+    </View>
+  </ScrollView>
 );
 
 const Photo = ({ label, tex }) => (
@@ -229,7 +361,13 @@ const Btn = ({ label, ghost, onPress, icon }) => (
   </TouchableOpacity>
 );
 
-/* ───────── Écran d'entrée : choix de l'espace ───────── */
+const Toggle = ({ on, onPress }) => (
+  <TouchableOpacity style={[s.sw, on && s.swOn]} onPress={onPress} activeOpacity={0.8} hitSlop={8}>
+    <View style={[s.swKnob, on && s.swKnobOn]} />
+  </TouchableOpacity>
+);
+
+/* ───────── Écran d'entrée ───────── */
 function WelcomeScreen({ choose }) {
   return (
     <View style={s.welcome}>
@@ -241,8 +379,8 @@ function WelcomeScreen({ choose }) {
         <Text style={s.welcomeTag}>L’art de la coupe, à l’heure juste.</Text>
       </View>
       {[
-        ['client', 'user', 'Espace Client', 'Réserver un artiste, suivre son statut,\nretrouver toutes vos coupes.'],
-        ['barber', 'scissors', 'Espace Barber', 'Votre planning, votre statut,\nvotre activité du jour.'],
+        ['client', 'user', 'Espace Client', 'Trouver un artiste près de vous,\nréserver, retrouver toutes vos coupes.'],
+        ['barber', 'scissors', 'Espace Barber', 'Ouvrir vos créneaux, créer vos formules,\nsuivre votre planning et votre activité.'],
       ].map(([role, icon, title, sub]) => (
         <TouchableOpacity key={role} style={s.welcomeCard} onPress={() => choose(role)} activeOpacity={0.85}>
           <View style={s.welcomeIcon}>
@@ -261,31 +399,81 @@ function WelcomeScreen({ choose }) {
 }
 
 /* ───────── Espace CLIENT ───────── */
-function HomeScreen({ barbers, openBarber }) {
+function ExploreScreen({ barbers, openBarber }) {
+  const [query, setQuery] = useState('');
+  const [style, setStyle] = useState(null);
+
+  const q = query.trim().toLowerCase();
+  const list = barbers
+    .filter((b) => {
+      const hay = `${b.name} ${b.salon} ${b.tags.join(' ')}`.toLowerCase();
+      const okQ = !q || hay.includes(q);
+      const okS = !style || b.tags.includes(style);
+      return okQ && okS;
+    })
+    .sort((a, b) => a.dist - b.dist);
+
   return (
-    <ScrollView style={s.screen} contentContainerStyle={s.screenPad}>
-      <Kicker>LE SALON</Kicker>
-      <Title em="coupe">L’art de la </Title>
-      <Lead>Réservez votre artiste, suivez son statut en temps réel.</Lead>
-      <View style={s.hero}>
-        <Text style={s.heroQuote}>« Une coupe n’est pas un service, c’est une signature. »</Text>
-        <Text style={s.heroSub}>Ouvert aujourd’hui · 9h — 23h</Text>
+    <ScrollView style={s.screen} contentContainerStyle={s.screenPad} keyboardShouldPersistTaps="handled">
+      <Kicker>AUTOUR DE VOUS · LILLE (POSITION SIMULÉE)</Kicker>
+      <Title em="artiste">Trouvez votre </Title>
+      <Lead>Par salon, par nom ou par style — du burst fade à la transformation complète.</Lead>
+
+      <View style={s.search}>
+        <Feather name="search" size={16} color={C.muted} />
+        <TextInput
+          style={s.searchInput}
+          placeholder="Un barber, un salon, un style…"
+          placeholderTextColor="#5A5852"
+          value={query}
+          onChangeText={setQuery}
+          returnKeyType="search"
+        />
+        {query !== '' && (
+          <TouchableOpacity onPress={() => setQuery('')} hitSlop={8}>
+            <Feather name="x" size={15} color={C.muted} />
+          </TouchableOpacity>
+        )}
       </View>
-      <Section>Nos artistes</Section>
-      {barbers.map((b) => (
-        <TouchableOpacity key={b.id} style={[s.card, s.row]} onPress={() => openBarber(b)} activeOpacity={0.85}>
-          <Ava b={b} />
-          <View style={s.grow}>
-            <Text style={s.bname}>{b.name}</Text>
-            <Text style={s.btags} numberOfLines={1}>{b.tags.slice(0, 3).join(' · ')}</Text>
-            <View style={[s.row, { gap: 12, marginTop: 7 }]}>
-              <Badge status={b.delay} />
-              <Text style={s.rate}>★ {b.rating}</Text>
+
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 6 }}>
+        <View style={[s.wrap, { flexWrap: 'nowrap' }]}>
+          {STYLES.map((st) => (
+            <Chip key={st} mini label={st} on={style === st}
+              onPress={() => setStyle(style === st ? null : st)} />
+          ))}
+        </View>
+      </ScrollView>
+
+      <Section note={`${list.length} artiste${list.length > 1 ? 's' : ''} · du plus proche au plus loin`}>
+        Résultats
+      </Section>
+      {list.length === 0 ? (
+        <Text style={s.footnote}>Aucun artiste ne correspond.{'\n'}Essayez un autre style ou effacez la recherche.</Text>
+      ) : (
+        list.map((b) => (
+          <TouchableOpacity key={b.id} style={s.card} onPress={() => openBarber(b)} activeOpacity={0.85}>
+            <View style={s.row}>
+              <Ava b={b} />
+              <View style={s.grow}>
+                <Text style={s.bname}>{b.name}</Text>
+                <View style={[s.row, { gap: 5, marginTop: 2 }]}>
+                  <Feather name="map-pin" size={10} color={C.gold} />
+                  <Text style={s.btags}>{b.salon} · {String(b.dist).replace('.', ',')} km</Text>
+                </View>
+                <View style={[s.row, { gap: 12, marginTop: 6 }]}>
+                  <Badge status={b.delay} />
+                  <Text style={s.rate}>★ {b.rating}</Text>
+                </View>
+              </View>
+              <Feather name="chevron-right" size={18} color="#56534E" />
             </View>
-          </View>
-          <Feather name="chevron-right" size={18} color="#56534E" />
-        </TouchableOpacity>
-      ))}
+            <View style={[s.wrap, { marginTop: 11, gap: 6 }]}>
+              {b.tags.map((t) => <Tag key={t} label={t} />)}
+            </View>
+          </TouchableOpacity>
+        ))
+      )}
     </ScrollView>
   );
 }
@@ -294,21 +482,22 @@ function BarberDetailScreen({ barber, onBack, onBook }) {
   return (
     <ScrollView style={s.screen} contentContainerStyle={s.screenPad}>
       <TouchableOpacity onPress={onBack} style={{ marginBottom: 18, alignSelf: 'flex-start' }} hitSlop={10}>
-        <Text style={s.back}>‹  LE SALON</Text>
+        <Text style={s.back}>‹  RETOUR</Text>
       </TouchableOpacity>
-      <View style={[s.row, { gap: 18, marginBottom: 16 }]}>
+      <View style={[s.row, { gap: 18, marginBottom: 14 }]}>
         <Ava b={barber} lg />
         <View style={s.grow}>
           <Text style={[s.title, { fontSize: 25, lineHeight: 29, marginBottom: 3 }]}>{barber.name}</Text>
-          <Text style={[s.btags, { marginBottom: 9 }]}>{barber.years} ans d’expérience</Text>
+          <View style={[s.row, { gap: 5, marginBottom: 8 }]}>
+            <Feather name="map-pin" size={11} color={C.gold} />
+            <Text style={s.btags}>{barber.salon} · {String(barber.dist).replace('.', ',')} km</Text>
+          </View>
           <Badge status={barber.delay} />
         </View>
       </View>
       <Text style={s.bio}>{barber.bio}</Text>
-      <View style={[s.wrap, { marginBottom: 18 }]}>
-        {barber.tags.map((t) => (
-          <Chip key={t} mini label={t} />
-        ))}
+      <View style={[s.wrap, { marginBottom: 18, gap: 6 }]}>
+        {barber.tags.map((t) => <Tag key={t} label={t} />)}
       </View>
       <View style={s.stats}>
         {[
@@ -344,7 +533,28 @@ function BarberDetailScreen({ barber, onBack, onBook }) {
   );
 }
 
-function BookScreen({ booking, setBooking, onConfirm }) {
+/* Créneaux ouverts, filtrés par fenêtre horaire de la formule */
+function openSlotsFor(agenda, dayIdx, barberId, window) {
+  const day = DAYS[dayIdx];
+  const now = new Date();
+  const list = barberId === 'any' ? BARBERS : BARBERS.filter((b) => b.id === barberId);
+  const out = [];
+  for (const time of TIMES) {
+    if (!inWindow(time, window)) continue;
+    const date = timeToDate(day, time);
+    if (date < now) continue;
+    for (const b of list) {
+      const slot = agenda[b.id]?.[day.key]?.[time];
+      if (slot && slot.status === 'open') {
+        out.push({ time, date, barber: b });
+        break;
+      }
+    }
+  }
+  return out;
+}
+
+function BookScreen({ agenda, formulas, booking, setBooking, dayIdx, setDayIdx, onConfirm }) {
   if (booking.done) {
     const d = booking.done;
     return (
@@ -354,10 +564,18 @@ function BookScreen({ booking, setBooking, onConfirm }) {
         <Lead>Nous vous attendons. Un rappel sera envoyé la veille et une heure avant.</Lead>
         <View style={[s.card, { borderColor: C.lineGold }]}>
           <Text style={[s.bname, { fontSize: 17 }]}>{d.serv}</Text>
-          <Text style={[s.btags, { marginVertical: 6 }]}>Aujourd’hui à {d.time} · avec {d.barber}</Text>
+          <Text style={[s.btags, { marginVertical: 6 }]}>{d.day} à {d.time} · avec {d.barber}</Text>
           {d.rules.length > 0 && <Text style={s.ruleText}>{d.rules.join('  +  ')}</Text>}
           <Text style={[s.price, { fontSize: 24, marginTop: 8 }]}>{fmt(d.price)}</Text>
         </View>
+        {d.recur && (
+          <View style={[s.card, s.row]}>
+            <Feather name="refresh-cw" size={19} color={C.gold} />
+            <Text style={[s.softText, s.grow]}>
+              Rendez-vous hebdomadaire : ce créneau est reconduit chaque semaine, annulable à tout moment.
+            </Text>
+          </View>
+        )}
         {[
           ['bell', 'Rappels automatiques : la veille puis 1 h avant le rendez-vous.'],
           ['gift', `+${Math.floor(d.price / 100)} points fidélité crédités — 1 € dépensé = 1 point.`],
@@ -368,51 +586,107 @@ function BookScreen({ booking, setBooking, onConfirm }) {
           </View>
         ))}
         <Btn ghost label="NOUVELLE RÉSERVATION"
-          onPress={() => setBooking({ service: null, barber: 'any', done: null })} />
+          onPress={() => setBooking({ barber: 'any', formula: null, service: null, done: null })} />
       </ScrollView>
     );
   }
 
+  // Formules proposées : celles du barber choisi (toutes actives), génériques sinon
+  const available = booking.barber === 'enzo'
+    ? formulas.filter((f) => f.active)
+    : booking.barber === 'any'
+      ? formulas.filter((f) => f.active && (f.id === 'f1' || f.id === 'f2'))
+      : initFormulas().filter((f) => f.active);
+  const formula = available.find((f) => f.id === booking.formula) || null;
+  const needService = formula && formula.fixed == null;
   const service = SERVICES.find((x) => x.id === booking.service);
+  const ready = formula && (!needService || service);
+  const slots = ready ? openSlotsFor(agenda, dayIdx, booking.barber, formula.window) : [];
+  const now = new Date();
+
   return (
     <ScrollView style={s.screen} contentContainerStyle={s.screenPad}>
       <Kicker>RENDEZ-VOUS</Kicker>
       <Title>Réserver</Title>
-      <Lead>La prestation, l’artiste, puis le créneau — au prix juste, affiché en direct.</Lead>
-      <Section>La prestation</Section>
+      <Lead>L’artiste, la formule, puis le créneau — parmi ceux que vos barbers ont ouverts.</Lead>
+
+      <Section>L’artiste</Section>
       <View style={s.wrap}>
-        {SERVICES.map((sv) => (
-          <Chip
-            key={sv.id} label={sv.name} price={fmt(sv.price)} on={booking.service === sv.id}
-            onPress={() => setBooking({ ...booking, service: sv.id })}
-          />
+        <Chip label="Premier disponible" on={booking.barber === 'any'}
+          onPress={() => setBooking({ ...booking, barber: 'any', formula: null })} />
+        {BARBERS.map((b) => (
+          <Chip key={b.id} label={b.name.split(' ')[0]} on={booking.barber === b.id}
+            onPress={() => setBooking({ ...booking, barber: b.id, formula: null })} />
         ))}
       </View>
-      {service && (
+
+      <Section>La formule</Section>
+      {available.map((f) => {
+        const on = booking.formula === f.id;
+        return (
+          <TouchableOpacity key={f.id} style={[s.opt, on && s.optOn]} activeOpacity={0.8}
+            onPress={() => setBooking({ ...booking, formula: f.id })}>
+            <Feather name={f.icon} size={17} color={on ? C.gold : C.muted} />
+            <View style={s.grow}>
+              <View style={s.row}>
+                <Text style={[s.optText, s.grow]}>{f.name}</Text>
+                <Text style={s.formulaMeta}>
+                  {f.dur} min · {WINDOWS[f.window]}{f.fixed != null ? ` · ${fmt(f.fixed)}` : ''}{f.recur ? ' · −15 %' : ''}
+                </Text>
+              </View>
+              <Text style={[s.btags, { marginTop: 3 }]}>{f.desc}</Text>
+            </View>
+          </TouchableOpacity>
+        );
+      })}
+
+      {needService && (
         <>
-          <Section>Avec qui</Section>
+          <Section>La prestation</Section>
           <View style={s.wrap}>
-            <Chip label="Premier disponible" on={booking.barber === 'any'}
-              onPress={() => setBooking({ ...booking, barber: 'any' })} />
-            {BARBERS.map((b) => (
-              <Chip key={b.id} label={b.name.split(' ')[0]} on={booking.barber === b.id}
-                onPress={() => setBooking({ ...booking, barber: b.id })} />
+            {SERVICES.map((sv) => (
+              <Chip key={sv.id} label={sv.name} price={fmt(sv.price)} on={booking.service === sv.id}
+                onPress={() => setBooking({ ...booking, service: sv.id })} />
             ))}
           </View>
-          <Section note="aujourd’hui">Le créneau</Section>
-          {genSlots(service, booking.barber).map((sl, i) => (
-            <TouchableOpacity key={i} style={[s.card, s.row]} onPress={() => onConfirm(service, sl)} activeOpacity={0.8}>
-              <Text style={s.slotTime}>{sl.time}</Text>
-              <View style={s.grow}>
-                <Text style={s.softText}>{sl.barber.name}</Text>
-                {sl.rules.length > 0 && <Text style={s.ruleText}>{sl.rules.join('  +  ')}</Text>}
-              </View>
-              <Text style={s.price}>{fmt(sl.price)}</Text>
-            </TouchableOpacity>
-          ))}
-          <Text style={s.footnote}>
-            Les prix évoluent selon l’heure — soirée après 20 h, nuit après 22 h, week-end, urgence.
-          </Text>
+        </>
+      )}
+
+      {ready && (
+        <>
+          <Section>Le jour</Section>
+          <DaysBar sel={dayIdx} onSel={setDayIdx} />
+          <Section note={`${slots.length} créneau${slots.length > 1 ? 'x' : ''} ouvert${slots.length > 1 ? 's' : ''}`}>
+            Le créneau
+          </Section>
+          {slots.length === 0 ? (
+            <Text style={s.footnote}>
+              Aucun créneau ouvert ce jour pour cette formule.{'\n'}
+              {formula.window === 'night'
+                ? 'La formule Nocturne ne propose que les créneaux après 20 h.'
+                : 'Essayez un autre jour ou un autre artiste.'}
+            </Text>
+          ) : (
+            <>
+              {slots.map((sl) => {
+                const q = quoteFor(formula, service, sl.date, now);
+                return (
+                  <TouchableOpacity key={sl.barber.id + sl.time} style={[s.card, s.row]}
+                    onPress={() => onConfirm(formula, service, sl, q)} activeOpacity={0.8}>
+                    <Text style={s.slotTime}>{sl.time}</Text>
+                    <View style={s.grow}>
+                      <Text style={s.softText}>{sl.barber.name}</Text>
+                      {q.rules.length > 0 && <Text style={s.ruleText}>{q.rules.join('  +  ')}</Text>}
+                    </View>
+                    <Text style={s.price}>{fmt(q.price)}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+              <Text style={s.footnote}>
+                Les prix évoluent selon l’horaire — soirée après 20 h, nuit après 22 h, week-end, urgence.
+              </Text>
+            </>
+          )}
         </>
       )}
     </ScrollView>
@@ -509,10 +783,12 @@ function MeScreen({ points, upcoming, onLogout }) {
       ) : (
         upcoming.map((u, i) => (
           <View key={i} style={[s.card, s.row]}>
-            <Feather name="calendar" size={18} color={C.gold} />
+            <Feather name={u.recur ? 'refresh-cw' : 'calendar'} size={18} color={C.gold} />
             <View style={s.grow}>
-              <Text style={[s.bname, { fontSize: 13.5 }]}>{u.serv} · {u.time}</Text>
-              <Text style={[s.btags, { marginTop: 2 }]}>avec {u.barber}</Text>
+              <Text style={[s.bname, { fontSize: 13.5 }]}>{u.serv} · {u.day} {u.time}</Text>
+              <Text style={[s.btags, { marginTop: 2 }]}>
+                avec {u.barber}{u.recur ? ' · chaque semaine' : ''}
+              </Text>
             </View>
             <Text style={[s.price, { fontSize: 15 }]}>{fmt(u.price)}</Text>
           </View>
@@ -531,38 +807,264 @@ function MeScreen({ points, upcoming, onLogout }) {
 }
 
 /* ───────── Espace BARBER (connecté : Enzo Moreau) ───────── */
-function PlanningScreen({ delay, toast }) {
-  const next = TODAY_RDV.filter((r) => !r.done);
-  const ca = TODAY_RDV.filter((r) => r.done).reduce((sum, r) => sum + r.price, 0);
+function SlotsScreen({ agenda, setAgenda, dayIdx, setDayIdx, toast }) {
+  const day = DAYS[dayIdx];
+  const slots = agenda.enzo[day.key] || {};
+  const nOpen = Object.values(slots).filter((x) => x.status === 'open').length;
+  const nBooked = Object.values(slots).filter((x) => x.status === 'booked').length;
+
+  const update = (fn) => {
+    setAgenda((a) => {
+      const copy = { ...(a.enzo[day.key] || {}) };
+      fn(copy);
+      return { ...a, enzo: { ...a.enzo, [day.key]: copy } };
+    });
+  };
+  const toggle = (time) => {
+    const cur = slots[time];
+    if (cur && cur.status === 'booked') {
+      toast(`${time} — déjà réservé par ${cur.who}.`);
+      return;
+    }
+    update((d) => {
+      if (d[time]) delete d[time];
+      else d[time] = { status: 'open' };
+    });
+  };
+  const bulk = (label, predicate, open) => {
+    update((d) => {
+      TIMES.forEach((time) => {
+        if (!predicate(Number(time.slice(0, 2)))) return;
+        if (d[time] && d[time].status === 'booked') return;
+        if (open) d[time] = { status: 'open' };
+        else delete d[time];
+      });
+    });
+    toast(label);
+  };
+
   return (
     <ScrollView style={s.screen} contentContainerStyle={s.screenPad}>
       <Kicker>ESPACE BARBER · ENZO MOREAU</Kicker>
-      <Title>Aujourd’hui</Title>
-      <View style={[s.row, { gap: 14, marginBottom: 20 }]}>
-        <Badge status={delay} />
-        <Text style={s.btags}>{next.length} rendez-vous restants · {fmt(ca)} encaissés</Text>
+      <Title em="créneaux">Mes </Title>
+      <Lead>Touchez un créneau pour l’ouvrir ou le fermer. Les clients ne voient que vos créneaux ouverts.</Lead>
+      <DaysBar sel={dayIdx} onSel={setDayIdx} />
+      <View style={[s.row, { marginTop: 12, marginBottom: 14, gap: 16 }]}>
+        <View style={s.row}><View style={[s.dot, { backgroundColor: '#3A3A40' }]} /><Text style={s.legend}>Fermé</Text></View>
+        <View style={s.row}><View style={[s.dot, { backgroundColor: C.gold }]} /><Text style={s.legend}>Ouvert</Text></View>
+        <View style={s.row}><View style={[s.dot, { backgroundColor: C.green }]} /><Text style={s.legend}>Réservé</Text></View>
+        <Text style={[s.btags, { marginLeft: 'auto' }]}>{nOpen} ouverts · {nBooked} réservés</Text>
       </View>
-      {TODAY_RDV.map((r) => (
-        <View key={r.time} style={[s.card, s.row, r.done && { opacity: 0.45 }]}>
-          <Text style={s.slotTime}>{r.time}</Text>
-          <View style={s.grow}>
-            <Text style={[s.bname, { fontSize: 14 }]}>{r.who}</Text>
-            <Text style={[s.btags, { marginTop: 2 }]}>{r.serv}</Text>
+      <View style={s.slotGrid}>
+        {TIMES.map((time) => {
+          const sl = slots[time];
+          const st = sl ? sl.status : 'closed';
+          return (
+            <TouchableOpacity
+              key={time}
+              style={[s.slotCell, st === 'open' && s.slotOpen, st === 'booked' && s.slotBooked]}
+              onPress={() => toggle(time)}
+              activeOpacity={0.75}
+            >
+              <Text style={[s.slotCellTime, st === 'closed' && { color: '#5A5852' }, st === 'booked' && { color: C.ink }]}>
+                {time}
+              </Text>
+              {st === 'booked' ? (
+                <Text style={s.slotCellWho} numberOfLines={1}>{sl.who}</Text>
+              ) : (
+                <Text style={[s.slotCellState, st === 'open' && { color: C.gold }]}>
+                  {st === 'open' ? 'ouvert' : 'fermé'}
+                </Text>
+              )}
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+      <Section>Actions rapides</Section>
+      <View style={s.wrap}>
+        <Chip mini label="Ouvrir la journée (9h–18h)" onPress={() => bulk('Journée ouverte — 9h à 18h.', (h) => h >= 9 && h < 18, true)} />
+        <Chip mini label="Ouvrir la soirée (20h–23h)" onPress={() => bulk('Soirée ouverte — tarifs soirée/nuit appliqués.', (h) => h >= 20, true)} />
+        <Chip mini label="Tout fermer" onPress={() => bulk('Tous les créneaux libres ont été fermés.', () => true, false)} />
+      </View>
+      <Text style={s.footnote}>
+        Les créneaux réservés ne peuvent pas être fermés. Les créneaux du soir appliquent automatiquement les tarifs soirée et nuit.
+      </Text>
+    </ScrollView>
+  );
+}
+
+const DUR_CHOICES = [30, 45, 60, 90, 120];
+const PRICE_CHOICES = [
+  ['dyn', 'Tarif dynamique'], ['3500', '35 €'], ['4500', '45 €'], ['6000', '60 €'], ['9000', '90 €'],
+];
+const ICON_FOR_WINDOW = { all: 'tag', day: 'sun', evening: 'sunset', night: 'moon' };
+
+function FormulasScreen({ formulas, setFormulas, toast }) {
+  const [creating, setCreating] = useState(false);
+  const [name, setName] = useState('');
+  const [dur, setDur] = useState(45);
+  const [windowSel, setWindowSel] = useState('all');
+  const [priceSel, setPriceSel] = useState('dyn');
+  const [recur, setRecur] = useState(false);
+
+  const toggleActive = (id) => {
+    setFormulas((fs) => fs.map((f) => {
+      if (f.id !== id) return f;
+      toast(f.active ? `Formule « ${f.name} » désactivée.` : `Formule « ${f.name} » visible par vos clients.`);
+      return { ...f, active: !f.active };
+    }));
+  };
+
+  const create = () => {
+    const label = name.trim();
+    if (!label) {
+      toast('Donnez un nom à votre formule.');
+      return;
+    }
+    setFormulas((fs) => [
+      ...fs,
+      {
+        id: 'f' + (fs.length + 1) + Date.now(),
+        name: label,
+        icon: recur ? 'refresh-cw' : ICON_FOR_WINDOW[windowSel],
+        dur,
+        window: windowSel,
+        fixed: priceSel === 'dyn' ? null : Number(priceSel),
+        recur,
+        active: true,
+        desc: `${dur} min · ${WINDOWS[windowSel]}${recur ? ' · chaque semaine' : ''}${priceSel === 'dyn' ? ' · tarif dynamique' : ''}`,
+      },
+    ]);
+    setCreating(false);
+    setName('');
+    setDur(45);
+    setWindowSel('all');
+    setPriceSel('dyn');
+    setRecur(false);
+    toast(`Formule « ${label} » créée — vos clients peuvent la réserver.`);
+  };
+
+  return (
+    <ScrollView style={s.screen} contentContainerStyle={s.screenPad} keyboardShouldPersistTaps="handled">
+      <Kicker>ESPACE BARBER · ENZO MOREAU</Kicker>
+      <Title em="formules">Mes </Title>
+      <Lead>
+        Créez vos types de rendez-vous — nocturne, transformation, hebdomadaire… Vos clients réservent dans le cadre que vous fixez.
+      </Lead>
+
+      {formulas.map((f) => (
+        <View key={f.id} style={[s.card, !f.active && { opacity: 0.55 }]}>
+          <View style={s.row}>
+            <Feather name={f.icon} size={17} color={C.gold} />
+            <View style={s.grow}>
+              <View style={s.row}>
+                <Text style={[s.bname, s.grow, { fontSize: 14.5 }]}>{f.name}</Text>
+                <Text style={s.formulaMeta}>
+                  {f.dur} min · {WINDOWS[f.window]}{f.fixed != null ? ` · ${fmt(f.fixed)}` : ''}{f.recur ? ' · hebdo' : ''}
+                </Text>
+              </View>
+              <Text style={[s.btags, { marginTop: 3 }]}>{f.desc}</Text>
+            </View>
+            <Toggle on={f.active} onPress={() => toggleActive(f.id)} />
           </View>
-          {r.done ? (
-            <Feather name="check" size={17} color={C.green} />
-          ) : (
-            <Text style={[s.price, { fontSize: 15 }]}>{fmt(r.price)}</Text>
-          )}
         </View>
       ))}
+
+      {creating ? (
+        <View style={[s.card, { borderColor: C.lineGold }]}>
+          <Text style={[s.bname, { marginBottom: 12 }]}>Nouvelle formule</Text>
+          <Text style={s.fieldLabel}>NOM</Text>
+          <TextInput
+            style={s.input}
+            placeholder="Ex. Rendez-vous domicile, Express midi…"
+            placeholderTextColor="#5A5852"
+            value={name}
+            onChangeText={setName}
+          />
+          <Text style={s.fieldLabel}>DURÉE</Text>
+          <View style={s.wrap}>
+            {DUR_CHOICES.map((d) => (
+              <Chip key={d} mini label={`${d} min`} on={dur === d} onPress={() => setDur(d)} />
+            ))}
+          </View>
+          <Text style={s.fieldLabel}>FENÊTRE HORAIRE</Text>
+          <View style={s.wrap}>
+            {Object.entries(WINDOWS).map(([k, l]) => (
+              <Chip key={k} mini label={l} on={windowSel === k} onPress={() => setWindowSel(k)} />
+            ))}
+          </View>
+          <Text style={s.fieldLabel}>TARIF</Text>
+          <View style={s.wrap}>
+            {PRICE_CHOICES.map(([k, l]) => (
+              <Chip key={k} mini label={l} on={priceSel === k} onPress={() => setPriceSel(k)} />
+            ))}
+          </View>
+          <Text style={s.fieldLabel}>RÉCURRENCE</Text>
+          <View style={s.wrap}>
+            <Chip mini label="Ponctuel" on={!recur} onPress={() => setRecur(false)} />
+            <Chip mini label="Hebdomadaire (−15 %)" on={recur} onPress={() => setRecur(true)} />
+          </View>
+          <Btn label="CRÉER LA FORMULE" onPress={create} />
+          <Btn ghost label="ANNULER" onPress={() => setCreating(false)} />
+        </View>
+      ) : (
+        <Btn ghost icon="plus" label="NOUVELLE FORMULE" onPress={() => setCreating(true)} />
+      )}
+      <Text style={s.footnote}>
+        Une formule désactivée disparaît immédiatement du parcours de réservation client.
+      </Text>
+    </ScrollView>
+  );
+}
+
+function PlanningScreen({ agenda, dayIdx, setDayIdx, delay, toast }) {
+  const day = DAYS[dayIdx];
+  const slots = agenda.enzo[day.key] || {};
+  const rdv = Object.entries(slots)
+    .filter(([, v]) => v.status === 'booked')
+    .map(([time, v]) => ({ time, ...v }))
+    .sort((a, b) => a.time.localeCompare(b.time));
+  const ca = rdv.filter((r) => r.done).reduce((sum, r) => sum + r.price, 0);
+  const todo = rdv.filter((r) => !r.done).length;
+  return (
+    <ScrollView style={s.screen} contentContainerStyle={s.screenPad}>
+      <Kicker>ESPACE BARBER · ENZO MOREAU</Kicker>
+      <Title>Planning</Title>
+      <View style={[s.row, { gap: 14, marginBottom: 16 }]}>
+        <Badge status={delay} />
+        <Text style={s.btags}>{todo} à venir{ca > 0 ? ` · ${fmt(ca)} encaissés` : ''}</Text>
+      </View>
+      <DaysBar sel={dayIdx} onSel={setDayIdx} />
+      <View style={{ height: 14 }} />
+      {rdv.length === 0 ? (
+        <Text style={s.footnote}>
+          Aucune réservation ce jour.{'\n'}Ouvrez des créneaux dans l’onglet Créneaux pour recevoir des clients.
+        </Text>
+      ) : (
+        rdv.map((r) => (
+          <View key={r.time} style={[s.card, s.row, r.done && { opacity: 0.45 }]}>
+            <Text style={s.slotTime}>{r.time}</Text>
+            <View style={s.grow}>
+              <Text style={[s.bname, { fontSize: 14 }]}>{r.who}</Text>
+              <Text style={[s.btags, { marginTop: 2 }]}>{r.serv}</Text>
+            </View>
+            {r.done ? (
+              <Feather name="check" size={17} color={C.green} />
+            ) : (
+              <Text style={[s.price, { fontSize: 15 }]}>{fmt(r.price)}</Text>
+            )}
+          </View>
+        ))
+      )}
       <Btn ghost icon="camera" label="PHOTOS DE FIN DE PRESTATION"
         onPress={() => toast('Appareil photo — 1 à 10 photos attachées à la prestation.')} />
     </ScrollView>
   );
 }
 
-function StatusScreen({ delay, setDelay, toast }) {
+function StatusScreen({ agenda, delay, setDelay, toast }) {
+  const todayBooked = Object.values(agenda.enzo[DAYS[0].key] || {})
+    .filter((v) => v.status === 'booked' && !v.done).length;
   return (
     <ScrollView style={s.screen} contentContainerStyle={s.screenPad}>
       <Kicker>ESPACE BARBER</Kicker>
@@ -577,7 +1079,7 @@ function StatusScreen({ delay, setDelay, toast }) {
             activeOpacity={0.8}
             onPress={() => {
               setDelay(k);
-              toast(`${TODAY_RDV.filter((r) => !r.done).length} clients notifiés — « Enzo · ${v.label} »`);
+              toast(`${todayBooked} client${todayBooked > 1 ? 's' : ''} notifié${todayBooked > 1 ? 's' : ''} — « Enzo · ${v.label} »`);
             }}
           >
             <View style={[s.dotLg, { backgroundColor: v.dot }]} />
@@ -593,8 +1095,13 @@ function StatusScreen({ delay, setDelay, toast }) {
   );
 }
 
-function ActivityScreen() {
-  const top = [['Coupe + Barbe', 46], ['Coupe Homme', 31], ['Hair Design', 14], ['Barbe seule', 9]];
+function ActivityScreen({ agenda }) {
+  const todaySlots = Object.values(agenda.enzo[DAYS[0].key] || {});
+  const booked = todaySlots.filter((v) => v.status === 'booked');
+  const open = todaySlots.filter((v) => v.status === 'open').length;
+  const ca = booked.filter((r) => r.done).reduce((sum, r) => sum + r.price, 0);
+  const fill = booked.length + open > 0 ? Math.round((booked.length / (booked.length + open)) * 100) : 0;
+  const top = [['Burst Fade', 38], ['Coupe + Barbe', 27], ['Transformation', 21], ['Barbe seule', 14]];
   return (
     <ScrollView style={s.screen} contentContainerStyle={s.screenPad}>
       <Kicker>ESPACE BARBER</Kicker>
@@ -602,8 +1109,8 @@ function ActivityScreen() {
       <Lead>Vos chiffres, en un coup d’œil.</Lead>
       <View style={s.kpis}>
         {[
-          ['173 €', 'CA DU JOUR'], ['1 240 €', 'CA SEMAINE'], ['4 980 €', 'CA MOIS'],
-          ['87 %', 'REMPLISSAGE'], ['6', 'RDV AUJOURD’HUI'], ['★ 4,9', 'NOTE MOYENNE'],
+          [fmt(ca), 'CA DU JOUR'], ['1 240 €', 'CA SEMAINE'], ['4 980 €', 'CA MOIS'],
+          [fill + ' %', 'REMPLISSAGE'], [String(booked.length), 'RDV AUJOURD’HUI'], ['★ 4,9', 'NOTE MOYENNE'],
         ].map(([v, l]) => (
           <View key={l} style={s.kpi}>
             <Text style={s.kpiV}>{v}</Text>
@@ -631,13 +1138,15 @@ function ActivityScreen() {
 
 /* ───────── Racine ───────── */
 const CLIENT_TABS = [
-  ['home', 'home', 'Salon'],
+  ['explore', 'search', 'Explorer'],
   ['book', 'calendar', 'Réserver'],
   ['cuts', 'image', 'Mes coupes'],
   ['shop', 'shopping-bag', 'Boutique'],
   ['me', 'user', 'Profil'],
 ];
 const BARBER_TABS = [
+  ['slots', 'unlock', 'Créneaux'],
+  ['formulas', 'layers', 'Formules'],
   ['planning', 'calendar', 'Planning'],
   ['status', 'clock', 'Statut'],
   ['activity', 'bar-chart-2', 'Activité'],
@@ -645,9 +1154,13 @@ const BARBER_TABS = [
 
 export default function App() {
   const [role, setRole] = useState(null); // null | 'client' | 'barber'
-  const [tab, setTab] = useState('home');
+  const [tab, setTab] = useState('explore');
   const [barberDetail, setBarberDetail] = useState(null);
-  const [booking, setBooking] = useState({ service: null, barber: 'any', done: null });
+  const [agenda, setAgenda] = useState(initAgenda);
+  const [formulas, setFormulas] = useState(initFormulas);
+  const [booking, setBooking] = useState({ barber: 'any', formula: null, service: null, done: null });
+  const [clientDay, setClientDay] = useState(0);
+  const [barberDay, setBarberDay] = useState(0);
   const [cat, setCat] = useState('ALL');
   const [cart, setCart] = useState(0);
   const [points, setPoints] = useState(86);
@@ -657,7 +1170,6 @@ export default function App() {
   const toastAnim = useRef(new Animated.Value(0)).current;
   const toastTimer = useRef(null);
 
-  // Le statut d'Enzo (modifié côté Barber) est visible en direct côté Client
   const barbersLive = BARBERS.map((b) => (b.id === 'enzo' ? { ...b, delay: enzoDelay } : b));
 
   const toast = (msg) => {
@@ -671,18 +1183,38 @@ export default function App() {
 
   const choose = (r) => {
     setRole(r);
-    setTab(r === 'client' ? 'home' : 'planning');
+    setTab(r === 'client' ? 'explore' : 'slots');
     setBarberDetail(null);
   };
 
-  const confirmBooking = (service, slot) => {
+  const confirmBooking = (formula, service, slot, quote) => {
+    const day = DAYS[clientDay];
+    const servLabel = formula.fixed != null
+      ? formula.name
+      : formula.id === 'f1' ? service.name : `${formula.name} · ${service.name}`;
+    setAgenda((a) => ({
+      ...a,
+      [slot.barber.id]: {
+        ...a[slot.barber.id],
+        [day.key]: {
+          ...a[slot.barber.id][day.key],
+          [slot.time]: { status: 'booked', who: 'Mathéo', serv: servLabel, price: quote.price, done: false },
+        },
+      },
+    }));
     setBooking({
       ...booking,
-      done: { serv: service.name, time: slot.time, barber: slot.barber.name, price: slot.price, rules: slot.rules },
+      done: {
+        serv: servLabel, time: slot.time, day: day.label, barber: slot.barber.name,
+        price: quote.price, rules: quote.rules, recur: formula.recur,
+      },
     });
-    setPoints((p) => p + Math.floor(slot.price / 100));
-    setUpcoming((u) => [...u, { serv: service.name, time: slot.time, barber: slot.barber.name, price: slot.price }]);
-    toast(`Réservation confirmée — ${slot.time} avec ${slot.barber.name.split(' ')[0]} · ${fmt(slot.price)}`);
+    setPoints((p) => p + Math.floor(quote.price / 100));
+    setUpcoming((u) => [...u, {
+      serv: servLabel, time: slot.time, day: day.label, barber: slot.barber.name,
+      price: quote.price, recur: formula.recur,
+    }]);
+    toast(`Réservation confirmée — ${day.label} ${slot.time} avec ${slot.barber.name.split(' ')[0]} · ${fmt(quote.price)}`);
   };
 
   const addCart = (p) => {
@@ -699,18 +1231,35 @@ export default function App() {
         <BarberDetailScreen
           barber={barbersLive.find((b) => b.id === barberDetail.id)}
           onBack={() => setBarberDetail(null)}
-          onBook={(id) => { setBooking({ service: null, barber: id, done: null }); setBarberDetail(null); setTab('book'); }}
+          onBook={(id) => {
+            setBooking({ barber: id, formula: null, service: null, done: null });
+            setBarberDetail(null);
+            setTab('book');
+          }}
         />
       );
-    } else if (tab === 'home') content = <HomeScreen barbers={barbersLive} openBarber={setBarberDetail} />;
-    else if (tab === 'book') content = <BookScreen booking={booking} setBooking={setBooking} onConfirm={confirmBooking} />;
+    } else if (tab === 'explore') content = <ExploreScreen barbers={barbersLive} openBarber={setBarberDetail} />;
+    else if (tab === 'book') content = (
+      <BookScreen agenda={agenda} formulas={formulas} booking={booking} setBooking={setBooking}
+        dayIdx={clientDay} setDayIdx={setClientDay} onConfirm={confirmBooking} />
+    );
     else if (tab === 'cuts') content = <CutsScreen toast={toast} />;
     else if (tab === 'shop') content = <ShopScreen cat={cat} setCat={setCat} cart={cart} addCart={addCart} toast={toast} />;
     else content = <MeScreen points={points} upcoming={upcoming} onLogout={() => setRole(null)} />;
   } else if (role === 'barber') {
-    if (tab === 'planning') content = <PlanningScreen delay={enzoDelay} toast={toast} />;
-    else if (tab === 'status') content = <StatusScreen delay={enzoDelay} setDelay={setEnzoDelay} toast={toast} />;
-    else content = <ActivityScreen />;
+    if (tab === 'slots') content = (
+      <SlotsScreen agenda={agenda} setAgenda={setAgenda} dayIdx={barberDay} setDayIdx={setBarberDay} toast={toast} />
+    );
+    else if (tab === 'formulas') content = (
+      <FormulasScreen formulas={formulas} setFormulas={setFormulas} toast={toast} />
+    );
+    else if (tab === 'planning') content = (
+      <PlanningScreen agenda={agenda} dayIdx={barberDay} setDayIdx={setBarberDay} delay={enzoDelay} toast={toast} />
+    );
+    else if (tab === 'status') content = (
+      <StatusScreen agenda={agenda} delay={enzoDelay} setDelay={setEnzoDelay} toast={toast} />
+    );
+    else content = <ActivityScreen agenda={agenda} />;
   }
 
   const tabs = role === 'client' ? CLIENT_TABS : BARBER_TABS;
@@ -738,7 +1287,7 @@ export default function App() {
               return (
                 <TouchableOpacity key={k} style={s.tabBtn}
                   onPress={() => { setTab(k); setBarberDetail(null); }} activeOpacity={0.7}>
-                  <Feather name={ic} size={20} color={on ? C.gold2 : '#6E6B65'} />
+                  <Feather name={ic} size={19} color={on ? C.gold2 : '#6E6B65'} />
                   <Text style={[s.tabLabel, on && { color: C.gold2 }]}>{l}</Text>
                 </TouchableOpacity>
               );
@@ -771,7 +1320,6 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
 
-  /* Accueil / choix d'espace */
   welcome: { flex: 1, justifyContent: 'center', padding: 26 },
   welcomeMark: { fontFamily: SERIF, fontSize: SMALL ? 38 : 44, fontWeight: '600', color: C.text, letterSpacing: 1 },
   welcomeRule: { width: 54, height: 1, backgroundColor: C.gold, marginVertical: 16, opacity: 0.7 },
@@ -792,7 +1340,7 @@ const s = StyleSheet.create({
   screen: { flex: 1 },
   screenPad: { padding: PAD, paddingBottom: 40 },
 
-  kicker: { color: C.gold, fontSize: 10, letterSpacing: 3.5, marginBottom: 8, fontWeight: '500' },
+  kicker: { color: C.gold, fontSize: 10, letterSpacing: 3, marginBottom: 8, fontWeight: '500' },
   title: { fontFamily: SERIF, fontSize: SMALL ? 28 : 32, fontWeight: '600', color: C.text, marginBottom: 6, lineHeight: SMALL ? 32 : 36 },
   titleEm: { fontStyle: 'italic', color: C.gold2, fontWeight: '500' },
   lead: { color: C.muted, fontSize: 13, lineHeight: 20, marginBottom: 20 },
@@ -802,12 +1350,13 @@ const s = StyleSheet.create({
   secNote: { color: C.muted, fontSize: 11 },
   secLine: { flex: 1, height: 1, backgroundColor: C.line },
 
-  hero: {
-    borderWidth: 1, borderColor: C.lineGold, borderRadius: 22, padding: 20,
-    backgroundColor: C.surface, marginBottom: 6,
+  search: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: C.surface, borderWidth: 1, borderColor: C.line,
+    borderRadius: 16, paddingHorizontal: 15, paddingVertical: Platform.OS === 'ios' ? 13 : 4,
+    marginBottom: 12,
   },
-  heroQuote: { fontFamily: SERIF, fontStyle: 'italic', fontSize: 19, lineHeight: 26, color: C.text, marginBottom: 8 },
-  heroSub: { color: C.muted, fontSize: 12, letterSpacing: 0.5 },
+  searchInput: { flex: 1, color: C.text, fontSize: 13.5, padding: 0 },
 
   card: {
     backgroundColor: C.surface, borderWidth: 1, borderColor: C.line,
@@ -833,6 +1382,13 @@ const s = StyleSheet.create({
   dotLg: { width: 9, height: 9, borderRadius: 4.5 },
   badgeText: { color: '#CFCCC4', fontSize: 11 },
   rate: { color: C.gold, fontSize: 12, letterSpacing: 0.5 },
+  legend: { color: C.soft, fontSize: 11 },
+
+  tag: {
+    borderWidth: 1, borderColor: C.lineGold, borderRadius: 999,
+    paddingHorizontal: 9, paddingVertical: 3.5,
+  },
+  tagText: { color: C.gold, fontSize: 10, letterSpacing: 0.4 },
 
   chip: {
     backgroundColor: C.surface, borderWidth: 1, borderColor: C.line,
@@ -850,6 +1406,32 @@ const s = StyleSheet.create({
   softText: { color: C.soft, fontSize: 12.5, lineHeight: 18 },
   footnote: { color: C.muted, fontSize: 12, textAlign: 'center', paddingVertical: 18, lineHeight: 19 },
   footnoteLeft: { color: C.muted, fontSize: 11.5, lineHeight: 18 },
+  formulaMeta: { color: C.gold, fontSize: 10.5, letterSpacing: 0.3 },
+
+  fieldLabel: { color: C.muted, fontSize: 9, letterSpacing: 1.8, marginTop: 14, marginBottom: 8 },
+  input: {
+    backgroundColor: C.surface2, borderWidth: 1, borderColor: C.line, borderRadius: 12,
+    color: C.text, fontSize: 13.5, paddingHorizontal: 14, paddingVertical: Platform.OS === 'ios' ? 12 : 9,
+  },
+
+  sw: {
+    width: 44, height: 25, borderRadius: 999, backgroundColor: '#2A2A2E',
+    borderWidth: 1, borderColor: C.line, justifyContent: 'center', paddingHorizontal: 3,
+  },
+  swOn: { backgroundColor: 'rgba(200,169,106,0.25)', borderColor: C.lineGold },
+  swKnob: { width: 17, height: 17, borderRadius: 9, backgroundColor: '#8E8B86' },
+  swKnobOn: { alignSelf: 'flex-end', backgroundColor: C.gold },
+
+  slotGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  slotCell: {
+    width: SLOT_W, borderRadius: 13, paddingVertical: 10, alignItems: 'center',
+    backgroundColor: C.surface, borderWidth: 1, borderColor: C.line,
+  },
+  slotOpen: { borderColor: C.gold, backgroundColor: 'rgba(200,169,106,0.07)' },
+  slotBooked: { backgroundColor: C.gold, borderColor: C.gold },
+  slotCellTime: { fontFamily: SERIF, fontSize: 15, fontWeight: '600', color: C.text },
+  slotCellState: { fontSize: 9, letterSpacing: 1, color: '#5A5852', marginTop: 3, textTransform: 'uppercase' },
+  slotCellWho: { fontSize: 9, color: C.ink, marginTop: 3, fontWeight: '600', maxWidth: SLOT_W - 12 },
 
   btn: {
     flexDirection: 'row', backgroundColor: C.gold, borderRadius: 16, padding: 15,
@@ -900,7 +1482,7 @@ const s = StyleSheet.create({
   opt: {
     flexDirection: 'row', alignItems: 'center', gap: 13,
     backgroundColor: C.surface, borderWidth: 1, borderColor: C.line,
-    borderRadius: 16, paddingVertical: 16, paddingHorizontal: 17, marginBottom: 9,
+    borderRadius: 16, paddingVertical: 15, paddingHorizontal: 17, marginBottom: 9,
   },
   optOn: { borderColor: C.lineGold, backgroundColor: C.surface2 },
   optText: { color: C.text, fontSize: 14 },
@@ -922,7 +1504,7 @@ const s = StyleSheet.create({
     paddingTop: 9, paddingBottom: Platform.OS === 'ios' ? 4 : 12,
   },
   tabBtn: { flex: 1, alignItems: 'center', gap: 4, paddingVertical: 2 },
-  tabLabel: { color: '#6E6B65', fontSize: 9.5, letterSpacing: 0.4 },
+  tabLabel: { color: '#6E6B65', fontSize: 9, letterSpacing: 0.3 },
 
   toast: {
     position: 'absolute', bottom: 92, left: PAD, right: PAD,
