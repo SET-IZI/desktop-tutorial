@@ -3,166 +3,262 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>BarberPro — Démo interactive</title>
+<title>BarberPro — Démo</title>
 <style>
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=Outfit:wght@300;400;500;600&display=swap');
+
   :root{
-    --black:#0D0D0D; --anthra:#2E2E2E; --anthra2:#1C1C1C;
-    --gold:#C9A227; --white:#FFF; --muted:#9A9A9A;
-    --green:#3DBE6B; --orange:#E8932A; --red:#D64545;
+    --bg:#0A0A0B; --surface:#131316; --surface2:#1B1B20;
+    --line:rgba(255,255,255,.075); --line2:rgba(200,169,106,.28);
+    --gold:#C8A96A; --gold2:#E6CFA0; --ink:#0E0D0B;
+    --text:#F1EEE7; --muted:#908D86;
+    --green:#7FB98F; --orange:#D9A05B; --red:#C97B6E;
+    --serif:'Cormorant Garamond',Georgia,'Times New Roman',serif;
+    --sans:'Outfit',system-ui,-apple-system,'Segoe UI',sans-serif;
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;}
   body{
-    margin:0; font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
-    background:radial-gradient(1200px 600px at 50% -10%, #1d1a10 0%, #0a0a0a 60%);
-    color:var(--white); min-height:100vh;
-    display:flex; flex-direction:column; align-items:center; padding:18px 10px 40px;
+    font-family:var(--sans); font-weight:300; color:var(--text);
+    background:
+      radial-gradient(900px 420px at 50% -8%, rgba(200,169,106,.10), transparent 65%),
+      radial-gradient(700px 500px at 90% 110%, rgba(200,169,106,.05), transparent 60%),
+      var(--bg);
+    min-height:100vh; display:flex; flex-direction:column; align-items:center;
+    padding:26px 12px 48px;
   }
-  .page-title{font-size:22px; font-weight:800; letter-spacing:.5px; margin:6px 0 2px;}
-  .page-title span{color:var(--gold);}
-  .page-sub{color:var(--muted); font-size:13px; margin:0 0 14px; text-align:center;}
-  .roles{display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; justify-content:center;}
-  .roles button{
-    background:transparent; border:1px solid var(--gold); color:var(--gold);
-    padding:8px 16px; border-radius:999px; font-size:13px; font-weight:700; cursor:pointer;
-  }
-  .roles button.on{background:var(--gold); color:#000;}
 
+  /* ── En-tête de page ── */
+  .wordmark{font-family:var(--serif); font-size:30px; font-weight:600; letter-spacing:.04em; margin:0;}
+  .wordmark em{color:var(--gold); font-style:italic;}
+  .page-sub{
+    color:var(--muted); font-size:11px; letter-spacing:.32em; text-transform:uppercase;
+    margin:6px 0 20px; text-align:center;
+  }
+  .roles{
+    display:flex; background:rgba(255,255,255,.04); border:1px solid var(--line);
+    border-radius:999px; padding:4px; margin-bottom:22px; backdrop-filter:blur(6px);
+  }
+  .roles button{
+    background:transparent; border:none; color:var(--muted); font-family:var(--sans);
+    font-size:12.5px; font-weight:500; letter-spacing:.06em; padding:8px 22px;
+    border-radius:999px; cursor:pointer; transition:all .25s;
+  }
+  .roles button.on{background:var(--gold); color:var(--ink); font-weight:600;}
+
+  /* ── Téléphone ── */
   .phone{
-    width:390px; max-width:100%; height:780px; background:var(--black);
-    border:1px solid #3a3a3a; border-radius:38px; overflow:hidden;
-    display:flex; flex-direction:column; box-shadow:0 30px 80px rgba(0,0,0,.6);
-    position:relative;
+    width:392px; max-width:100%; height:800px; background:var(--bg);
+    border:1px solid rgba(255,255,255,.10); border-radius:44px; overflow:hidden;
+    display:flex; flex-direction:column; position:relative;
+    box-shadow:0 0 0 6px rgba(0,0,0,.55), 0 40px 90px rgba(0,0,0,.65);
   }
   @media (max-width:480px){
-    body{padding:8px 0 0;}
-    .phone{height:calc(100vh - 130px); border-radius:24px;}
+    body{padding:10px 0 0;}
+    .phone{height:calc(100vh - 140px); border-radius:28px;}
   }
-  .screen{flex:1; overflow-y:auto; padding:20px 16px 24px;}
+  .screen{flex:1; overflow-y:auto; padding:26px 20px 30px; scrollbar-width:none;}
+  .screen::-webkit-scrollbar{display:none;}
+  .fade{animation:fadeUp .35s ease both;}
+  @keyframes fadeUp{from{opacity:0; transform:translateY(10px);} to{opacity:1; transform:none;}}
+
+  /* ── Barre d'onglets ── */
   .tabbar{
-    display:flex; background:var(--anthra2); border-top:1px solid #262626;
+    display:flex; background:rgba(14,14,16,.92); backdrop-filter:blur(14px);
+    border-top:1px solid var(--line); padding:6px 4px 12px;
   }
   .tabbar button{
-    flex:1; background:none; border:none; color:var(--muted); padding:10px 2px 12px;
-    font-size:10.5px; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:3px;
+    flex:1; background:none; border:none; color:#6E6B65; padding:8px 0 0;
+    font-family:var(--sans); font-size:9.5px; font-weight:500; letter-spacing:.08em;
+    cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:5px;
+    transition:color .2s;
   }
-  .tabbar button .ic{font-size:19px;}
-  .tabbar button.on{color:var(--gold);}
+  .tabbar button svg{width:21px; height:21px;}
+  .tabbar button.on{color:var(--gold2);}
 
-  h1.app{font-size:26px; margin:0;}
-  h1.app span{color:var(--gold);}
-  .caption{color:var(--muted); font-size:13px; margin:4px 0 16px;}
-  h2.sec{font-size:16px; margin:20px 0 10px;}
-  .card{background:var(--anthra); border-radius:16px; padding:14px; margin-bottom:12px;}
-  .row{display:flex; align-items:center; gap:12px;}
+  /* ── Typo écrans ── */
+  .kicker{
+    color:var(--gold); font-size:10px; letter-spacing:.34em; text-transform:uppercase;
+    font-weight:500; margin:0 0 8px;
+  }
+  h1.t{font-family:var(--serif); font-size:34px; font-weight:600; line-height:1.04; margin:0 0 6px;}
+  h1.t em{font-style:italic; color:var(--gold2); font-weight:500;}
+  .lead{color:var(--muted); font-size:13px; line-height:1.55; margin:0 0 22px;}
+  h2.sec{
+    font-family:var(--serif); font-size:20px; font-weight:600; margin:26px 0 12px;
+    display:flex; align-items:baseline; gap:10px;
+  }
+  h2.sec::after{content:''; flex:1; height:1px; background:var(--line);}
+  h2.sec small{color:var(--muted); font-family:var(--sans); font-size:11px; font-weight:400; letter-spacing:.05em;}
+
+  /* ── Composants ── */
+  .card{
+    background:linear-gradient(180deg, rgba(255,255,255,.025), rgba(255,255,255,0)), var(--surface);
+    border:1px solid var(--line); border-radius:20px; padding:17px; margin-bottom:12px;
+  }
+  .row{display:flex; align-items:center; gap:14px;}
   .grow{flex:1; min-width:0;}
+  .tap{cursor:pointer; transition:border-color .2s, transform .15s;}
+  .tap:active{transform:scale(.985);}
+  .tap:hover{border-color:var(--line2);}
 
-  .avatar{
-    width:58px; height:58px; border-radius:16px; display:flex; align-items:center;
-    justify-content:center; font-size:28px; flex-shrink:0;
+  .ava{
+    width:56px; height:56px; border-radius:50%; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center;
+    font-family:var(--serif); font-size:21px; font-weight:600; color:var(--gold2);
+    background:radial-gradient(circle at 32% 28%, #26242274, #121110) var(--surface2);
+    border:1px solid var(--line2); position:relative;
   }
-  .bname{font-weight:700; font-size:15.5px;}
-  .btags{color:var(--muted); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin:2px 0 6px;}
-  .badge{
-    display:inline-flex; align-items:center; gap:6px; background:#0d0d0d;
-    border-radius:999px; padding:4px 10px; font-size:11.5px;
-  }
-  .dot{width:8px; height:8px; border-radius:50%;}
-  .star{color:var(--gold); font-weight:700; font-size:13px;}
-  .chev{color:var(--muted); font-size:18px;}
+  .ava.lg{width:86px; height:86px; font-size:32px;}
+
+  .bname{font-weight:500; font-size:15.5px; letter-spacing:.01em;}
+  .btags{color:var(--muted); font-size:11.5px; letter-spacing:.02em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin:3px 0 8px;}
+
+  .status{display:inline-flex; align-items:center; gap:7px; font-size:11px; color:#CFCCC4; letter-spacing:.04em;}
+  .status .dot{width:6px; height:6px; border-radius:50%; box-shadow:0 0 8px 1px currentColor;}
+  .rate{font-size:12px; color:var(--gold); letter-spacing:.05em; white-space:nowrap;}
+  .chev{color:#56534E; font-size:20px; font-family:var(--serif);}
 
   .chips{display:flex; flex-wrap:wrap; gap:8px;}
   .chip{
-    border:1px solid var(--gold); color:var(--gold); border-radius:999px;
-    padding:8px 13px; font-size:12.5px; font-weight:600; cursor:pointer; background:transparent;
+    font-family:var(--sans); background:var(--surface); border:1px solid var(--line);
+    color:#CFCCC4; border-radius:999px; padding:9px 15px; font-size:12px; font-weight:400;
+    letter-spacing:.03em; cursor:pointer; transition:all .2s;
   }
-  .chip.on{background:var(--gold); color:#000;}
-  .chip.gray{border-color:#555; color:#bbb;}
+  .chip .p{color:var(--gold); margin-left:5px;}
+  .chip.on{background:var(--gold); border-color:var(--gold); color:var(--ink); font-weight:600;}
+  .chip.on .p{color:var(--ink);}
+  .chip.mini{padding:7px 13px; font-size:11px;}
 
   .slot{
-    display:flex; align-items:center; background:var(--anthra); border-radius:14px;
-    padding:12px 14px; margin-bottom:8px; cursor:pointer; border:1px solid transparent;
+    display:flex; align-items:center; gap:13px; background:var(--surface);
+    border:1px solid var(--line); border-radius:16px; padding:13px 16px; margin-bottom:8px;
+    cursor:pointer; transition:border-color .2s;
   }
-  .slot:hover{border-color:var(--gold);}
-  .slot .t{font-weight:700; font-size:15px; width:56px;}
-  .slot .who{color:var(--muted); font-size:12px;}
-  .slot .rule{color:var(--orange); font-size:11px;}
-  .price{color:var(--gold); font-weight:800; font-size:15px; margin-left:auto;}
+  .slot:hover{border-color:var(--line2);}
+  .slot .t{font-family:var(--serif); font-size:19px; font-weight:600; width:58px; color:var(--gold2);}
+  .slot .who{font-size:12px; color:#CFCCC4;}
+  .slot .rule{color:var(--orange); font-size:10.5px; letter-spacing:.03em; margin-top:2px;}
+  .price{margin-left:auto; font-family:var(--serif); font-size:17px; font-weight:700; color:var(--gold); white-space:nowrap;}
 
   .btn{
-    display:block; width:100%; background:var(--gold); color:#000; border:none;
-    border-radius:14px; padding:14px; font-size:15px; font-weight:800; cursor:pointer; margin-top:14px;
+    display:block; width:100%; border:none; cursor:pointer; margin-top:16px;
+    background:linear-gradient(135deg, var(--gold2), var(--gold) 55%, #A8884E);
+    color:var(--ink); border-radius:16px; padding:15px;
+    font-family:var(--sans); font-size:13px; font-weight:600; letter-spacing:.14em; text-transform:uppercase;
+    box-shadow:0 10px 26px rgba(200,169,106,.22);
   }
-  .btn.ghost{background:transparent; border:1px solid var(--gold); color:var(--gold);}
+  .btn.ghost{background:transparent; border:1px solid var(--line2); color:var(--gold); box-shadow:none;}
   .back{
-    background:none; border:none; color:var(--gold); font-size:14px; font-weight:700;
-    cursor:pointer; padding:0; margin-bottom:12px;
+    background:none; border:none; color:var(--muted); font-family:var(--sans); font-size:12px;
+    letter-spacing:.1em; text-transform:uppercase; cursor:pointer; padding:0; margin-bottom:18px;
   }
+  .back:hover{color:var(--gold);}
 
-  .photos{display:flex; gap:8px; overflow-x:auto; padding-bottom:4px;}
+  .photos{display:flex; gap:9px; overflow-x:auto; padding-bottom:4px; scrollbar-width:none;}
+  .photos::-webkit-scrollbar{display:none;}
   .photo{
-    width:104px; height:104px; border-radius:12px; flex-shrink:0; display:flex;
-    align-items:flex-end; justify-content:center; font-size:34px; position:relative;
+    width:106px; height:128px; border-radius:14px; flex-shrink:0; position:relative;
+    border:1px solid var(--line); display:flex; align-items:center; justify-content:center;
+    overflow:hidden;
   }
+  .photo svg{width:30px; height:30px; color:rgba(200,169,106,.4);}
   .photo small{
-    position:absolute; bottom:0; left:0; right:0; background:rgba(0,0,0,.55);
-    color:#fff; font-size:10px; text-align:center; padding:3px 0; border-radius:0 0 12px 12px;
+    position:absolute; bottom:0; left:0; right:0; padding:6px 0;
+    background:linear-gradient(transparent, rgba(0,0,0,.72)); color:#D8D5CE;
+    font-size:9.5px; letter-spacing:.14em; text-transform:uppercase; text-align:center;
   }
-  .stats{display:flex; background:var(--anthra); border-radius:16px; padding:14px 6px;}
-  .stat{flex:1; text-align:center;}
-  .stat .v{color:var(--gold); font-weight:800; font-size:16px;}
-  .stat .l{color:var(--muted); font-size:10.5px; margin-top:3px;}
 
-  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
-  .pcard{background:var(--anthra); border-radius:14px; padding:10px; }
-  .pimg{height:96px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:40px; margin-bottom:8px;}
-  .pname{font-size:13px; font-weight:600; margin-bottom:2px;}
-  .pstock{color:var(--muted); font-size:11px;}
-  .add{width:100%; margin-top:8px; background:transparent; border:1px solid var(--gold); color:var(--gold); border-radius:10px; padding:7px; font-size:12px; font-weight:700; cursor:pointer;}
+  .stats{display:flex; background:var(--surface); border:1px solid var(--line); border-radius:20px; padding:18px 4px;}
+  .stat{flex:1; text-align:center; border-left:1px solid var(--line);}
+  .stat:first-child{border-left:none;}
+  .stat .v{font-family:var(--serif); color:var(--gold2); font-weight:700; font-size:19px;}
+  .stat .l{color:var(--muted); font-size:9px; letter-spacing:.16em; text-transform:uppercase; margin-top:5px;}
 
-  .kpis{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
-  .kpi{background:var(--anthra); border-radius:14px; padding:14px;}
-  .kpi .v{color:var(--gold); font-size:22px; font-weight:800;}
-  .kpi .l{color:var(--muted); font-size:11.5px; margin-top:3px;}
-
-  table{width:100%; border-collapse:collapse; font-size:12.5px;}
-  th{text-align:left; color:var(--gold); padding:8px 6px; font-size:11.5px;}
-  td{padding:9px 6px; border-top:1px solid #3a3a3a;}
-
-  .switchrow{display:flex; justify-content:space-between; align-items:center; background:var(--anthra); border-radius:14px; padding:13px 15px; margin-bottom:10px;}
-  .sw{
-    width:48px; height:27px; border-radius:999px; background:#555; position:relative; cursor:pointer; border:none; flex-shrink:0;
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:11px;}
+  .pcard{background:var(--surface); border:1px solid var(--line); border-radius:18px; padding:11px; display:flex; flex-direction:column;}
+  .pimg{
+    height:108px; border-radius:12px; margin-bottom:11px; border:1px solid var(--line);
+    display:flex; align-items:center; justify-content:center;
   }
-  .sw::after{content:''; position:absolute; top:3px; left:3px; width:21px; height:21px; border-radius:50%; background:#fff; transition:left .15s;}
-  .sw.on{background:var(--gold);}
-  .sw.on::after{left:24px;}
-
-  .delaybtn{
-    display:flex; align-items:center; gap:10px; width:100%; background:var(--anthra);
-    border:1px solid transparent; color:#fff; border-radius:14px; padding:14px; margin-bottom:8px;
-    font-size:14px; cursor:pointer; text-align:left;
+  .pimg svg{width:30px; height:30px; color:rgba(200,169,106,.45);}
+  .pname{font-size:12.5px; font-weight:500; margin-bottom:3px; line-height:1.3;}
+  .pstock{color:var(--muted); font-size:10.5px; letter-spacing:.04em; margin-top:2px;}
+  .pprice{font-family:var(--serif); font-size:16px; font-weight:700; color:var(--gold);}
+  .add{
+    margin-top:10px; background:transparent; border:1px solid var(--line2); color:var(--gold);
+    border-radius:10px; padding:8px; font-family:var(--sans); font-size:10px; font-weight:600;
+    letter-spacing:.12em; text-transform:uppercase; cursor:pointer;
   }
-  .delaybtn.on{border-color:var(--gold);}
+  .add:hover{background:rgba(200,169,106,.08);}
 
-  .review{border-top:1px solid #3a3a3a; padding:10px 0;}
-  .review:first-of-type{border-top:none;}
-  .review .who{font-weight:700; font-size:13px;}
-  .review .txt{color:#ccc; font-size:12.5px; margin-top:3px;}
+  .kpis{display:grid; grid-template-columns:1fr 1fr; gap:11px;}
+  .kpi{background:var(--surface); border:1px solid var(--line); border-radius:18px; padding:16px;}
+  .kpi .v{font-family:var(--serif); color:var(--gold2); font-size:23px; font-weight:700; line-height:1.1;}
+  .kpi .l{color:var(--muted); font-size:9.5px; letter-spacing:.14em; text-transform:uppercase; margin-top:7px;}
+
+  table{width:100%; border-collapse:collapse; font-size:12px;}
+  th{text-align:left; color:var(--muted); padding:4px 6px 10px; font-size:9.5px; font-weight:500; letter-spacing:.16em; text-transform:uppercase;}
+  td{padding:11px 6px; border-top:1px solid var(--line); font-weight:300;}
+  td b{font-weight:500;}
+  .gold{color:var(--gold);}
+
+  .switchrow{
+    display:flex; justify-content:space-between; align-items:center;
+    background:var(--surface); border:1px solid var(--line); border-radius:16px;
+    padding:15px 17px; margin-bottom:10px; font-size:13.5px;
+  }
+  .sw{width:46px; height:26px; border-radius:999px; background:#2A2A2E; position:relative; cursor:pointer; border:1px solid var(--line); flex-shrink:0; transition:background .2s;}
+  .sw::after{content:''; position:absolute; top:3px; left:3px; width:18px; height:18px; border-radius:50%; background:#8E8B86; transition:all .2s;}
+  .sw.on{background:rgba(200,169,106,.25); border-color:var(--line2);}
+  .sw.on::after{left:23px; background:var(--gold);}
+
+  .opt{
+    display:flex; align-items:center; gap:13px; width:100%; background:var(--surface);
+    border:1px solid var(--line); color:var(--text); border-radius:16px; padding:15px 17px;
+    margin-bottom:9px; font-family:var(--sans); font-size:13.5px; font-weight:300;
+    cursor:pointer; text-align:left; transition:border-color .2s;
+  }
+  .opt.on{border-color:var(--line2); background:linear-gradient(90deg, rgba(200,169,106,.07), transparent 60%), var(--surface);}
+  .opt .check{margin-left:auto; color:var(--gold); font-size:11px; letter-spacing:.1em; text-transform:uppercase;}
+
+  .review{border-top:1px solid var(--line); padding:13px 0;}
+  .review:first-child{border-top:none; padding-top:2px;}
+  .review .who{font-weight:500; font-size:13px;}
+  .review .txt{color:#A5A29B; font-size:12.5px; line-height:1.55; margin-top:4px; font-style:italic; font-family:var(--serif); font-size:14.5px;}
+
+  .tip{
+    border-left:2px solid var(--gold); background:linear-gradient(90deg, rgba(200,169,106,.07), transparent);
+    color:#BBB6AA; font-size:12px; line-height:1.55; padding:11px 14px; margin:0 0 18px;
+    border-radius:0 12px 12px 0;
+  }
+  .tip b{color:var(--gold2); font-weight:500;}
+
+  .hero{
+    border:1px solid var(--line2); border-radius:22px; padding:24px 20px; margin-bottom:6px;
+    background:
+      radial-gradient(340px 160px at 85% -20%, rgba(200,169,106,.16), transparent 70%),
+      linear-gradient(160deg, #16151285, transparent), var(--surface);
+  }
+  .hero .q{font-family:var(--serif); font-size:23px; font-style:italic; font-weight:500; line-height:1.25; margin:0 0 6px;}
+  .hero .s{color:var(--muted); font-size:12px; letter-spacing:.06em;}
 
   #toast{
-    position:fixed; left:50%; bottom:26px; transform:translateX(-50%) translateY(20px);
-    background:#1c1c1c; border:1px solid var(--gold); color:#fff; padding:12px 18px;
-    border-radius:14px; font-size:13.5px; opacity:0; transition:all .25s; pointer-events:none;
-    max-width:90vw; z-index:99; box-shadow:0 10px 30px rgba(0,0,0,.5);
+    position:fixed; left:50%; bottom:30px; transform:translateX(-50%) translateY(16px);
+    background:#17161A; border:1px solid var(--line2); color:var(--text);
+    padding:13px 20px; border-radius:14px; font-size:12.5px; letter-spacing:.02em;
+    opacity:0; transition:all .3s; pointer-events:none; max-width:88vw; z-index:99;
+    box-shadow:0 16px 40px rgba(0,0,0,.6);
   }
   #toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
-  .empty{color:var(--muted); font-size:13px; text-align:center; padding:30px 10px;}
-  .note{background:#1a1710; border:1px solid #4a3d14; color:#d8c171; font-size:11.5px; border-radius:12px; padding:10px 12px; margin-bottom:14px;}
+  .empty{color:var(--muted); font-size:12.5px; text-align:center; padding:28px 12px; line-height:1.6;}
+  .divider{height:1px; background:var(--line); margin:14px 0;}
 </style>
 </head>
 <body>
 
-<div class="page-title">💈 Barber<span>Pro</span> — Démo interactive</div>
-<p class="page-sub">Prototype cliquable de l'application. Changez de rôle pour voir les 3 univers :</p>
+<h1 class="wordmark">Barber<em>Pro</em></h1>
+<p class="page-sub">Démo interactive · trois univers</p>
 <div class="roles" id="roles"></div>
 
 <div class="phone">
@@ -173,35 +269,64 @@
 <div id="toast"></div>
 
 <script>
-/* ───────── Données de démonstration ───────── */
-const G = ['linear-gradient(135deg,#3a2f12,#191300)','linear-gradient(135deg,#26313a,#0d1216)',
-           'linear-gradient(135deg,#3a2626,#160d0d)','linear-gradient(135deg,#27332a,#0d130f)'];
+/* ───────── Icônes (SVG trait fin) ───────── */
+function svg(d){return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">'+d+'</svg>';}
+const IC = {
+  home:    svg('<path d="M3.5 10.5 12 3.5l8.5 7"/><path d="M5.5 9.5V20.5h13V9.5"/><path d="M10 20.5v-5h4v5"/>'),
+  cal:     svg('<rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 9.5h17M8.5 3v4M15.5 3v4"/>'),
+  img:     svg('<rect x="3.5" y="4.5" width="17" height="15" rx="3"/><circle cx="9" cy="10" r="1.5"/><path d="m5 17.5 4.5-4.5 3.5 3.5 2.5-2.5 3.5 3.5"/>'),
+  bag:     svg('<path d="M5.5 8.5h13l-1 12h-11l-1-12Z"/><path d="M9 8.5V8a3 3 0 0 1 6 0v.5"/>'),
+  user:    svg('<circle cx="12" cy="8.2" r="3.4"/><path d="M5.5 19.5c1.3-3.2 3.7-4.8 6.5-4.8s5.2 1.6 6.5 4.8"/>'),
+  clock:   svg('<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>'),
+  chart:   svg('<path d="M4 20.5h16"/><path d="M6.5 20.5v-7M11.5 20.5V8.5M16.5 20.5V12"/>'),
+  tag:     svg('<path d="M12.5 3.5H20.5V11.5L11.5 20.5L3.5 12.5L12.5 3.5Z"/><circle cx="16" cy="8" r="1.3"/>'),
+  star:    svg('<path d="m12 4 2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 16.4 7.2 18.9l.9-5.4L4.2 9.7l5.4-.8L12 4Z"/>'),
+  box:     svg('<path d="M3.5 7.5 12 3.5l8.5 4v9l-8.5 4-8.5-4v-9Z"/><path d="M3.5 7.5 12 11.5l8.5-4M12 11.5v9"/>'),
+  scissors:svg('<circle cx="6.5" cy="6.5" r="2.5"/><circle cx="6.5" cy="17.5" r="2.5"/><path d="M8.7 8.2 20 19M8.7 15.8 20 5"/>'),
+  bottle:  svg('<path d="M9.5 3.5h5"/><path d="M10.5 3.5v3l-2.5 3v10a1.5 1.5 0 0 0 1.5 1.5h5a1.5 1.5 0 0 0 1.5-1.5v-10l-2.5-3v-3"/><path d="M8 13.5h8"/>'),
+  comb:    svg('<rect x="4" y="9" width="16" height="6" rx="2"/><path d="M7 9v3M10 9v3M13 9v3M16 9v3"/>'),
+  razor:   svg('<rect x="4" y="4.5" width="16" height="5" rx="1.5"/><path d="M11 9.5 10 19.5h4l-1-10"/>'),
+  bell:    svg('<path d="M6 16.5v-5a6 6 0 0 1 12 0v5l1.5 2.5h-15L6 16.5Z"/><path d="M10.5 21.5a1.8 1.8 0 0 0 3 0"/>'),
+  gift:    svg('<rect x="4" y="9.5" width="16" height="11" rx="2"/><path d="M4 13.5h16M12 9.5v11"/><path d="M12 9.5c-4.5 0-5.5-5-2.5-5 2 0 2.5 3 2.5 5Zm0 0c4.5 0 5.5-5 2.5-5-2 0-2.5 3-2.5 5Z"/>'),
+  card:    svg('<rect x="3.5" y="5.5" width="17" height="13" rx="2.5"/><path d="M3.5 10h17M7 15h4"/>'),
+  camera:  svg('<rect x="3.5" y="7" width="17" height="13" rx="3"/><path d="M8.5 7l1.5-2.5h4L15.5 7"/><circle cx="12" cy="13" r="3.2"/>'),
+  dl:      svg('<path d="M12 4v10m0 0 3.5-3.5M12 14l-3.5-3.5"/><path d="M5 19.5h14"/>'),
+  share:   svg('<circle cx="6.5" cy="12" r="2.3"/><circle cx="17" cy="6" r="2.3"/><circle cx="17" cy="18" r="2.3"/><path d="m8.6 10.9 6.3-3.7M8.6 13.1l6.3 3.7"/>'),
+};
+
+/* ───────── Données ───────── */
+const TEX = [
+  'radial-gradient(120px 120px at 70% 25%, rgba(200,169,106,.20), transparent), linear-gradient(155deg,#23201A,#100F0D)',
+  'radial-gradient(120px 120px at 30% 70%, rgba(140,150,165,.14), transparent), linear-gradient(155deg,#1B1E24,#0E0F12)',
+  'radial-gradient(120px 120px at 60% 60%, rgba(190,120,100,.12), transparent), linear-gradient(155deg,#221A18,#100D0C)',
+  'radial-gradient(120px 120px at 40% 30%, rgba(125,160,135,.12), transparent), linear-gradient(155deg,#1A201B,#0D100E)',
+];
 
 const DELAY = {
   ON_TIME:      {dot:'var(--green)',  label:'À l’heure'},
   DELAY_5:      {dot:'var(--orange)', label:'5 min de retard'},
   DELAY_10:     {dot:'var(--orange)', label:'10 min de retard'},
   DELAY_15:     {dot:'var(--red)',    label:'15 min de retard'},
-  DELAY_15_PLUS:{dot:'var(--red)',    label:'+15 min de retard'},
-  ABSENT:       {dot:'#888',          label:'Absent'},
+  DELAY_15_PLUS:{dot:'var(--red)',    label:'Plus de 15 min'},
+  ABSENT:       {dot:'#76736D', label:'Absent'},
 };
 
 const barbers = [
-  {id:'enzo', name:'Enzo Moreau', em:'🧔🏻', g:G[0], years:8, rating:4.9, clients:1240, prestations:3680, ponct:97,
+  {id:'enzo', name:'Enzo Moreau', ini:'EM', tex:0, years:8, rating:4.9, clients:1240, prestations:3680, ponct:97,
    tags:['Dégradé américain','Coupe afro','Barbe','Hair Design'], delay:'ON_TIME',
-   bio:'Spécialiste du dégradé américain depuis 8 ans. Précision, détail et finitions rasoir.',
-   reviews:[{who:'Karim',note:5,txt:'Meilleur dégradé de la ville, je ne vais plus ailleurs.'},
+   bio:'Spécialiste du dégradé américain depuis huit ans. Précision du trait, finitions au rasoir, sens du détail.',
+   reviews:[{who:'Karim',note:5,txt:'Le meilleur dégradé de la ville. Je ne vais plus nulle part ailleurs.'},
             {who:'Lucas',note:5,txt:'Toujours à l’heure, toujours impeccable.'},
-            {who:'Mehdi',note:4,txt:'Très bon travail sur la barbe.'}]},
-  {id:'sofiane', name:'Sofiane K.', em:'🧔🏽', g:G[1], years:6, rating:4.7, clients:860, prestations:2210, ponct:91,
+            {who:'Mehdi',note:4,txt:'Très beau travail sur la barbe, salon élégant.'}]},
+  {id:'sofiane', name:'Sofiane Kaci', ini:'SK', tex:1, years:6, rating:4.7, clients:860, prestations:2210, ponct:91,
    tags:['Rasage traditionnel','Barbe','Coloration'], delay:'DELAY_10',
-   bio:'Maître du rasage traditionnel à l’ancienne : serviette chaude, coupe-chou et soins.',
-   reviews:[{who:'Antoine',note:5,txt:'Le rasage serviette chaude est une expérience incroyable.'},
-            {who:'Yanis',note:4,txt:'Top, juste un peu d’attente parfois.'}]},
-  {id:'marco', name:'Marco V.', em:'👨🏻‍🦱', g:G[2], years:5, rating:4.8, clients:540, prestations:1490, ponct:95,
+   bio:'Maître du rasage à l’ancienne : serviette chaude, coupe-chou et soins. Un rituel plus qu’une prestation.',
+   reviews:[{who:'Antoine',note:5,txt:'Le rasage serviette chaude est une expérience à part.'},
+            {who:'Yanis',note:4,txt:'Excellent, juste un peu d’attente parfois.'}]},
+  {id:'marco', name:'Marco Vitale', ini:'MV', tex:2, years:5, rating:4.8, clients:540, prestations:1490, ponct:95,
    tags:['Hair Design','Dégradé américain','Coupe enfant'], delay:'ON_TIME',
-   bio:'Hair design et motifs personnalisés. Chaque coupe est une pièce unique.',
-   reviews:[{who:'Sacha',note:5,txt:'Le design tribal était parfait, photo à l’appui !'}]},
+   bio:'Hair design et motifs sur mesure. Chaque coupe est traitée comme une pièce unique.',
+   reviews:[{who:'Sacha',note:5,txt:'Le motif était exactement celui que j’imaginais.'}]},
 ];
 
 const services = [
@@ -213,24 +338,24 @@ const services = [
   {id:'s6', name:'Premium Package', dur:90, price:7000},
 ];
 
-const CATS = [['ALL','Tous'],['CIRE','Cires'],['POMMADE','Pommades'],['HUILE','Huiles à barbe'],['SHAMP','Shampoings'],['ACC','Accessoires']];
+const CATS = [['ALL','Tout'],['CIRE','Cires'],['POMMADE','Pommades'],['HUILE','Huiles'],['SHAMP','Shampoings'],['ACC','Accessoires']];
 const products = [
-  {id:'p1', name:'Cire coiffante mate',  cat:'CIRE',    price:1490, stock:40, em:'🫙', g:G[0]},
-  {id:'p2', name:'Pommade brillante',    cat:'POMMADE', price:1690, stock:25, em:'🧴', g:G[1]},
-  {id:'p3', name:'Huile à barbe cèdre',  cat:'HUILE',   price:1990, stock:30, em:'🛢️', g:G[2]},
-  {id:'p4', name:'Shampoing fortifiant', cat:'SHAMP',   price:1290, stock:50, em:'🧴', g:G[3]},
-  {id:'p5', name:'Peigne en bois',       cat:'ACC',     price:990,  stock:60, em:'🪮', g:G[0]},
-  {id:'p6', name:'Tondeuse de finition', cat:'ACC',     price:4990, stock:8,  em:'✂️', g:G[1]},
+  {id:'p1', name:'Cire coiffante mate',  cat:'CIRE',    price:1490, stock:40, ic:'box',    tex:0},
+  {id:'p2', name:'Pommade brillante',    cat:'POMMADE', price:1690, stock:25, ic:'bottle', tex:1},
+  {id:'p3', name:'Huile à barbe — cèdre',cat:'HUILE',   price:1990, stock:30, ic:'bottle', tex:2},
+  {id:'p4', name:'Shampoing fortifiant', cat:'SHAMP',   price:1290, stock:50, ic:'bottle', tex:3},
+  {id:'p5', name:'Peigne en bois',       cat:'ACC',     price:990,  stock:60, ic:'comb',   tex:0},
+  {id:'p6', name:'Tondeuse de finition', cat:'ACC',     price:4990, stock:8,  ic:'razor',  tex:1},
 ];
 
 const history = [
-  {date:'12/04/2026', barber:'Enzo Moreau', servs:'Coupe + Barbe', price:3500,
-   photos:[['Face','💇🏻‍♂️',G[0]],['Profil gauche','🧑🏻',''+G[1]],['Profil droit','🧑🏻',G[2]],['Arrière','👤',G[3]]]},
-  {date:'02/03/2026', barber:'Marco V.', servs:'Hair Design', price:4500,
-   photos:[['Face','💇🏻‍♂️',G[2]],['Arrière','👤',G[1]]]},
+  {date:'12 avril 2026', barber:'Enzo Moreau', servs:'Coupe + Barbe', price:3500,
+   photos:[['Face',0],['Profil gauche',1],['Profil droit',2],['Arrière',3]]},
+  {date:'2 mars 2026', barber:'Marco Vitale', servs:'Hair Design', price:4500,
+   photos:[['Face',2],['Arrière',1]]},
 ];
 
-/* ───────── État de l'application ───────── */
+/* ───────── État ───────── */
 const state = {
   role:'client', tab:'home', view:null,
   booking:{service:null, barber:'any', slot:null, done:null},
@@ -238,48 +363,51 @@ const state = {
   reviewSettings:{showReviews:true, showRating:true, showPhotos:true},
 };
 
-/* ───────── Moteur de tarification dynamique (PRD §4) ───────── */
+/* ───────── Tarification dynamique (PRD §4) ───────── */
 function computePrice(base, slotDate, now){
   let price = base; const rules = [];
   const h = slotDate.getHours();
-  if (h >= 22)      { price = base + 2500; rules.push('Tarif nuit (après 22h)'); }
-  else if (h >= 20) { price = base + 1000; rules.push('Tarif soirée (après 20h)'); }
+  if (h >= 22)      { price = base + 2500; rules.push('Tarif nuit · après 22h'); }
+  else if (h >= 20) { price = base + 1000; rules.push('Tarif soirée · après 20h'); }
   const d = slotDate.getDay();
   if (d === 0 || d === 6) { price = Math.round(price * 1.15); rules.push('Week-end +15 %'); }
-  if ((slotDate - now) / 60000 < 120 && slotDate > now) { price = Math.round(price * 1.20); rules.push('Urgence < 2h +20 %'); }
+  if ((slotDate - now) / 60000 < 120 && slotDate > now) { price = Math.round(price * 1.20); rules.push('Urgence +20 %'); }
   return {price, rules};
 }
-const fmt = c => (c/100).toFixed(2).replace('.', ',') + ' €';
+const fmt = c => (c/100).toLocaleString('fr-FR', {minimumFractionDigits:0, maximumFractionDigits:2}) + ' €';
 
 /* ───────── Helpers ───────── */
 const $ = id => document.getElementById(id);
 function toast(msg){
   const t = $('toast'); t.innerHTML = msg; t.classList.add('show');
-  clearTimeout(t._h); t._h = setTimeout(()=>t.classList.remove('show'), 3200);
+  clearTimeout(t._h); t._h = setTimeout(()=>t.classList.remove('show'), 3400);
 }
-function badge(status){
-  const d = DELAY[status];
-  return `<span class="badge"><span class="dot" style="background:${d.dot}"></span>${d.label}</span>`;
+function badge(s){
+  const d = DELAY[s];
+  return `<span class="status"><span class="dot" style="background:${d.dot};color:${d.dot}"></span>${d.label}</span>`;
 }
-function stars(n){ return '★'.repeat(n) + '☆'.repeat(5-n); }
+function ava(b, lg){
+  return `<div class="ava${lg?' lg':''}" style="background:${TEX[b.tex]}">${b.ini}</div>`;
+}
+function stars(n){ return '★'.repeat(n) + '<span style="opacity:.25">'+'★'.repeat(5-n)+'</span>'; }
 
 /* ───────── Rôles & onglets ───────── */
 const TABS = {
-  client:[['home','💈','Accueil'],['book','📅','Réserver'],['cuts','📸','Mes Coupes'],['shop','🛍️','Boutique'],['me','👤','Profil']],
-  barber:[['planning','🗓️','Planning'],['status','⏱️','Mon statut'],['bstats','📊','Mes stats']],
-  admin: [['dash','📈','Dashboard'],['pricing','💶','Tarifs'],['reviews','⭐','Avis'],['stock','📦','Produits']],
+  client:[['home',IC.home,'Salon'],['book',IC.cal,'Réserver'],['cuts',IC.img,'Mes coupes'],['shop',IC.bag,'Boutique'],['me',IC.user,'Profil']],
+  barber:[['planning',IC.cal,'Planning'],['status',IC.clock,'Statut'],['bstats',IC.chart,'Activité']],
+  admin: [['dash',IC.chart,'Vue globale'],['pricing',IC.tag,'Tarifs'],['reviews',IC.star,'Avis'],['stock',IC.box,'Produits']],
 };
 function setRole(r){ state.role = r; state.tab = TABS[r][0][0]; state.view = null; render(); }
 function setTab(t){ state.tab = t; state.view = null; render(); }
 
-/* ───────── Écrans CLIENT ───────── */
+/* ───────── CLIENT ───────── */
 function barberCard(b){
-  return `<div class="card row" style="cursor:pointer" onclick="openBarber('${b.id}')">
-    <div class="avatar" style="background:${b.g}">${b.em}</div>
+  return `<div class="card row tap" onclick="openBarber('${b.id}')">
+    ${ava(b)}
     <div class="grow">
       <div class="bname">${b.name}</div>
-      <div class="btags">${b.tags.join(' · ')}</div>
-      <div class="row" style="gap:8px">${badge(b.delay)}<span class="star">★ ${b.rating}</span></div>
+      <div class="btags">${b.tags.slice(0,3).join(' · ')}</div>
+      <div class="row" style="gap:12px">${badge(b.delay)}<span class="rate">★ ${String(b.rating).replace('.',',')}</span></div>
     </div>
     <div class="chev">›</div>
   </div>`;
@@ -287,11 +415,16 @@ function barberCard(b){
 function openBarber(id){ state.view = {type:'barber', id}; render(); }
 
 function vHome(){
-  return `<h1 class="app">Barber<span>Pro</span></h1>
-  <p class="caption">Réservez votre barber, suivez son statut en temps réel.</p>
-  <div class="note">💡 Démo : Sofiane est en retard — passez en vue <b>Barber</b> ou <b>Admin</b> en haut de l'écran pour piloter l'app.</div>
-  <h2 class="sec">Nos barbiers</h2>
-  ${barbers.map(barberCard).join('')}`;
+  return `<p class="kicker">Le salon</p>
+  <h1 class="t">L’art de la <em>coupe</em></h1>
+  <p class="lead">Réservez votre artiste, suivez son statut en temps réel.</p>
+  <div class="hero">
+    <p class="q">« Une coupe n’est pas un service, c’est une signature. »</p>
+    <div class="s">Ouvert aujourd’hui · 9h — 23h</div>
+  </div>
+  <h2 class="sec">Nos artistes</h2>
+  ${barbers.map(barberCard).join('')}
+  <div class="tip">Sofiane est en retard — passez en vue <b>Barber</b> ou <b>Admin</b> au-dessus du téléphone pour piloter l’application.</div>`;
 }
 
 function vBarberProfile(id){
@@ -299,33 +432,33 @@ function vBarberProfile(id){
   const rs = state.reviewSettings;
   let reviews = '';
   if (rs.showReviews){
-    reviews = `<h2 class="sec">Avis clients</h2><div class="card">` +
+    reviews = `<h2 class="sec">Avis</h2><div class="card">` +
       b.reviews.map(r=>`<div class="review">
-        <div class="row"><span class="who grow">${r.who}</span>${rs.showRating?`<span class="star">${stars(r.note)}</span>`:''}</div>
-        <div class="txt">${r.txt}</div>
+        <div class="row"><span class="who grow">${r.who}</span>${rs.showRating?`<span class="rate">${stars(r.note)}</span>`:''}</div>
+        <div class="txt">« ${r.txt} »</div>
       </div>`).join('') + `</div>`;
   }
-  return `<button class="back" onclick="state.view=null;render()">‹ Retour</button>
-  <div class="row" style="gap:14px">
-    <div class="avatar" style="width:84px;height:84px;font-size:40px;background:${b.g}">${b.em}</div>
+  return `<button class="back" onclick="state.view=null;render()">‹ Le salon</button>
+  <div class="row" style="gap:18px; margin-bottom:16px">
+    ${ava(b, true)}
     <div class="grow">
-      <div class="bname" style="font-size:19px">${b.name}</div>
-      <div class="caption" style="margin:2px 0 8px">${b.years} ans d'expérience</div>
+      <h1 class="t" style="font-size:27px; margin-bottom:4px">${b.name}</h1>
+      <div class="btags" style="margin:0 0 9px">${b.years} ans d’expérience</div>
       ${badge(b.delay)}
     </div>
   </div>
-  <p style="font-size:13.5px;color:#ccc;line-height:1.5">${b.bio}</p>
-  <div class="chips" style="margin-bottom:16px">${b.tags.map(t=>`<span class="chip" style="cursor:default">${t}</span>`).join('')}</div>
+  <p class="lead" style="font-family:var(--serif); font-style:italic; font-size:15.5px; color:#B9B5AC; margin-bottom:16px">${b.bio}</p>
+  <div class="chips" style="margin-bottom:18px">${b.tags.map(t=>`<span class="chip mini" style="cursor:default">${t}</span>`).join('')}</div>
   <div class="stats">
     <div class="stat"><div class="v">${b.clients.toLocaleString('fr-FR')}</div><div class="l">Clients</div></div>
     <div class="stat"><div class="v">${b.prestations.toLocaleString('fr-FR')}</div><div class="l">Prestations</div></div>
-    <div class="stat"><div class="v">${rs.showRating?'★ '+b.rating:'—'}</div><div class="l">Note</div></div>
-    <div class="stat"><div class="v">${b.ponct} %</div><div class="l">Ponctualité</div></div>
+    <div class="stat"><div class="v">${rs.showRating ? '★ '+String(b.rating).replace('.',',') : '—'}</div><div class="l">Note</div></div>
+    <div class="stat"><div class="v">${b.ponct}<span style="font-size:13px"> %</span></div><div class="l">Ponctualité</div></div>
   </div>
   <h2 class="sec">Galerie</h2>
-  <div class="photos">${rs.showPhotos
-      ? G.map((g,i)=>`<div class="photo" style="background:${g}">💈</div>`).join('')
-      : '<p class="caption">Photos masquées par l’administrateur.</p>'}</div>
+  ${rs.showPhotos
+    ? `<div class="photos">${[0,1,2,3].map(i=>`<div class="photo" style="background:${TEX[i]}">${IC.scissors}</div>`).join('')}</div>`
+    : `<p class="empty">Photos masquées par l’administrateur.</p>`}
   ${reviews}
   <button class="btn" onclick="startBooking('${b.id}')">Réserver avec ${b.name.split(' ')[0]}</button>`;
 }
@@ -340,7 +473,7 @@ function genSlots(service){
     const list = state.booking.barber==='any' ? barbers : barbers.filter(b=>b.id===state.booking.barber);
     const idx = h*2 + m/30;
     const b = list[idx % list.length];
-    if ((idx + b.id.length) % 3 === 0) continue;            // créneaux déjà pris (simulation)
+    if ((idx + b.id.length) % 3 === 0) continue;
     const q = computePrice(service.price, d, now);
     out.push({time:`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`, date:d, barber:b, ...q});
   }
@@ -351,40 +484,42 @@ function vBook(){
   const bk = state.booking;
   if (bk.done){
     const d = bk.done;
-    return `<h1 class="app">Confirmé <span>✓</span></h1>
-    <p class="caption">Votre rendez-vous est réservé.</p>
+    return `<p class="kicker">Confirmation</p>
+    <h1 class="t">C’est <em>réservé</em></h1>
+    <p class="lead">Nous vous attendons. Un rappel sera envoyé la veille et une heure avant.</p>
     <div class="card">
-      <div class="bname" style="margin-bottom:6px">${d.serv} — ${d.time}</div>
-      <div class="caption" style="margin:0 0 8px">avec ${d.barber} · aujourd'hui</div>
-      ${d.rules.length?`<div class="slot-rule" style="color:var(--orange);font-size:12px;margin-bottom:6px">${d.rules.join(' + ')}</div>`:''}
-      <div class="price" style="font-size:20px">${fmt(d.price)}</div>
+      <div class="bname" style="font-size:17px">${d.serv}</div>
+      <div class="btags" style="margin:4px 0 10px">Aujourd’hui à ${d.time} · avec ${d.barber}</div>
+      ${d.rules.length?`<div style="color:var(--orange);font-size:11px;letter-spacing:.04em;margin-bottom:8px">${d.rules.join('  +  ')}</div>`:''}
+      <div class="price" style="margin:0;font-size:24px">${fmt(d.price)}</div>
     </div>
-    <div class="card row"><span style="font-size:20px">🔔</span><span style="font-size:13px;color:#ccc">Rappels automatiques : la veille (J-1) et 1h avant le rendez-vous.</span></div>
-    <div class="card row"><span style="font-size:20px">🎁</span><span style="font-size:13px;color:#ccc">+${Math.floor(d.price/100)} points fidélité crédités (1 € = 1 point).</span></div>
+    <div class="card row"><span style="color:var(--gold);width:22px">${IC.bell}</span><span style="font-size:12.5px;color:#A5A29B">Rappels automatiques : la veille puis 1 h avant le rendez-vous.</span></div>
+    <div class="card row"><span style="color:var(--gold);width:22px">${IC.gift}</span><span style="font-size:12.5px;color:#A5A29B">+${Math.floor(d.price/100)} points fidélité crédités — 1 € dépensé = 1 point.</span></div>
     <button class="btn ghost" onclick="state.booking={service:null,barber:'any',slot:null,done:null};render()">Nouvelle réservation</button>`;
   }
   let step2 = '';
   if (bk.service){
     const s = services.find(x=>x.id===bk.service);
-    step2 = `<h2 class="sec">2. Avec qui ?</h2>
+    step2 = `<h2 class="sec">Avec qui</h2>
     <div class="chips">
-      <button class="chip ${bk.barber==='any'?'on':''}" onclick="state.booking.barber='any';render()">⚡ Premier disponible</button>
-      ${barbers.map(b=>`<button class="chip ${bk.barber===b.id?'on':''}" onclick="state.booking.barber='${b.id}';render()">${b.em} ${b.name.split(' ')[0]}</button>`).join('')}
+      <button class="chip ${bk.barber==='any'?'on':''}" onclick="state.booking.barber='any';render()">Premier disponible</button>
+      ${barbers.map(b=>`<button class="chip ${bk.barber===b.id?'on':''}" onclick="state.booking.barber='${b.id}';render()">${b.name.split(' ')[0]}</button>`).join('')}
     </div>
-    <h2 class="sec">3. Choisissez un créneau <span style="color:var(--muted);font-weight:400;font-size:12px">— aujourd'hui</span></h2>
-    ${genSlots(s).map((sl,i)=>`<div class="slot" onclick="confirmSlot(${i})" id="slot${i}">
+    <h2 class="sec">Le créneau <small>aujourd’hui</small></h2>
+    ${genSlots(s).map((sl,i)=>`<div class="slot" onclick="confirmSlot(${i})">
         <div class="t">${sl.time}</div>
-        <div class="grow"><div class="who">${sl.barber.em} ${sl.barber.name}</div>
-        ${sl.rules.length?`<div class="rule">${sl.rules.join(' + ')}</div>`:''}</div>
+        <div class="grow"><div class="who">${sl.barber.name}</div>
+        ${sl.rules.length?`<div class="rule">${sl.rules.join('  +  ')}</div>`:''}</div>
         <div class="price">${fmt(sl.price)}</div>
       </div>`).join('')}
-    <p class="caption" style="text-align:center">💶 Les prix varient selon l'heure : soirée après 20h, nuit après 22h, week-end, urgence…</p>`;
+    <p class="empty" style="padding-top:10px">Les prix évoluent selon l’heure — soirée après 20 h, nuit après 22 h, week-end, urgence.</p>`;
   }
-  return `<h1 class="app">Réserver</h1>
-  <p class="caption">Prestation → barber → créneau. Prix dynamique affiché en direct.</p>
-  <h2 class="sec">1. Choisissez votre prestation</h2>
+  return `<p class="kicker">Rendez-vous</p>
+  <h1 class="t">Réserver</h1>
+  <p class="lead">La prestation, l’artiste, puis le créneau — au prix juste, affiché en direct.</p>
+  <h2 class="sec">La prestation</h2>
   <div class="chips">${services.map(s=>
-    `<button class="chip ${bk.service===s.id?'on':''}" onclick="state.booking.service='${s.id}';render()">${s.name} · ${fmt(s.price)}</button>`).join('')}
+    `<button class="chip ${bk.service===s.id?'on':''}" onclick="state.booking.service='${s.id}';render()">${s.name}<span class="p">${fmt(s.price)}</span></button>`).join('')}
   </div>${step2}`;
 }
 function confirmSlot(i){
@@ -393,63 +528,72 @@ function confirmSlot(i){
   state.booking.done = {serv:s.name, time:sl.time, barber:sl.barber.name, price:sl.price, rules:sl.rules};
   state.points += Math.floor(sl.price/100);
   state.upcoming.push({serv:s.name, time:sl.time, barber:sl.barber.name, price:sl.price});
-  toast(`✂️ Réservation confirmée — ${sl.time} avec ${sl.barber.name.split(' ')[0]} · ${fmt(sl.price)}`);
+  toast(`Réservation confirmée — ${sl.time} avec ${sl.barber.name.split(' ')[0]} · ${fmt(sl.price)}`);
   render();
 }
 
 function vCuts(){
-  return `<h1 class="app">Mes <span>Coupes</span></h1>
-  <p class="caption">Votre historique visuel : le barber prend 1 à 10 photos après chaque prestation.</p>
+  return `<p class="kicker">Galerie personnelle</p>
+  <h1 class="t">Mes <em>coupes</em></h1>
+  <p class="lead">Après chaque prestation, votre barber photographie le résultat. Tout reste ici.</p>
   ${history.map(h=>`<div class="card">
-    <div class="bname">${h.servs} du ${h.date}</div>
-    <div class="caption" style="margin:2px 0 10px">${h.barber} · ${fmt(h.price)}</div>
-    <div class="photos">${h.photos.map(p=>`<div class="photo" style="background:${p[2]}">${p[1]}<small>${p[0]}</small></div>`).join('')}</div>
-    <div class="row" style="gap:8px;margin-top:10px">
-      <button class="chip" onclick="toast('📥 Photos téléchargées')">📥 Télécharger</button>
-      <button class="chip" onclick="toast('🔗 Lien de partage copié')">↗ Partager</button>
-      <button class="chip" onclick="toast('👀 À montrer à votre prochain barber !')">💈 Montrer</button>
+    <div class="bname" style="font-size:15px">${h.servs}</div>
+    <div class="btags" style="margin:3px 0 12px">${h.date} · ${h.barber} · <span class="gold">${fmt(h.price)}</span></div>
+    <div class="photos">${h.photos.map(p=>`<div class="photo" style="background:${TEX[p[1]]}">${IC.scissors}<small>${p[0]}</small></div>`).join('')}</div>
+    <div class="row" style="gap:8px;margin-top:13px">
+      <button class="chip mini" onclick="toast('Photos téléchargées.')">Télécharger</button>
+      <button class="chip mini" onclick="toast('Lien de partage copié.')">Partager</button>
+      <button class="chip mini" onclick="toast('À montrer à votre prochain barber.')">Montrer</button>
     </div>
   </div>`).join('')}`;
 }
 
 function vShop(){
   const list = products.filter(p=> state.cat==='ALL' || p.cat===state.cat);
-  return `<h1 class="app">Boutique</h1>
-  <p class="caption">Les produits du salon, livrés ou à récupérer sur place.</p>
-  <div class="chips" style="margin-bottom:14px">${CATS.map(([k,l])=>
-    `<button class="chip ${state.cat===k?'on':'gray'}" onclick="state.cat='${k}';render()">${l}</button>`).join('')}
+  return `<p class="kicker">Boutique</p>
+  <h1 class="t">Les <em>essentiels</em></h1>
+  <p class="lead">Les produits utilisés au salon, livrés chez vous ou à retirer sur place.</p>
+  <div class="chips" style="margin-bottom:16px">${CATS.map(([k,l])=>
+    `<button class="chip mini ${state.cat===k?'on':''}" onclick="state.cat='${k}';render()">${l}</button>`).join('')}
   </div>
   <div class="grid2">${list.map(p=>`<div class="pcard">
-    <div class="pimg" style="background:${p.g}">${p.em}</div>
+    <div class="pimg" style="background:${TEX[p.tex]}">${IC[p.ic]}</div>
     <div class="pname">${p.name}</div>
-    <div class="price" style="margin:0">${fmt(p.price)}</div>
-    <div class="pstock">${p.stock>0 ? p.stock+' en stock' : 'Rupture'}</div>
-    <button class="add" onclick="state.cart++;toast('🛒 ${p.name} ajouté au panier ('+state.cart+')')">Ajouter au panier</button>
+    <div class="pprice">${fmt(p.price)}</div>
+    <div class="pstock">${p.stock>0 ? p.stock+' en stock' : 'Épuisé'}</div>
+    <button class="add" onclick="state.cart++;toast('${p.name} — ajouté au panier ('+state.cart+')')">Ajouter</button>
   </div>`).join('')}</div>
-  ${state.cart>0?`<button class="btn" onclick="toast('💳 Paiement Stripe : CB, Apple Pay, Google Pay')">Payer le panier (${state.cart})</button>`:''}`;
+  ${state.cart>0?`<button class="btn" onclick="toast('Paiement Stripe — CB, Apple Pay, Google Pay.')">Commander · ${state.cart} article${state.cart>1?'s':''}</button>`:''}`;
 }
 
 function vMe(){
-  return `<h1 class="app">Mon profil</h1>
-  <p class="caption">Mathéo · matheo59150@icloud.com</p>
-  <div class="card">
-    <div class="bname">Programme fidélité</div>
-    <div class="price" style="font-size:30px;margin:6px 0">${state.points} points</div>
-    <div class="caption" style="margin:0">1 € dépensé = 1 point. Échangez vos points contre une réduction, un produit ou une coupe offerte.</div>
+  return `<p class="kicker">Espace personnel</p>
+  <h1 class="t">Mathéo</h1>
+  <p class="lead">Membre depuis mars 2026</p>
+  <div class="card" style="border-color:var(--line2)">
+    <div class="row">
+      <div class="grow">
+        <div class="btags" style="margin:0 0 4px; letter-spacing:.18em; text-transform:uppercase; font-size:9.5px">Fidélité</div>
+        <div style="font-family:var(--serif);font-size:34px;font-weight:700;color:var(--gold2)">${state.points} <span style="font-size:16px;font-weight:500">points</span></div>
+      </div>
+      <span style="color:var(--gold);width:26px">${IC.gift}</span>
+    </div>
+    <div class="divider"></div>
+    <div style="font-size:11.5px;color:var(--muted);line-height:1.6">1 € dépensé = 1 point. Vos points s’échangent contre une réduction, un produit ou une coupe offerte.</div>
   </div>
-  <h2 class="sec">Rendez-vous à venir</h2>
+  <h2 class="sec">À venir</h2>
   ${state.upcoming.length ? state.upcoming.map(u=>`<div class="card row">
-      <span style="font-size:22px">📅</span>
-      <div class="grow"><div class="bname" style="font-size:14px">${u.serv} — ${u.time}</div>
-      <div class="caption" style="margin:0">avec ${u.barber}</div></div>
-      <div class="price">${fmt(u.price)}</div>
+      <span style="color:var(--gold);width:21px">${IC.cal}</span>
+      <div class="grow"><div class="bname" style="font-size:13.5px">${u.serv} · ${u.time}</div>
+      <div class="btags" style="margin:2px 0 0">avec ${u.barber}</div></div>
+      <div class="price" style="font-size:15px">${fmt(u.price)}</div>
     </div>`).join('')
-    : `<div class="empty">Aucun rendez-vous à venir.<br>Faites une réservation dans l'onglet 📅 !</div>`}
+    : `<div class="empty">Aucun rendez-vous à venir.<br>Réservez votre prochaine coupe dans l’onglet Réserver.</div>`}
   <h2 class="sec">Paiement</h2>
-  <div class="card row"><span style="font-size:20px">💳</span><span style="font-size:13px;color:#ccc">Carte bancaire, Apple Pay, Google Pay ou paiement sur place. Acompte selon prestation.</span></div>`;
+  <div class="card row"><span style="color:var(--gold);width:21px">${IC.card}</span><span style="font-size:12.5px;color:#A5A29B">Carte bancaire, Apple Pay, Google Pay ou sur place. Acompte selon la prestation.</span></div>`;
 }
 
-/* ───────── Écrans BARBER (connecté en tant qu'Enzo) ───────── */
+/* ───────── BARBER (connecté : Enzo) ───────── */
 function vPlanning(){
   const me = barbers[0];
   const rdv = [
@@ -457,109 +601,120 @@ function vPlanning(){
     ['11:30','Mehdi A.','Barbe seule',1500],['14:00','Sacha L.','Hair Design',4500],
     ['16:00','Noah P.','Coupe enfant',1800],['20:30','Tom R.','Coupe Homme',3500],
   ];
-  return `<h1 class="app">Mon <span>planning</span></h1>
-  <p class="caption">Vue Barber — connecté : ${me.em} ${me.name} ${badge(me.delay)}</p>
-  <h2 class="sec">Aujourd'hui · ${rdv.length} rendez-vous</h2>
+  return `<p class="kicker">Espace barber · ${me.name}</p>
+  <h1 class="t">Aujourd’hui</h1>
+  <p class="lead">${rdv.length} rendez-vous · ${badge(me.delay)}</p>
   ${rdv.map(r=>`<div class="slot" style="cursor:default">
     <div class="t">${r[0]}</div>
-    <div class="grow"><div style="font-weight:600;font-size:13.5px">${r[1]}</div><div class="who">${r[2]}</div></div>
+    <div class="grow"><div class="who" style="font-weight:500;color:var(--text)">${r[1]}</div><div class="rule" style="color:var(--muted)">${r[2]}</div></div>
     <div class="price">${fmt(r[3])}</div>
   </div>`).join('')}
-  <button class="btn ghost" onclick="toast('📸 Appareil photo : 1 à 10 photos attachées à la prestation')">📸 Photos fin de prestation</button>`;
+  <button class="btn ghost" onclick="toast('Appareil photo — 1 à 10 photos attachées à la prestation.')">${'Photos de fin de prestation'}</button>`;
 }
 
 function vStatus(){
   const me = barbers[0];
-  return `<h1 class="app">Mon <span>statut</span></h1>
-  <p class="caption">Les clients du jour sont notifiés automatiquement à chaque changement.</p>
+  return `<p class="kicker">Espace barber</p>
+  <h1 class="t">Mon <em>statut</em></h1>
+  <p class="lead">Vos clients du jour sont prévenus automatiquement à chaque changement.</p>
   ${Object.entries(DELAY).map(([k,v])=>`
-    <button class="delaybtn ${me.delay===k?'on':''}" onclick="setDelay('${k}')">
-      <span class="dot" style="background:${v.dot};width:11px;height:11px"></span>
-      ${v.label} ${me.delay===k?'<span style="margin-left:auto;color:var(--gold)">✓ actif</span>':''}
+    <button class="opt ${me.delay===k?'on':''}" onclick="setDelay('${k}')">
+      <span class="dot" style="width:8px;height:8px;border-radius:50%;background:${v.dot};box-shadow:0 0 9px ${v.dot}"></span>
+      ${v.label}
+      ${me.delay===k?'<span class="check">Actif</span>':''}
     </button>`).join('')}`;
 }
 function setDelay(k){
   barbers[0].delay = k;
-  toast(`🔔 6 clients notifiés : « Enzo — ${DELAY[k].label} »`);
+  toast(`6 clients notifiés — « Enzo · ${DELAY[k].label} »`);
   render();
 }
 
 function vBStats(){
-  return `<h1 class="app">Mes <span>stats</span></h1>
-  <p class="caption">Tableau de bord Barber (PRD §13)</p>
+  return `<p class="kicker">Espace barber</p>
+  <h1 class="t">Activité</h1>
+  <p class="lead">Vos chiffres, en un coup d’œil.</p>
   <div class="kpis">
     <div class="kpi"><div class="v">173 €</div><div class="l">CA du jour</div></div>
     <div class="kpi"><div class="v">1 240 €</div><div class="l">CA semaine</div></div>
     <div class="kpi"><div class="v">4 980 €</div><div class="l">CA mois</div></div>
-    <div class="kpi"><div class="v">87 %</div><div class="l">Taux de remplissage</div></div>
-    <div class="kpi"><div class="v">6</div><div class="l">RDV aujourd'hui</div></div>
+    <div class="kpi"><div class="v">87 %</div><div class="l">Remplissage</div></div>
+    <div class="kpi"><div class="v">6</div><div class="l">RDV aujourd’hui</div></div>
     <div class="kpi"><div class="v">★ 4,9</div><div class="l">Note moyenne</div></div>
   </div>
-  <h2 class="sec">Prestations les plus demandées</h2>
+  <h2 class="sec">Prestations demandées</h2>
   <div class="card">
-    ${[['Coupe + Barbe','46 %'],['Coupe Homme','31 %'],['Hair Design','14 %'],['Barbe seule','9 %']].map(x=>
-      `<div class="row" style="padding:6px 0"><span class="grow" style="font-size:13.5px">${x[0]}</span><span class="star">${x[1]}</span></div>`).join('')}
+    ${[['Coupe + Barbe',46],['Coupe Homme',31],['Hair Design',14],['Barbe seule',9]].map(x=>
+      `<div style="padding:7px 0">
+        <div class="row" style="margin-bottom:6px"><span class="grow" style="font-size:13px">${x[0]}</span><span class="rate">${x[1]} %</span></div>
+        <div style="height:3px;background:var(--surface2);border-radius:2px"><div style="height:3px;width:${x[1]}%;background:linear-gradient(90deg,var(--gold),var(--gold2));border-radius:2px"></div></div>
+      </div>`).join('')}
   </div>`;
 }
 
-/* ───────── Écrans ADMIN ───────── */
+/* ───────── ADMIN ───────── */
 function vDash(){
-  return `<h1 class="app">Dashboard <span>admin</span></h1>
-  <p class="caption">CA global, tops et activité du salon (PRD §14)</p>
+  return `<p class="kicker">Administration</p>
+  <h1 class="t">Vue <em>globale</em></h1>
+  <p class="lead">Le salon, en chiffres — ce mois-ci.</p>
   <div class="kpis">
-    <div class="kpi"><div class="v">18 430 €</div><div class="l">CA global (mois)</div></div>
-    <div class="kpi"><div class="v">412</div><div class="l">Réservations (mois)</div></div>
-    <div class="kpi"><div class="v">Coupe + Barbe</div><div class="l">Prestation populaire</div></div>
-    <div class="kpi"><div class="v">Huile cèdre</div><div class="l">Produit le + vendu</div></div>
-    <div class="kpi"><div class="v">Enzo M.</div><div class="l">Barber le + réservé</div></div>
-    <div class="kpi"><div class="v">★ 4,8</div><div class="l">Note moyenne salon</div></div>
+    <div class="kpi"><div class="v">18 430 €</div><div class="l">CA global</div></div>
+    <div class="kpi"><div class="v">412</div><div class="l">Réservations</div></div>
+    <div class="kpi"><div class="v" style="font-size:17px">Coupe + Barbe</div><div class="l">Prestation phare</div></div>
+    <div class="kpi"><div class="v" style="font-size:17px">Huile cèdre</div><div class="l">Produit le + vendu</div></div>
+    <div class="kpi"><div class="v" style="font-size:17px">Enzo Moreau</div><div class="l">Barber le + réservé</div></div>
+    <div class="kpi"><div class="v">★ 4,8</div><div class="l">Note du salon</div></div>
   </div>
-  <h2 class="sec">Barbiers</h2>
+  <h2 class="sec">L’équipe</h2>
   ${barbers.map(b=>`<div class="card row">
-    <div class="avatar" style="width:44px;height:44px;font-size:22px;background:${b.g}">${b.em}</div>
-    <div class="grow"><div class="bname" style="font-size:14px">${b.name}</div>${badge(b.delay)}</div>
-    <span class="star">★ ${b.rating}</span>
+    ${ava(b)}
+    <div class="grow"><div class="bname" style="font-size:14px">${b.name}</div><div style="margin-top:4px">${badge(b.delay)}</div></div>
+    <span class="rate">★ ${String(b.rating).replace('.',',')}</span>
   </div>`).join('')}`;
 }
 
 function vPricing(){
   const rules = [
-    ['Tarif normal','Base','Coupe homme 25 €','🟢'],
-    ['Tarif soirée','Après 20h','35 € (prix fixe)','🟢'],
-    ['Tarif nuit','Après 22h','50 € (prix fixe)','🟢'],
-    ['Week-end','Sam. & dim.','+15 %','🟢'],
-    ['Jours fériés','Calendrier FR','+25 %','🟢'],
-    ['Urgence','Résa < 2h avant','+20 %','🟢'],
-    ['Prix VIP','Client privilège','Personnalisé','⚪'],
+    ['Tarif normal','Journée','Coupe 25 €',true],
+    ['Tarif soirée','Après 20 h','35 € fixe',true],
+    ['Tarif nuit','Après 22 h','50 € fixe',true],
+    ['Week-end','Sam. & dim.','+15 %',true],
+    ['Jours fériés','Calendrier','+25 %',true],
+    ['Urgence','Résa < 2 h','+20 %',true],
+    ['Prix VIP','Sur sélection','Personnalisé',false],
   ];
-  return `<h1 class="app">Tarifs <span>dynamiques</span></h1>
-  <p class="caption">Ces règles sont appliquées en direct dans l'onglet Réserver du client.</p>
+  return `<p class="kicker">Administration</p>
+  <h1 class="t">Tarification</h1>
+  <p class="lead">Ces règles s’appliquent en direct dans l’onglet Réserver, côté client.</p>
   <div class="card"><table>
     <tr><th>Règle</th><th>Condition</th><th>Effet</th><th></th></tr>
-    ${rules.map(r=>`<tr><td><b>${r[0]}</b></td><td style="color:var(--muted)">${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td></tr>`).join('')}
+    ${rules.map(r=>`<tr><td><b>${r[0]}</b></td><td style="color:var(--muted)">${r[1]}</td><td class="gold">${r[2]}</td>
+      <td style="text-align:right"><span class="dot" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${r[3]?'var(--green)':'#5A5852'}"></span></td></tr>`).join('')}
   </table></div>
-  <div class="note">💡 Essayez : en vue Client, réservez une Coupe Homme sur un créneau après 20h → 35 €, après 22h → 50 €.</div>`;
+  <div class="tip">Essayez : en vue <b>Client</b>, réservez une Coupe Homme après 20 h → <b>35 €</b>, après 22 h → <b>50 €</b>.</div>`;
 }
 
 function vReviews(){
   const rs = state.reviewSettings;
-  const sw = (key,label) => `<div class="switchrow"><span style="font-size:14px">${label}</span>
-    <button class="sw ${rs[key]?'on':''}" onclick="state.reviewSettings.${key}=!state.reviewSettings.${key};toast('⚙️ Réglage appliqué côté client');render()"></button></div>`;
-  return `<h1 class="app">Avis <span>clients</span></h1>
-  <p class="caption">Contrôle total de la visibilité — l'effet est immédiat sur les profils barbiers côté client.</p>
+  const sw = (key,label) => `<div class="switchrow"><span>${label}</span>
+    <button class="sw ${rs[key]?'on':''}" onclick="state.reviewSettings.${key}=!state.reviewSettings.${key};toast('Réglage appliqué côté client.');render()"></button></div>`;
+  return `<p class="kicker">Administration</p>
+  <h1 class="t">Avis <em>clients</em></h1>
+  <p class="lead">Contrôle total de la visibilité — l’effet est immédiat sur les profils, côté client.</p>
   ${sw('showReviews','Afficher les avis')}
   ${sw('showRating','Afficher la note')}
   ${sw('showPhotos','Afficher les photos')}
-  <div class="note">💡 Désactivez un réglage puis allez voir un profil barber en vue Client : la section disparaît.</div>`;
+  <div class="tip">Désactivez un réglage puis ouvrez un profil barber en vue <b>Client</b> : la section disparaît.</div>`;
 }
 
 function vStock(){
-  return `<h1 class="app">Produits</h1>
-  <p class="caption">Catalogue & stocks de la boutique intégrée.</p>
+  return `<p class="kicker">Administration</p>
+  <h1 class="t">Produits</h1>
+  <p class="lead">Catalogue et stocks de la boutique intégrée.</p>
   <div class="card"><table>
-    <tr><th>Produit</th><th>Prix</th><th>Stock</th></tr>
-    ${products.map(p=>`<tr><td>${p.em} ${p.name}</td><td class="price" style="font-size:12.5px">${fmt(p.price)}</td>
-      <td style="color:${p.stock<10?'var(--red)':'var(--muted)'}">${p.stock}</td></tr>`).join('')}
+    <tr><th>Produit</th><th style="text-align:right">Prix</th><th style="text-align:right">Stock</th></tr>
+    ${products.map(p=>`<tr><td>${p.name}</td><td class="gold" style="text-align:right;font-family:var(--serif);font-weight:700;font-size:14px">${fmt(p.price)}</td>
+      <td style="text-align:right;color:${p.stock<10?'var(--red)':'var(--muted)'}">${p.stock}</td></tr>`).join('')}
   </table></div>`;
 }
 
@@ -569,12 +724,14 @@ const VIEWS = {home:vHome, book:vBook, cuts:vCuts, shop:vShop, me:vMe,
                dash:vDash, pricing:vPricing, reviews:vReviews, stock:vStock};
 
 function render(){
-  $('roles').innerHTML = [['client','👤 Client'],['barber','💈 Barber'],['admin','🛠️ Admin']]
+  $('roles').innerHTML = [['client','Client'],['barber','Barber'],['admin','Admin']]
     .map(([r,l])=>`<button class="${state.role===r?'on':''}" onclick="setRole('${r}')">${l}</button>`).join('');
   $('tabbar').innerHTML = TABS[state.role]
-    .map(([k,ic,l])=>`<button class="${state.tab===k?'on':''}" onclick="setTab('${k}')"><span class="ic">${ic}</span>${l}</button>`).join('');
+    .map(([k,ic,l])=>`<button class="${state.tab===k?'on':''}" onclick="setTab('${k}')">${ic}${l}</button>`).join('');
   const screen = $('screen');
-  screen.innerHTML = (state.view && state.view.type==='barber') ? vBarberProfile(state.view.id) : VIEWS[state.tab]();
+  screen.innerHTML = '<div class="fade">' +
+    ((state.view && state.view.type==='barber') ? vBarberProfile(state.view.id) : VIEWS[state.tab]()) +
+    '</div>';
   screen.scrollTop = 0;
 }
 render();
