@@ -10,7 +10,6 @@ import {
   Dimensions,
   Image,
   Platform,
-  SafeAreaView,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -20,6 +19,7 @@ import {
   View,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 
@@ -201,12 +201,17 @@ const PRODUCTS = [
 
 const HISTORY = [
   {
-    date: '12 avril 2026', barber: 'Enzo Moreau', servs: 'Coupe + Barbe', price: 3500,
-    photos: [['Face', 0], ['Profil gauche', 1], ['Profil droit', 2], ['Arrière', 3]],
+    id: 'h1', date: '12 avril 2026', barber: 'Enzo Moreau', barberId: 'enzo',
+    servs: 'Coupe + Barbe', price: 3500, rating: 5,
+    photos: [
+      { id: 'hp1', label: 'Face', tex: 0 }, { id: 'hp2', label: 'Profil gauche', tex: 1 },
+      { id: 'hp3', label: 'Profil droit', tex: 2 }, { id: 'hp4', label: 'Arrière', tex: 3 },
+    ],
   },
   {
-    date: '2 mars 2026', barber: 'Marco Vitale', servs: 'Hair Design', price: 4500,
-    photos: [['Face', 2], ['Arrière', 1]],
+    id: 'h2', date: '2 mars 2026', barber: 'Marco Vitale', barberId: 'marco',
+    servs: 'Hair Design', price: 4500, rating: null,
+    photos: [{ id: 'hp5', label: 'Face', tex: 2 }, { id: 'hp6', label: 'Arrière', tex: 1 }],
   },
 ];
 
@@ -1040,12 +1045,12 @@ function BarberDetailScreen({ barber, services, onBack, onBook, toast }) {
               <Section note={`note moyenne ★ ${barber.rating}`}>Avis</Section>
               <View style={s.card}>
                 {barber.reviews.map((r, i) => (
-                  <View key={r.who} style={[s.review, i > 0 && { borderTopWidth: 1, borderTopColor: C.line }]}>
+                  <View key={r.who + '-' + i} style={[s.review, i > 0 && { borderTopWidth: 1, borderTopColor: C.line }]}>
                     <View style={s.row}>
                       <Text style={[s.bname, s.grow, { fontSize: 13 }]}>{r.who}</Text>
                       <Stars n={r.note} />
                     </View>
-                    <Text style={s.reviewTxt}>« {r.txt} »</Text>
+                    {r.txt ? <Text style={s.reviewTxt}>« {r.txt} »</Text> : null}
                   </View>
                 ))}
               </View>
@@ -1251,21 +1256,78 @@ function BookScreen({ agenda, formulas, services, booking, setBooking, dayIdx, s
   );
 }
 
-function CutsScreen({ toast }) {
+function CutsScreen({ history, setHistory, setBarbers, user, toast }) {
+  const [pendingRate, setPendingRate] = useState(null); // { id, n }
+  const [comment, setComment] = useState('');
+
+  const publishReview = (h) => {
+    const n = pendingRate.n;
+    setHistory((hs) => hs.map((x) => (x.id === h.id ? { ...x, rating: n } : x)));
+    if (h.barberId) {
+      const txt = comment.trim();
+      setBarbers((bs) => bs.map((b) =>
+        b.id === h.barberId
+          ? { ...b, reviews: [{ who: user?.firstName || 'Client', note: n, txt }, ...b.reviews] }
+          : b
+      ));
+    }
+    setPendingRate(null);
+    setComment('');
+    toast(`Merci pour votre avis — ${'★'.repeat(n)} pour ${h.barber}.`);
+  };
+
   return (
-    <ScrollView style={s.screen} contentContainerStyle={s.screenPad}>
+    <ScrollView style={s.screen} contentContainerStyle={s.screenPad} keyboardShouldPersistTaps="handled">
       <Kicker>GALERIE PERSONNELLE</Kicker>
       <Title em="coupes">Mes </Title>
       <Lead>Après chaque prestation, votre barber photographie le résultat. Tout reste ici.</Lead>
-      {HISTORY.map((h) => (
-        <View key={h.date} style={s.card}>
+      {history.length === 0 && (
+        <Text style={s.footnote}>Aucune coupe pour l’instant — votre première apparaîtra ici.</Text>
+      )}
+      {history.map((h) => (
+        <View key={h.id} style={s.card}>
           <Text style={[s.bname, { fontSize: 15 }]}>{h.servs}</Text>
           <Text style={[s.btags, { marginTop: 3, marginBottom: 12 }]}>
             {h.date} · {h.barber} · <Text style={{ color: C.gold }}>{fmt(h.price)}</Text>
           </Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {h.photos.map(([label, tex]) => <Photo key={label} label={label} tex={tex} />)}
-          </ScrollView>
+          {h.photos.length > 0 ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              {h.photos.map((ph) => <Photo key={ph.id} label={ph.label} tex={ph.tex} uri={ph.uri} />)}
+            </ScrollView>
+          ) : (
+            <Text style={s.footnote}>Pas de photo pour cette prestation.</Text>
+          )}
+
+          {/* ── Avis 5 étoiles ── */}
+          {h.rating != null ? (
+            <View style={[s.row, { gap: 8, marginTop: 13 }]}>
+              <Stars n={h.rating} />
+              <Text style={s.btags}>Votre avis</Text>
+            </View>
+          ) : (
+            <View style={s.rateBox}>
+              <Text style={[s.btags, { marginBottom: 8 }]}>Comment s’est passée cette coupe ?</Text>
+              <View style={[s.row, { gap: 6, marginBottom: 4 }]}>
+                {[1, 2, 3, 4, 5].map((n) => {
+                  const on = pendingRate?.id === h.id && pendingRate.n >= n;
+                  return (
+                    <TouchableOpacity key={n} hitSlop={6}
+                      onPress={() => setPendingRate({ id: h.id, n })}>
+                      <Text style={[s.rateStarBig, on && { color: C.gold, opacity: 1 }]}>★</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              {pendingRate?.id === h.id && (
+                <>
+                  <TextInput style={[s.input, { marginTop: 8 }]} value={comment} onChangeText={setComment}
+                    placeholder="Un mot sur la prestation ? (facultatif)" placeholderTextColor="#5A5852" />
+                  <Btn label={`PUBLIER MON AVIS ${'★'.repeat(pendingRate.n)}`} onPress={() => publishReview(h)} />
+                </>
+              )}
+            </View>
+          )}
+
           <View style={[s.wrap, { marginTop: 13 }]}>
             <Chip mini label="Télécharger" onPress={() => toast('Photos téléchargées.')} />
             <Chip mini label="Partager" onPress={() => toast('Lien de partage copié.')} />
@@ -1819,7 +1881,7 @@ function FormulasScreen({ formulas, setFormulas, services, setServices, toast })
   );
 }
 
-function PlanningScreen({ agenda, setAgenda, dayIdx, setDayIdx, delay, toast }) {
+function PlanningScreen({ agenda, setAgenda, dayIdx, setDayIdx, delay, setHistory, toast }) {
   const day = DAYS[dayIdx];
   const slots = agenda.enzo[day.key] || {};
   const rdv = Object.entries(slots)
@@ -1828,6 +1890,9 @@ function PlanningScreen({ agenda, setAgenda, dayIdx, setDayIdx, delay, toast }) 
     .sort((a, b) => a.time.localeCompare(b.time));
   const ca = rdv.filter((r) => r.done).reduce((sum, r) => sum + r.price, 0);
   const todo = rdv.filter((r) => !r.done).length;
+
+  const [finModal, setFinModal] = useState(null); // rdv en cours de clôture
+  const [finPhotos, setFinPhotos] = useState([]);
 
   const cancel = (time, who) => {
     setAgenda((a) => ({
@@ -1840,47 +1905,136 @@ function PlanningScreen({ agenda, setAgenda, dayIdx, setDayIdx, delay, toast }) 
     toast(`Réservation de ${who} annulée — créneau ${time} réouvert.`);
   };
 
+  const addFinPhoto = async (fromCamera) => {
+    if (finPhotos.length >= 10) { toast('Maximum 10 photos par prestation.'); return; }
+    const perm = fromCamera
+      ? await ImagePicker.requestCameraPermissionsAsync()
+      : await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (perm.status !== 'granted') { toast('Permission refusée.'); return; }
+    const opts = { mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, aspect: [3, 4], quality: 0.85 };
+    const result = fromCamera
+      ? await ImagePicker.launchCameraAsync(opts)
+      : await ImagePicker.launchImageLibraryAsync(opts);
+    if (result.canceled) return;
+    const labels = ['Face', 'Profil gauche', 'Profil droit', 'Arrière'];
+    setFinPhotos((ps) => [...ps, {
+      id: 'fp' + Date.now(),
+      label: labels[ps.length] || `Photo ${ps.length + 1}`,
+      tex: ps.length % 4,
+      uri: result.assets[0].uri,
+    }]);
+  };
+
+  const confirmFinish = () => {
+    const r = finModal;
+    setAgenda((a) => ({
+      ...a,
+      enzo: {
+        ...a.enzo,
+        [day.key]: { ...a.enzo[day.key], [r.time]: { ...a.enzo[day.key][r.time], done: true } },
+      },
+    }));
+    const d = day.date;
+    setHistory((hs) => [{
+      id: 'h' + Date.now(),
+      date: `${d.getDate()} ${MO[d.getMonth()]} ${d.getFullYear()}`,
+      barber: 'Enzo Moreau', barberId: 'enzo',
+      servs: r.serv, price: r.price,
+      photos: finPhotos, rating: null,
+    }, ...hs]);
+    setFinModal(null);
+    setFinPhotos([]);
+    toast(finPhotos.length > 0
+      ? `Coupe terminée — ${finPhotos.length} photo${finPhotos.length > 1 ? 's' : ''} envoyée${finPhotos.length > 1 ? 's' : ''} dans l’historique du client.`
+      : 'Coupe terminée — le client peut maintenant laisser un avis.');
+  };
+
   return (
-    <ScrollView style={s.screen} contentContainerStyle={s.screenPad}>
-      <Kicker>ESPACE BARBER · ENZO MOREAU</Kicker>
-      <Title>Planning</Title>
-      <View style={[s.row, { gap: 14, marginBottom: 16 }]}>
-        <Badge status={delay} />
-        <Text style={s.btags}>{todo} à venir{ca > 0 ? ` · ${fmt(ca)} encaissés` : ''}</Text>
-      </View>
-      <Calendar sel={dayIdx} onSel={setDayIdx} markFor={(key) => {
-        const vals = Object.values(agenda.enzo[key] || {});
-        return vals.some((v) => v.status === 'booked') ? 'booked' : null;
-      }} />
-      <Text style={[s.btags, { marginVertical: 12 }]}>{DAYS[dayIdx].label}</Text>
-      {rdv.length === 0 ? (
-        <Text style={s.footnote}>
-          Aucune réservation ce jour.{'\n'}Ouvrez des créneaux dans l’onglet Créneaux pour recevoir des clients.
-        </Text>
-      ) : (
-        rdv.map((r) => (
-          <View key={r.time} style={[s.card, s.row, r.done && { opacity: 0.45 }]}>
-            <Text style={s.slotTime}>{r.time}</Text>
-            <View style={s.grow}>
-              <Text style={[s.bname, { fontSize: 14 }]}>{r.who}</Text>
-              <Text style={[s.btags, { marginTop: 2 }]}>{r.serv}</Text>
-            </View>
-            {r.done ? (
-              <Feather name="check" size={17} color={C.green} />
-            ) : (
-              <View style={[s.row, { gap: 12 }]}>
-                <Text style={[s.price, { fontSize: 15 }]}>{fmt(r.price)}</Text>
-                <TouchableOpacity onPress={() => cancel(r.time, r.who)} hitSlop={10}>
-                  <Feather name="x-circle" size={20} color={C.red} />
-                </TouchableOpacity>
+    <View style={{ flex: 1 }}>
+      <ScrollView style={s.screen} contentContainerStyle={s.screenPad}>
+        <Kicker>ESPACE BARBER · ENZO MOREAU</Kicker>
+        <Title>Planning</Title>
+        <View style={[s.row, { gap: 14, marginBottom: 16 }]}>
+          <Badge status={delay} />
+          <Text style={s.btags}>{todo} à venir{ca > 0 ? ` · ${fmt(ca)} encaissés` : ''}</Text>
+        </View>
+        <Calendar sel={dayIdx} onSel={setDayIdx} markFor={(key) => {
+          const vals = Object.values(agenda.enzo[key] || {});
+          return vals.some((v) => v.status === 'booked') ? 'booked' : null;
+        }} />
+        <Text style={[s.btags, { marginVertical: 12 }]}>{DAYS[dayIdx].label}</Text>
+        {rdv.length === 0 ? (
+          <Text style={s.footnote}>
+            Aucune réservation ce jour.{'\n'}Ouvrez des créneaux dans l’onglet Créneaux pour recevoir des clients.
+          </Text>
+        ) : (
+          rdv.map((r) => (
+            <View key={r.time} style={[s.card, s.row, r.done && { opacity: 0.45 }]}>
+              <Text style={s.slotTime}>{r.time}</Text>
+              <View style={s.grow}>
+                <Text style={[s.bname, { fontSize: 14 }]}>{r.who}</Text>
+                <Text style={[s.btags, { marginTop: 2 }]}>{r.serv}</Text>
               </View>
-            )}
+              {r.done ? (
+                <Feather name="check" size={17} color={C.green} />
+              ) : (
+                <View style={[s.row, { gap: 12 }]}>
+                  <Text style={[s.price, { fontSize: 15 }]}>{fmt(r.price)}</Text>
+                  <TouchableOpacity onPress={() => { setFinModal(r); setFinPhotos([]); }} hitSlop={10}>
+                    <Feather name="check-circle" size={20} color={C.green} />
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => cancel(r.time, r.who)} hitSlop={10}>
+                    <Feather name="x-circle" size={20} color={C.red} />
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          ))
+        )}
+        <Text style={s.footnote}>
+          ✓ pour terminer une coupe (avec ou sans photos du résultat) — ✕ pour annuler la réservation.
+        </Text>
+      </ScrollView>
+
+      {/* ── Fin de coupe : photos du résultat ── */}
+      {finModal && (
+        <View style={s.modalOverlay}>
+          <TouchableOpacity style={s.grow} activeOpacity={1} onPress={() => setFinModal(null)} />
+          <View style={s.modal}>
+            <Text style={[s.bname, { fontSize: 16 }]}>Terminer la coupe</Text>
+            <Text style={[s.btags, { marginTop: 3, marginBottom: 14 }]}>
+              {finModal.time} · {finModal.who} · {finModal.serv} · {fmt(finModal.price)}
+            </Text>
+            <Text style={[s.fieldLabel]}>PHOTOS DU RÉSULTAT (FACULTATIF — VISIBLES PAR LE CLIENT)</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}
+              style={{ overflow: 'visible' }}
+              contentContainerStyle={{ paddingTop: 10, paddingBottom: 6 }}>
+              {finPhotos.map((ph) => (
+                <View key={ph.id} style={{ position: 'relative', marginRight: 12 }}>
+                  <Photo label={ph.label} tex={ph.tex} uri={ph.uri} />
+                  <TouchableOpacity style={s.photoRemove}
+                    onPress={() => setFinPhotos((ps) => ps.filter((p) => p.id !== ph.id))} hitSlop={8}>
+                    <Feather name="x" size={12} color="#fff" />
+                  </TouchableOpacity>
+                </View>
+              ))}
+              <TouchableOpacity style={[s.photoAdd, { marginRight: 9 }]} onPress={() => addFinPhoto(true)} activeOpacity={0.8}>
+                <Feather name="camera" size={22} color={C.gold} />
+                <Text style={[s.btags, { marginTop: 6, textAlign: 'center' }]}>Appareil{'\n'}photo</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.photoAdd} onPress={() => addFinPhoto(false)} activeOpacity={0.8}>
+                <Feather name="image" size={22} color={C.gold} />
+                <Text style={[s.btags, { marginTop: 6, textAlign: 'center' }]}>Galerie</Text>
+              </TouchableOpacity>
+            </ScrollView>
+            <Btn label={finPhotos.length > 0
+              ? `TERMINER — ENVOYER ${finPhotos.length} PHOTO${finPhotos.length > 1 ? 'S' : ''}`
+              : 'TERMINER SANS PHOTO'} onPress={confirmFinish} />
+            <Btn ghost label="ANNULER" onPress={() => setFinModal(null)} />
           </View>
-        ))
+        </View>
       )}
-      <Btn ghost icon="camera" label="PHOTOS DE FIN DE PRESTATION"
-        onPress={() => toast('Appareil photo — 1 à 10 photos attachées à la prestation.')} />
-    </ScrollView>
+    </View>
   );
 }
 
@@ -2310,6 +2464,15 @@ const BARBER_TABS = [
 ];
 
 export default function App() {
+  return (
+    <SafeAreaProvider>
+      <Main />
+    </SafeAreaProvider>
+  );
+}
+
+function Main() {
+  const insets = useSafeAreaInsets();
   const [role, setRole] = useState(null); // null | 'client' | 'barber'
   const [user, setUser] = useState(null); // { firstName, lastName, email, role, plan }
   const [authStep, setAuthStep] = useState(null); // null | { role } — flow connexion/inscription
@@ -2336,6 +2499,7 @@ export default function App() {
   const [products, setProducts] = useState(() => [...PRODUCTS]);
   const [barberPreview, setBarberPreview] = useState(false);
   const [clients, setClients] = useState(() => [...INIT_CLIENTS]);
+  const [history, setHistory] = useState(() => [...HISTORY]);
 
   const barbersLive = barbers.map((b) => (b.id === 'enzo' ? { ...b, delay: enzoDelay } : b));
 
@@ -2437,7 +2601,7 @@ export default function App() {
       <BookScreen agenda={agenda} formulas={formulas} services={services} booking={booking} setBooking={setBooking}
         dayIdx={clientDay} setDayIdx={setClientDay} onConfirm={confirmBooking} />
     );
-    else if (tab === 'cuts') content = <CutsScreen toast={toast} />;
+    else if (tab === 'cuts') content = <CutsScreen history={history} setHistory={setHistory} setBarbers={setBarbers} user={user} toast={toast} />;
     else if (tab === 'shop') content = <ShopScreen products={products} cat={cat} setCat={setCat} cart={cart} addCart={addCart} toast={toast} />;
     else content = <MeScreen user={user} points={points} upcoming={upcoming} onLogout={logout} />;
   } else if (role === 'barber') {
@@ -2451,7 +2615,7 @@ export default function App() {
       <FormulasScreen formulas={formulas} setFormulas={setFormulas} services={services} setServices={setServices} toast={toast} />
     );
     else if (tab === 'planning') content = (
-      <PlanningScreen agenda={agenda} setAgenda={setAgenda} dayIdx={barberDay} setDayIdx={setBarberDay} delay={enzoDelay} toast={toast} />
+      <PlanningScreen agenda={agenda} setAgenda={setAgenda} dayIdx={barberDay} setDayIdx={setBarberDay} delay={enzoDelay} setHistory={setHistory} toast={toast} />
     );
     else if (tab === 'status') content = (
       <StatusScreen agenda={agenda} delay={enzoDelay} setDelay={setEnzoDelay} toast={toast} />
@@ -2476,7 +2640,7 @@ export default function App() {
   const tabs = role === 'client' ? CLIENT_TABS : BARBER_TABS;
 
   return (
-    <SafeAreaView style={s.root}>
+    <View style={[s.root, { paddingTop: insets.top || (Platform.OS === 'android' ? StatusBar.currentHeight || 24 : 0) }]}>
       <StatusBar barStyle="light-content" backgroundColor={C.bg} />
       {role === null && authStep === null ? (
         <WelcomeScreen choose={choose} />
@@ -2507,7 +2671,7 @@ export default function App() {
             </TouchableOpacity>
           </View>
           {content}
-          <View style={s.tabbar}>
+          <View style={[s.tabbar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
             {tabs.map(([k, ic, l]) => {
               const on = tab === k && !barberDetail;
               return (
@@ -2526,16 +2690,13 @@ export default function App() {
           <Text style={s.toastText}>{toastMsg}</Text>
         </Animated.View>
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 
 /* ───────── Styles ───────── */
 const s = StyleSheet.create({
-  root: {
-    flex: 1, backgroundColor: C.bg,
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight || 24 : 0,
-  },
+  root: { flex: 1, backgroundColor: C.bg },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: PAD, paddingTop: 8, paddingBottom: 6,
@@ -2792,7 +2953,7 @@ const s = StyleSheet.create({
 
   tabbar: {
     flexDirection: 'row', backgroundColor: '#0E0E10', borderTopWidth: 1, borderTopColor: C.line,
-    paddingTop: 9, paddingBottom: Platform.OS === 'ios' ? 4 : 12,
+    paddingTop: 9,
   },
   tabBtn: { flex: 1, alignItems: 'center', gap: 3, paddingVertical: 2 },
   tabLabel: { color: '#6E6B65', fontSize: 8, letterSpacing: 0 },
@@ -2896,6 +3057,13 @@ const s = StyleSheet.create({
     marginBottom: 6,
   },
   clientRowOn: { borderColor: C.gold, backgroundColor: 'rgba(200,169,106,0.07)' },
+
+  /* Avis 5 étoiles (fin de coupe) */
+  rateBox: {
+    marginTop: 13, paddingTop: 12,
+    borderTopWidth: 1, borderTopColor: C.line,
+  },
+  rateStarBig: { fontSize: 28, color: C.muted, opacity: 0.45 },
 
   /* Visionneuse photo plein écran */
   viewerBox: {
