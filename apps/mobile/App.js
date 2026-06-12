@@ -513,14 +513,13 @@ const Toggle = ({ on, onPress }) => (
 );
 
 /* ───────── Écran d’entrée ───────── */
-/* Logo barbr — ciseaux + wordmark bas-de-casse */
+/* Logo barbr — fichier officiel (assets/logo.png, ratio ≈ 3,19:1) */
 const Logo = ({ size = 22 }) => (
-  <View style={{ flexDirection: 'row', alignItems: 'center', gap: size * 0.32 }}>
-    <Feather name="scissors" size={size * 0.82} color={C.text} style={{ transform: [{ rotate: '-90deg' }] }} />
-    <Text style={{ color: C.text, fontSize: size, fontWeight: '800', letterSpacing: size * -0.03, includeFontPadding: false }}>
-      barbr
-    </Text>
-  </View>
+  <Image
+    source={require('./assets/logo.png')}
+    style={{ height: size * 1.35, width: size * 1.35 * 3.19 }}
+    resizeMode="contain"
+  />
 );
 
 function WelcomeScreen({ choose }) {
