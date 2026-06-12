@@ -1,4 +1,4 @@
-// BarberPro — application mobile (démo autonome, sans serveur)
+// barbr — application mobile (démo autonome, sans serveur)
 // Deux interfaces reliées par un agenda partagé :
 //  · Client : recherche par position & style, réservation dans les créneaux ouverts
 //  · Barber : ouverture des créneaux, formules de rendez-vous, planning, statut, activité
@@ -78,13 +78,13 @@ const VENUES = { salon: 'En salon', studio: 'Studio privé', domicile: 'À domic
 const BARBERS = [
   {
     id: 'enzo', name: 'Enzo Moreau', ini: 'EM', tex: 0, years: 8, rating: '4,9',
-    salon: 'BarberPro — Le Salon', city: 'Lille Centre', dist: 0.8,
+    salon: 'barbr — Le Salon', city: 'Lille Centre', dist: 0.8,
     venue: 'salon', address: '12 rue Nationale, 59000 Lille',
     clients: '1 240', prestations: '3 680', ponct: 97, delay: 'ON_TIME',
     shopEnabled: true, loyalty: true,
     tags: ['Burst Fade', 'Fade', 'Dégradé américain', 'Barbe'],
     bio: 'Spécialiste du burst fade et du dégradé américain depuis huit ans. Précision du trait, finitions au rasoir.',
-    story: 'Tout a commencé à 16 ans, une tondeuse à la main, dans le garage familial. Après un CAP coiffure et cinq ans dans les salons du Vieux-Lille, j’ai rejoint BarberPro pour y imposer ma signature : des dégradés au millimètre, jamais pressés, toujours finis au rasoir. Chaque client repart avec des conseils d’entretien personnalisés.',
+    story: 'Tout a commencé à 16 ans, une tondeuse à la main, dans le garage familial. Après un CAP coiffure et cinq ans dans les salons du Vieux-Lille, j’ai rejoint barbr pour y imposer ma signature : des dégradés au millimètre, jamais pressés, toujours finis au rasoir. Chaque client repart avec des conseils d’entretien personnalisés.',
     photos: [
       { id: 'ph1', label: 'Burst Fade', tex: 0 },
       { id: 'ph2', label: 'Dégradé', tex: 1 },
@@ -99,7 +99,7 @@ const BARBERS = [
   },
   {
     id: 'sofiane', name: 'Sofiane Kaci', ini: 'SK', tex: 1, years: 6, rating: '4,7',
-    salon: 'BarberPro — Le Salon', city: 'Lille Centre', dist: 0.8,
+    salon: 'barbr — Le Salon', city: 'Lille Centre', dist: 0.8,
     venue: 'salon', address: '12 rue Nationale, 59000 Lille',
     clients: '860', prestations: '2 210', ponct: 91, delay: 'DELAY_10',
     tags: ['Rasage traditionnel', 'Barbe', 'Coloration'],
@@ -513,13 +513,21 @@ const Toggle = ({ on, onPress }) => (
 );
 
 /* ───────── Écran d’entrée ───────── */
+/* Logo barbr — ciseaux + wordmark bas-de-casse */
+const Logo = ({ size = 22 }) => (
+  <View style={{ flexDirection: 'row', alignItems: 'center', gap: size * 0.32 }}>
+    <Feather name="scissors" size={size * 0.82} color={C.text} style={{ transform: [{ rotate: '-90deg' }] }} />
+    <Text style={{ color: C.text, fontSize: size, fontWeight: '800', letterSpacing: size * -0.03, includeFontPadding: false }}>
+      barbr
+    </Text>
+  </View>
+);
+
 function WelcomeScreen({ choose }) {
   return (
     <View style={s.welcome}>
       <View style={{ alignItems: 'center', marginBottom: 40 }}>
-        <Text style={s.welcomeMark}>
-          Barber<Text style={{ color: C.gold, fontStyle: 'italic' }}>Pro</Text>
-        </Text>
+        <Logo size={44} />
         <View style={s.welcomeRule} />
         <Text style={s.welcomeTag}>L’art de la coupe, à l’heure juste.</Text>
       </View>
@@ -728,7 +736,7 @@ function PayScreen({ user, plan, onConfirm, onBack }) {
       <View style={[s.card, { borderColor: C.lineGold }]}>
         <View style={s.row}>
           <View style={s.grow}>
-            <Text style={[s.bname, { fontSize: 15 }]}>BarberPro {p.name}</Text>
+            <Text style={[s.bname, { fontSize: 15 }]}>barbr {p.name}</Text>
             <Text style={[s.btags, { marginTop: 3 }]}>14 jours d’essai puis {fmt(p.price)}/mois · sans engagement</Text>
           </View>
           <Text style={[s.price, { fontSize: 20 }]}>{fmt(p.price)}</Text>
@@ -2800,9 +2808,7 @@ function Main() {
         <>
           <View style={s.header}>
             <View style={{ width: 34 }} />
-            <Text style={s.wordmark}>
-              Barber<Text style={{ color: C.gold, fontStyle: 'italic' }}>Pro</Text>
-            </Text>
+            <Logo size={20} />
             <TouchableOpacity style={s.switchBtn} onPress={logout} hitSlop={10}>
               <Feather name="repeat" size={15} color={C.muted} />
             </TouchableOpacity>

@@ -1,19 +1,22 @@
 {
   "expo": {
-    "name": "BarberPro",
-    "slug": "barberpro",
+    "name": "barbr",
+    "slug": "barbr",
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
+    "icon": "./assets/icon.png",
     "splash": {
-      "backgroundColor": "#0D0D0D"
+      "image": "./assets/icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#000000"
     },
     "ios": {
-      "bundleIdentifier": "app.barberpro.mobile",
+      "bundleIdentifier": "app.barbr.mobile",
       "supportsTablet": false
     },
     "android": {
-      "package": "app.barberpro.mobile"
+      "package": "app.barbr.mobile"
     }
   }
 }
