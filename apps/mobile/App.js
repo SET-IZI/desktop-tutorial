@@ -22,6 +22,7 @@ import { Feather } from '@expo/vector-icons';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
+import * as MediaLibrary from 'expo-media-library';
 
 /* ───────── Thème ───────── */
 const C = {
@@ -80,6 +81,7 @@ const BARBERS = [
     salon: 'BarberPro — Le Salon', city: 'Lille Centre', dist: 0.8,
     venue: 'salon', address: '12 rue Nationale, 59000 Lille',
     clients: '1 240', prestations: '3 680', ponct: 97, delay: 'ON_TIME',
+    shopEnabled: true, loyalty: true,
     tags: ['Burst Fade', 'Fade', 'Dégradé américain', 'Barbe'],
     bio: 'Spécialiste du burst fade et du dégradé américain depuis huit ans. Précision du trait, finitions au rasoir.',
     story: 'Tout a commencé à 16 ans, une tondeuse à la main, dans le garage familial. Après un CAP coiffure et cinq ans dans les salons du Vieux-Lille, j’ai rejoint BarberPro pour y imposer ma signature : des dégradés au millimètre, jamais pressés, toujours finis au rasoir. Chaque client repart avec des conseils d’entretien personnalisés.',
@@ -444,6 +446,51 @@ const Photo = ({ label, tex, uri }) => (
     {label ? <Text style={s.photoLabel}>{label}</Text> : null}
   </View>
 );
+
+/* Visionneuse plein écran — onDownload (facultatif) ajoute le bouton Télécharger */
+function PhotoViewer({ photo, onClose, onDownload }) {
+  if (!photo) return null;
+  return (
+    <View style={[s.modalOverlay, { justifyContent: 'center', padding: 26 }]}>
+      <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
+      <View style={s.viewerBox}>
+        {photo.uri ? (
+          <Image source={{ uri: photo.uri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+        ) : (
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: TEX[photo.tex] || '#1C1B18', alignItems: 'center', justifyContent: 'center' }]}>
+            <Feather name="scissors" size={52} color="rgba(200,169,106,0.45)" />
+          </View>
+        )}
+      </View>
+      {photo.label ? <Text style={s.viewerLabel}>{photo.label}</Text> : null}
+      {onDownload && (
+        <TouchableOpacity style={s.viewerDl} onPress={() => onDownload(photo)} activeOpacity={0.85}>
+          <Feather name="download" size={15} color={C.ink} />
+          <Text style={s.viewerDlText}>TÉLÉCHARGER</Text>
+        </TouchableOpacity>
+      )}
+      <TouchableOpacity style={s.viewerClose} onPress={onClose} hitSlop={10}>
+        <Feather name="x" size={20} color={C.text} />
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+/* Enregistre dans la galerie du téléphone les photos qui ont un vrai fichier */
+async function savePhotos(photos, toast) {
+  const real = photos.filter((p) => p.uri);
+  if (real.length === 0) {
+    toast('Photos de démonstration — rien à enregistrer.');
+    return;
+  }
+  const { status } = await MediaLibrary.requestPermissionsAsync();
+  if (status !== 'granted') {
+    toast('Permission refusée — autorisez l’accès aux photos.');
+    return;
+  }
+  for (const p of real) await MediaLibrary.saveToLibraryAsync(p.uri);
+  toast(`${real.length} photo${real.length > 1 ? 's' : ''} enregistrée${real.length > 1 ? 's' : ''} dans votre galerie.`);
+}
 
 const Stars = ({ n }) => (
   <Text style={s.rate}>
@@ -1064,25 +1111,7 @@ function BarberDetailScreen({ barber, services, onBack, onBook, toast }) {
         <Btn label="RÉSERVER L’ARTISTE" onPress={() => onBook(barber.id)} />
       </View>
 
-      {/* Visionneuse photo plein écran */}
-      {viewer && (
-        <View style={[s.modalOverlay, { justifyContent: 'center', padding: 26 }]}>
-          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setViewer(null)} />
-          <View style={s.viewerBox}>
-            {viewer.uri ? (
-              <Image source={{ uri: viewer.uri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-            ) : (
-              <View style={[StyleSheet.absoluteFill, { backgroundColor: TEX[viewer.tex] || '#1C1B18', alignItems: 'center', justifyContent: 'center' }]}>
-                <Feather name="scissors" size={52} color="rgba(200,169,106,0.45)" />
-              </View>
-            )}
-          </View>
-          {viewer.label ? <Text style={s.viewerLabel}>{viewer.label}</Text> : null}
-          <TouchableOpacity style={s.viewerClose} onPress={() => setViewer(null)} hitSlop={10}>
-            <Feather name="x" size={20} color={C.text} />
-          </TouchableOpacity>
-        </View>
-      )}
+      <PhotoViewer photo={viewer} onClose={() => setViewer(null)} />
     </View>
   );
 }
@@ -1132,7 +1161,7 @@ function BookScreen({ agenda, formulas, services, booking, setBooking, dayIdx, s
         )}
         {[
           ['bell', 'Rappels automatiques : la veille puis 1 h avant le rendez-vous.'],
-          ['gift', `+${Math.floor(d.price / 100)} points fidélité crédités — 1 € dépensé = 1 point.`],
+          ...(d.loyalty ? [['gift', `+${Math.floor(d.price / 100)} points fidélité crédités chez ${d.barber} — 1 € dépensé = 1 point.`]] : []),
         ].map(([ic, txt]) => (
           <View key={ic} style={[s.card, s.row]}>
             <Feather name={ic} size={19} color={C.gold} />
@@ -1259,6 +1288,7 @@ function BookScreen({ agenda, formulas, services, booking, setBooking, dayIdx, s
 function CutsScreen({ history, setHistory, setBarbers, user, toast }) {
   const [pendingRate, setPendingRate] = useState(null); // { id, n }
   const [comment, setComment] = useState('');
+  const [viewer, setViewer] = useState(null);
 
   const publishReview = (h) => {
     const n = pendingRate.n;
@@ -1277,6 +1307,7 @@ function CutsScreen({ history, setHistory, setBarbers, user, toast }) {
   };
 
   return (
+    <View style={{ flex: 1 }}>
     <ScrollView style={s.screen} contentContainerStyle={s.screenPad} keyboardShouldPersistTaps="handled">
       <Kicker>GALERIE PERSONNELLE</Kicker>
       <Title em="coupes">Mes </Title>
@@ -1292,7 +1323,11 @@ function CutsScreen({ history, setHistory, setBarbers, user, toast }) {
           </Text>
           {h.photos.length > 0 ? (
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              {h.photos.map((ph) => <Photo key={ph.id} label={ph.label} tex={ph.tex} uri={ph.uri} />)}
+              {h.photos.map((ph) => (
+                <TouchableOpacity key={ph.id} activeOpacity={0.85} onPress={() => setViewer(ph)}>
+                  <Photo label={ph.label} tex={ph.tex} uri={ph.uri} />
+                </TouchableOpacity>
+              ))}
             </ScrollView>
           ) : (
             <Text style={s.footnote}>Pas de photo pour cette prestation.</Text>
@@ -1329,13 +1364,16 @@ function CutsScreen({ history, setHistory, setBarbers, user, toast }) {
           )}
 
           <View style={[s.wrap, { marginTop: 13 }]}>
-            <Chip mini label="Télécharger" onPress={() => toast('Photos téléchargées.')} />
+            <Chip mini label="Télécharger" onPress={() => savePhotos(h.photos, toast)} />
             <Chip mini label="Partager" onPress={() => toast('Lien de partage copié.')} />
             <Chip mini label="Montrer" onPress={() => toast('À montrer à votre prochain barber.')} />
           </View>
         </View>
       ))}
     </ScrollView>
+    <PhotoViewer photo={viewer} onClose={() => setViewer(null)}
+      onDownload={(ph) => savePhotos([ph], toast)} />
+    </View>
   );
 }
 
@@ -1374,27 +1412,40 @@ function ShopScreen({ products, cat, setCat, cart, addCart, toast }) {
   );
 }
 
-function MeScreen({ user, points, upcoming, onLogout }) {
+function MeScreen({ user, points, barbers, upcoming, onLogout }) {
+  // points uniquement chez les barbers qui ont activé la fidélité
+  const progs = barbers.filter((b) => b.loyalty && (points[b.id] || 0) > 0);
   return (
     <ScrollView style={s.screen} contentContainerStyle={s.screenPad}>
       <Kicker>ESPACE PERSONNEL</Kicker>
       <Title>{user ? user.firstName : 'Profil'}</Title>
       <Lead>{user ? user.email : 'Membre depuis mars 2026'}</Lead>
-      <View style={[s.card, { borderColor: C.lineGold }]}>
-        <View style={s.row}>
-          <View style={s.grow}>
-            <Text style={s.statL}>FIDÉLITÉ</Text>
-            <Text style={s.points}>
-              {points} <Text style={{ fontSize: 16 }}>points</Text>
+      {progs.length === 0 ? (
+        <View style={[s.card, s.row]}>
+          <Feather name="gift" size={19} color={C.gold} />
+          <Text style={[s.softText, s.grow]}>
+            Pas encore de points — vous en cumulez à chaque réservation chez les barbers qui ont activé la fidélité.
+          </Text>
+        </View>
+      ) : (
+        progs.map((b) => (
+          <View key={b.id} style={[s.card, { borderColor: C.lineGold }]}>
+            <View style={s.row}>
+              <View style={s.grow}>
+                <Text style={s.statL}>FIDÉLITÉ · CHEZ {b.name.split(' ')[0].toUpperCase()}</Text>
+                <Text style={s.points}>
+                  {points[b.id]} <Text style={{ fontSize: 16 }}>points</Text>
+                </Text>
+              </View>
+              <Feather name="gift" size={22} color={C.gold} />
+            </View>
+            <View style={s.divider} />
+            <Text style={s.footnoteLeft}>
+              1 € dépensé = 1 point, valable uniquement chez {b.name}. À échanger contre une réduction, un produit ou une coupe offerte.
             </Text>
           </View>
-          <Feather name="gift" size={22} color={C.gold} />
-        </View>
-        <View style={s.divider} />
-        <Text style={s.footnoteLeft}>
-          1 € dépensé = 1 point. Vos points s’échangent contre une réduction, un produit ou une coupe offerte.
-        </Text>
-      </View>
+        ))
+      )}
       <Section>À venir</Section>
       {upcoming.length === 0 ? (
         <Text style={s.footnote}>
@@ -1734,6 +1785,25 @@ function FormulasScreen({ formulas, setFormulas, services, setServices, toast })
   const [priceMode, setPriceMode] = useState('dyn');
   const [priceTxt, setPriceTxt] = useState('');
   const [recur, setRecur] = useState(false);
+  const [addingServ, setAddingServ] = useState(false);
+  const [svName, setSvName] = useState('');
+  const [svDur, setSvDur] = useState(30);
+  const [svPrice, setSvPrice] = useState('');
+
+  const createService = () => {
+    const label = svName.trim();
+    const v = parseFloat(svPrice.replace(',', '.'));
+    if (!label) { toast('Donnez un nom à votre prestation.'); return; }
+    if (isNaN(v) || v <= 0) { toast('Indiquez un prix valide.'); return; }
+    setServices((ss) => [...ss, { id: 'sv' + Date.now(), name: label, dur: svDur, price: Math.round(v * 100) }]);
+    setAddingServ(false); setSvName(''); setSvPrice(''); setSvDur(30);
+    toast(`Prestation « ${label} » créée — vos clients peuvent la réserver.`);
+  };
+
+  const removeService = (sv) => {
+    setServices((ss) => ss.filter((x) => x.id !== sv.id));
+    toast(`Prestation « ${sv.name} » supprimée.`);
+  };
 
   const toggleActive = (id) => {
     setFormulas((fs) => fs.map((f) => {
@@ -1790,9 +1860,9 @@ function FormulasScreen({ formulas, setFormulas, services, setServices, toast })
         Créez vos types de rendez-vous — nocturne, transformation, hebdomadaire… Vos clients réservent dans le cadre que vous fixez.
       </Lead>
 
-      <Section>Mes tarifs</Section>
+      <Section note="créez vos types de coupe, au prix que vous voulez">Mes tarifs</Section>
       {services.map((sv) => (
-        <View key={sv.id} style={[s.card, s.row]}>
+        <View key={sv.id} style={[s.card, s.row, { gap: 12 }]}>
           <View style={s.grow}>
             <Text style={[s.bname, { fontSize: 14 }]}>{sv.name}</Text>
             <Text style={[s.btags, { marginTop: 2 }]}>{sv.dur} min</Text>
@@ -1800,8 +1870,31 @@ function FormulasScreen({ formulas, setFormulas, services, setServices, toast })
           <PriceField cents={sv.price} onChange={(v) =>
             setServices((ss) => ss.map((x) => x.id === sv.id ? { ...x, price: v } : x))
           } />
+          <TouchableOpacity onPress={() => removeService(sv)} hitSlop={8}>
+            <Feather name="trash-2" size={16} color={C.red} />
+          </TouchableOpacity>
         </View>
       ))}
+
+      {addingServ ? (
+        <View style={[s.card, { borderColor: C.lineGold }]}>
+          <Text style={[s.bname, { marginBottom: 10 }]}>Nouvelle prestation</Text>
+          <Field label="NOM" placeholder="Ex. Dégradé américain, Locks, Défrisage…"
+            value={svName} onChangeText={setSvName} />
+          <Text style={s.fieldLabel}>DURÉE</Text>
+          <View style={[s.wrap, { marginBottom: 4 }]}>
+            {[20, 25, ...DUR_CHOICES].map((d) => (
+              <Chip key={d} mini label={`${d} min`} on={svDur === d} onPress={() => setSvDur(d)} />
+            ))}
+          </View>
+          <Field label="PRIX (€)" placeholder="35" keyboardType="numeric"
+            value={svPrice} onChangeText={setSvPrice} />
+          <Btn label="CRÉER LA PRESTATION" onPress={createService} />
+          <Btn ghost label="ANNULER" onPress={() => setAddingServ(false)} />
+        </View>
+      ) : (
+        <Btn ghost icon="plus" label="NOUVELLE PRESTATION" onPress={() => setAddingServ(true)} />
+      )}
 
       <Section>Mes formules</Section>
       {formulas.map((f) => (
@@ -2398,8 +2491,42 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, onPreview, to
       </View>
       <Btn ghost label="ENREGISTRER LES CHIFFRES" onPress={saveStats} />
 
+      {/* ── Fidélité ── */}
+      <Section note="1 € dépensé = 1 point, cumulé uniquement chez vous">Fidélité</Section>
+      <View style={[s.card, s.row, { gap: 10 }]}>
+        <View style={s.grow}>
+          <Text style={[s.bname, { fontSize: 13.5 }]}>Points de fidélité</Text>
+          <Text style={[s.btags, { marginTop: 2 }]}>
+            {enzo.loyalty
+              ? 'Vos clients cumulent des points à chaque prestation chez vous.'
+              : 'Programme désactivé — vos clients ne cumulent pas de points.'}
+          </Text>
+        </View>
+        <Toggle on={!!enzo.loyalty} onPress={() => {
+          updateEnzo((b) => ({ loyalty: !b.loyalty }));
+          toast(enzo.loyalty ? 'Programme de fidélité désactivé.' : 'Programme de fidélité activé.');
+        }} />
+      </View>
+
       {/* ── Boutique ── */}
-      <Section note="modifiez le prix ou supprimez">Boutique — mes produits</Section>
+      <Section note="désactivez-la si vous ne vendez pas de produits">Boutique — mes produits</Section>
+      <View style={[s.card, s.row, { gap: 10 }]}>
+        <View style={s.grow}>
+          <Text style={[s.bname, { fontSize: 13.5 }]}>Boutique activée</Text>
+          <Text style={[s.btags, { marginTop: 2 }]}>
+            {enzo.shopEnabled !== false
+              ? 'Vos produits sont visibles dans l’onglet Boutique des clients.'
+              : 'L’onglet Boutique est masqué pour vos clients.'}
+          </Text>
+        </View>
+        <Toggle on={enzo.shopEnabled !== false} onPress={() => {
+          const next = !(enzo.shopEnabled !== false);
+          updateEnzo(() => ({ shopEnabled: next }));
+          toast(next ? 'Boutique activée — visible par vos clients.' : 'Boutique désactivée.');
+        }} />
+      </View>
+      {enzo.shopEnabled !== false && (
+      <>
       {products.map((p) => (
         <View key={p.id} style={[s.card, s.row, { gap: 10 }]}>
           <View style={[s.pimg, { width: 44, height: 44, borderRadius: 10, flexShrink: 0 }]}>
@@ -2439,6 +2566,8 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, onPreview, to
         </View>
       ) : (
         <Btn ghost icon="plus" label="NOUVEAU PRODUIT" onPress={() => setAddingProduct(true)} />
+      )}
+      </>
       )}
 
       <Text style={s.footnote}>Modifications visibles immédiatement côté client.</Text>
@@ -2488,7 +2617,7 @@ function Main() {
   const [barberDay, setBarberDay] = useState(0);
   const [cat, setCat] = useState('ALL');
   const [cart, setCart] = useState(0);
-  const [points, setPoints] = useState(86);
+  const [points, setPoints] = useState({ enzo: 86 }); // points fidélité par barber
   const [upcoming, setUpcoming] = useState([]);
   const [enzoDelay, setEnzoDelay] = useState('ON_TIME');
   const [toastMsg, setToastMsg] = useState(null);
@@ -2558,14 +2687,17 @@ function Main() {
         },
       },
     }));
+    const hasLoyalty = !!barbers.find((b) => b.id === slot.barber.id)?.loyalty;
     setBooking({
       ...booking,
       done: {
         serv: servLabel, time: slot.time, day: day.label, barber: slot.barber.name,
-        price: quote.price, rules: quote.rules, recur: formula.recur,
+        price: quote.price, rules: quote.rules, recur: formula.recur, loyalty: hasLoyalty,
       },
     });
-    setPoints((p) => p + Math.floor(quote.price / 100));
+    if (hasLoyalty) {
+      setPoints((p) => ({ ...p, [slot.barber.id]: (p[slot.barber.id] || 0) + Math.floor(quote.price / 100) }));
+    }
     setUpcoming((u) => [...u, {
       serv: servLabel, time: slot.time, day: day.label, barber: slot.barber.name,
       price: quote.price, recur: formula.recur,
@@ -2579,6 +2711,9 @@ function Main() {
       return n + 1;
     });
   };
+
+  // La boutique du salon n’apparaît côté client que si le barber l’a activée
+  const shopOn = barbers.find((b) => b.id === 'enzo')?.shopEnabled !== false;
 
   let content = null;
   if (role === 'client') {
@@ -2602,8 +2737,8 @@ function Main() {
         dayIdx={clientDay} setDayIdx={setClientDay} onConfirm={confirmBooking} />
     );
     else if (tab === 'cuts') content = <CutsScreen history={history} setHistory={setHistory} setBarbers={setBarbers} user={user} toast={toast} />;
-    else if (tab === 'shop') content = <ShopScreen products={products} cat={cat} setCat={setCat} cart={cart} addCart={addCart} toast={toast} />;
-    else content = <MeScreen user={user} points={points} upcoming={upcoming} onLogout={logout} />;
+    else if (tab === 'shop' && shopOn) content = <ShopScreen products={products} cat={cat} setCat={setCat} cart={cart} addCart={addCart} toast={toast} />;
+    else content = <MeScreen user={user} points={points} barbers={barbers} upcoming={upcoming} onLogout={logout} />;
   } else if (role === 'barber') {
     if (tab === 'slots') content = (
       <SlotsScreen agenda={agenda} setAgenda={setAgenda} daycfg={daycfg} setDaycfg={setDaycfg}
@@ -2637,7 +2772,9 @@ function Main() {
     );
   }
 
-  const tabs = role === 'client' ? CLIENT_TABS : BARBER_TABS;
+  const tabs = role === 'client'
+    ? CLIENT_TABS.filter(([k]) => k !== 'shop' || shopOn)
+    : BARBER_TABS;
 
   return (
     <View style={[s.root, { paddingTop: insets.top || (Platform.OS === 'android' ? StatusBar.currentHeight || 24 : 0) }]}>
@@ -3075,6 +3212,13 @@ const s = StyleSheet.create({
     fontFamily: SERIF, color: C.text, fontSize: 16, textAlign: 'center',
     marginTop: 16, letterSpacing: 0.5,
   },
+  viewerDl: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    alignSelf: 'center', marginTop: 14,
+    backgroundColor: C.gold, borderRadius: 999,
+    paddingHorizontal: 20, paddingVertical: 11,
+  },
+  viewerDlText: { color: C.ink, fontSize: 11, fontWeight: '700', letterSpacing: 1.5 },
   viewerClose: {
     position: 'absolute', top: 56, right: 24,
     width: 40, height: 40, borderRadius: 20,
