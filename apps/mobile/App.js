@@ -217,6 +217,40 @@ const HISTORY = [
   },
 ];
 
+/* ───────── Notifications de démonstration (PRD §10) ───────── */
+const DEMO_NOTIFS = [
+  {
+    id: 'n1', icon: 'check-circle', color: '#7FB98F', unread: true,
+    title: 'Réservation confirmée',
+    msg: 'Enzo Moreau — Coupe + Barbe · Demain à 10h30. Salon barbr, 12 rue Nationale.',
+    time: 'À l’instant',
+  },
+  {
+    id: 'n2', icon: 'clock', color: '#C8A96A', unread: true,
+    title: 'Rappel J-1',
+    msg: 'Votre coupe chez Enzo Moreau est demain à 10h30. Pensez à confirmer votre présence.',
+    time: 'Il y a 2h',
+  },
+  {
+    id: 'n3', icon: 'alert-circle', color: '#D9A05B', unread: false,
+    title: 'Enzo Moreau est en retard',
+    msg: '10 min de retard sur votre RDV de 14h00. Nouvelle heure de passage estimée : 14h10.',
+    time: 'Hier, 13h52',
+  },
+  {
+    id: 'n4', icon: 'tag', color: '#C8A96A', unread: false,
+    title: 'Offre spéciale week-end',
+    msg: '-20 % sur la formule Transformation chez Ibrahim Diallo — ce samedi et dimanche.',
+    time: 'Il y a 3 jours',
+  },
+  {
+    id: 'n5', icon: 'bell', color: '#908D86', unread: false,
+    title: 'Nouveaux créneaux disponibles',
+    msg: 'Marco Vitale a ouvert de nouveaux créneaux cette semaine à partir de 17h. Réservez vite !',
+    time: 'Il y a 5 jours',
+  },
+];
+
 /* ───────── Jours & créneaux ───────── */
 const WD = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
 const MO = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
@@ -512,6 +546,50 @@ const Toggle = ({ on, onPress }) => (
   </TouchableOpacity>
 );
 
+/* ───────── Panel notifications (PRD §10) ───────── */
+function NotifPanel({ notifs, setNotifs, onClose }) {
+  const unreadCount = notifs.filter((n) => n.unread).length;
+  const markAll = () => setNotifs((ns) => ns.map((n) => ({ ...n, unread: false })));
+  const markOne = (id) => setNotifs((ns) => ns.map((n) => n.id === id ? { ...n, unread: false } : n));
+
+  return (
+    <View style={s.modalOverlay}>
+      <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
+      <View style={s.notifPanel}>
+        <View style={[s.row, { marginBottom: 18 }]}>
+          <Text style={[s.secText, s.grow]}>Notifications</Text>
+          {unreadCount > 0 && (
+            <TouchableOpacity onPress={markAll} hitSlop={8}>
+              <Text style={s.authLink}>Tout marquer lu</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+        <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 420 }}>
+          {notifs.map((n) => (
+            <TouchableOpacity key={n.id} style={[s.notifRow, n.unread && s.notifRowUnread]}
+              onPress={() => markOne(n.id)} activeOpacity={0.8}>
+              <View style={[s.notifIcon, { backgroundColor: n.color + ‘22’, borderColor: n.color + ‘44’ }]}>
+                <Feather name={n.icon} size={16} color={n.color} />
+              </View>
+              <View style={s.grow}>
+                <View style={[s.row, { gap: 6, marginBottom: 3 }]}>
+                  <Text style={[s.bname, { fontSize: 13, flex: 1 }]} numberOfLines={1}>{n.title}</Text>
+                  {n.unread && <View style={s.notifDot} />}
+                </View>
+                <Text style={[s.softText, { lineHeight: 17 }]} numberOfLines={3}>{n.msg}</Text>
+                <Text style={[s.statL, { marginTop: 5 }]}>{n.time}</Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+          {notifs.length === 0 && (
+            <Text style={s.footnote}>Aucune notification pour l’instant.</Text>
+          )}
+        </ScrollView>
+      </View>
+    </View>
+  );
+}
+
 /* ───────── Écran d’entrée ───────── */
 /* Logo barbr — fichier officiel (assets/logo.png, ratio ≈ 3,19:1) */
 const Logo = ({ size = 22 }) => (
@@ -629,8 +707,29 @@ function AuthScreen({ role, onSuccess, onBack }) {
       {error && <Text style={s.authError}>{error}</Text>}
 
       <Btn label={signup ? (role === 'barber' ? 'CONTINUER — ABONNEMENT' : 'CRÉER MON COMPTE') : 'SE CONNECTER'} onPress={submit} />
+
+      {/* Connexion sociale — Google et Apple */}
+      <View style={s.socialRow}>
+        <View style={s.socialLine} />
+        <Text style={s.socialOr}>ou continuer avec</Text>
+        <View style={s.socialLine} />
+      </View>
+      <View style={[s.row, { gap: 11 }]}>
+        {[
+          { label: 'Google', icon: 'globe', name: 'Demo Google' },
+          { label: 'Apple', icon: 'smartphone', name: 'Demo Apple' },
+        ].map(({ label, icon, name }) => (
+          <TouchableOpacity key={label} style={[s.socialBtn, s.grow]}
+            onPress={() => onSuccess({ firstName: name.split(' ')[0], lastName: name.split(' ')[1], email: `${label.toLowerCase()}@demo.fr`, role, plan: null }, { isNew: false })}
+            activeOpacity={0.85}>
+            <Feather name={icon} size={15} color={C.text} />
+            <Text style={s.socialBtnText}>{label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
       <TouchableOpacity onPress={() => { setMode(signup ? 'login' : 'signup'); setError(null); }}
-        hitSlop={8} style={{ marginTop: 18, alignItems: 'center' }}>
+        hitSlop={8} style={{ marginTop: 20, alignItems: 'center' }}>
         <Text style={s.authLink}>
           {signup ? 'Déjà inscrit ? Se connecter' : 'Pas encore de compte ? Créer un compte'}
         </Text>
@@ -2636,8 +2735,11 @@ function Main() {
   const [barberPreview, setBarberPreview] = useState(false);
   const [clients, setClients] = useState(() => [...INIT_CLIENTS]);
   const [history, setHistory] = useState(() => [...HISTORY]);
+  const [notifs, setNotifs] = useState(() => [...DEMO_NOTIFS]);
+  const [notifOpen, setNotifOpen] = useState(false);
 
   const barbersLive = barbers.map((b) => (b.id === 'enzo' ? { ...b, delay: enzoDelay } : b));
+  const notifUnread = notifs.filter((n) => n.unread).length;
 
   const toast = (msg) => {
     setToastMsg(msg);
@@ -2806,13 +2908,27 @@ function Main() {
       ) : (
         <>
           <View style={s.header}>
-            <View style={{ width: 34 }} />
+            {role === 'client' ? (
+              <TouchableOpacity style={s.switchBtn} onPress={() => setNotifOpen(true)} hitSlop={10}>
+                <Feather name="bell" size={15} color={notifUnread > 0 ? C.gold2 : C.muted} />
+                {notifUnread > 0 && (
+                  <View style={s.bellBadge}>
+                    <Text style={s.bellBadgeText}>{notifUnread}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            ) : (
+              <View style={{ width: 34 }} />
+            )}
             <Logo size={20} />
             <TouchableOpacity style={s.switchBtn} onPress={logout} hitSlop={10}>
               <Feather name="repeat" size={15} color={C.muted} />
             </TouchableOpacity>
           </View>
           {content}
+          {notifOpen && role === 'client' && (
+            <NotifPanel notifs={notifs} setNotifs={setNotifs} onClose={() => setNotifOpen(false)} />
+          )}
           <View style={[s.tabbar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
             {tabs.map(([k, ic, l]) => {
               const on = tab === k && !barberDetail;
@@ -3199,6 +3315,42 @@ const s = StyleSheet.create({
     marginBottom: 6,
   },
   clientRowOn: { borderColor: C.gold, backgroundColor: 'rgba(200,169,106,0.07)' },
+
+  /* Connexion sociale */
+  socialRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 18 },
+  socialLine: { flex: 1, height: 1, backgroundColor: 'rgba(255,255,255,0.08)' },
+  socialOr: { color: '#5A5852', fontSize: 11, letterSpacing: 1 },
+  socialBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: '#1B1B20', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 14, paddingVertical: 13,
+  },
+  socialBtnText: { color: '#D0CEC9', fontSize: 13, fontWeight: '500' },
+
+  /* Cloche notifications */
+  bellBadge: {
+    position: 'absolute', top: -4, right: -4,
+    backgroundColor: C.red, borderRadius: 8, minWidth: 16, height: 16,
+    alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3,
+    borderWidth: 1.5, borderColor: C.bg,
+  },
+  bellBadgeText: { color: '#fff', fontSize: 9, fontWeight: '700' },
+
+  /* Panel notifications */
+  notifPanel: {
+    backgroundColor: C.surface, borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    padding: 22, paddingBottom: 36,
+  },
+  notifRow: {
+    flexDirection: 'row', gap: 13, paddingVertical: 13,
+    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)',
+  },
+  notifRowUnread: { backgroundColor: 'rgba(200,169,106,0.04)', marginHorizontal: -22, paddingHorizontal: 22 },
+  notifIcon: {
+    width: 40, height: 40, borderRadius: 20, borderWidth: 1,
+    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+  },
+  notifDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: C.gold, marginTop: 2 },
 
   /* Avis 5 étoiles (fin de coupe) */
   rateBox: {
