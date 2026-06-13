@@ -568,7 +568,7 @@ function NotifPanel({ notifs, setNotifs, onClose }) {
           {notifs.map((n) => (
             <TouchableOpacity key={n.id} style={[s.notifRow, n.unread && s.notifRowUnread]}
               onPress={() => markOne(n.id)} activeOpacity={0.8}>
-              <View style={[s.notifIcon, { backgroundColor: n.color + ‘22’, borderColor: n.color + ‘44’ }]}>
+              <View style={[s.notifIcon, { backgroundColor: `${n.color}22`, borderColor: `${n.color}44` }]}>
                 <Feather name={n.icon} size={16} color={n.color} />
               </View>
               <View style={s.grow}>
