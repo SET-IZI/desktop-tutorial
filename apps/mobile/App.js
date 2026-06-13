@@ -419,7 +419,7 @@ const Chip = ({ label, price, on, onPress, mini }) => (
 );
 
 /* Calendrier mensuel — sélection d’une date sur 2 mois, points de statut par jour */
-function Calendar({ sel, onSel, markFor }) {
+function Calendar({ sel, onSel, markFor, onlyMarked }) {
   const now = new Date();
   const [mOff, setMOff] = useState(0);
   const base = new Date(now.getFullYear(), now.getMonth() + mOff, 1);
@@ -454,7 +454,7 @@ function Calendar({ sel, onSel, markFor }) {
           if (d === null) return <View key={'b' + i} style={s.calCell} />;
           const key = new Date(year, month, d).toDateString();
           const idx = DAY_INDEX[key];
-          const enabled = idx != null;
+          const enabled = idx != null && (!onlyMarked || !!(markFor && markFor(key)));
           const on = enabled && sel === idx;
           const mark = enabled && markFor ? markFor(key) : null;
           return (
@@ -930,7 +930,15 @@ function BigCard({ b, onPress }) {
   );
 }
 
-function ExploreScreen({ barbers, user, openBarber, toast }) {
+const EXPLORE_TIPS = [
+  { icon: 'camera', title: 'Apportez une photo', sub: 'Montrez une référence à votre barber pour éviter les malentendus.' },
+  { icon: 'clock', title: "Réservez à l'avance", sub: '2 à 3 jours avant pour décrocher les meilleurs créneaux.' },
+  { icon: 'gift', title: 'Programme fidélité', sub: '1 € dépensé = 1 point. Cumulez et débloquez des récompenses.' },
+  { icon: 'moon', title: 'Tarifs soirée', sub: 'Les prix varient après 20 h. Vérifiez le montant avant de confirmer.' },
+  { icon: 'image', title: 'Photos avant/après', sub: 'Retrouvez toutes vos coupes dans "Mes coupes".' },
+];
+
+function ExploreScreen({ barbers, user, openBarber, favoriteBarber, toast }) {
   const [query, setQuery] = useState('');
   const [style, setStyle] = useState(null);
   const [city, setCity] = useState('');
@@ -1083,6 +1091,42 @@ function ExploreScreen({ barbers, user, openBarber, toast }) {
         </>
       ) : (
         <>
+          <Section>Conseils</Section>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}
+            style={{ marginHorizontal: -PAD, marginBottom: 4 }}
+            contentContainerStyle={{ paddingHorizontal: PAD, gap: 10 }}>
+            {EXPLORE_TIPS.map((tip) => (
+              <View key={tip.icon} style={[s.card, { width: 190, marginBottom: 0, borderColor: C.line }]}>
+                <Feather name={tip.icon} size={18} color={C.gold} style={{ marginBottom: 8 }} />
+                <Text style={[s.bname, { fontSize: 13, marginBottom: 4 }]}>{tip.title}</Text>
+                <Text style={[s.softText, { fontSize: 11.5, lineHeight: 16 }]}>{tip.sub}</Text>
+              </View>
+            ))}
+          </ScrollView>
+          {favoriteBarber && (
+            <>
+              <Section>Mon barber</Section>
+              {barbers.filter((b) => b.id === favoriteBarber).map((b) => (
+                <TouchableOpacity key={b.id} style={[s.card, { borderColor: C.lineGold }]}
+                  onPress={() => openBarber(b)} activeOpacity={0.85}>
+                  <View style={s.row}>
+                    <Ava b={b} />
+                    <View style={s.grow}>
+                      <Text style={s.bname}>{b.name}</Text>
+                      <Text style={s.btags}>{b.salon} · {String(b.dist).replace('.', ',')} km</Text>
+                      <View style={[s.row, { gap: 12, marginTop: 6 }]}>
+                        <Badge status={b.delay} />
+                        <Text style={s.rate}>★ {b.rating}</Text>
+                      </View>
+                    </View>
+                    <View style={[s.tag, { alignSelf: 'flex-start', backgroundColor: 'rgba(200,169,106,0.15)', borderColor: C.gold }]}>
+                      <Text style={[s.tagText, { color: C.gold }]}>MON BARBER</Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </>
+          )}
           <Row title="Autour de vous" note="du plus proche au plus loin" data={sorted} />
           <Row title="Studios privés" note="un client à la fois" data={sorted.filter((b) => b.venue === 'studio')} />
           <Row title="À domicile" note="ils se déplacent" data={sorted.filter((b) => b.venue === 'domicile')} />
@@ -1094,12 +1138,13 @@ function ExploreScreen({ barbers, user, openBarber, toast }) {
   );
 }
 
-function BarberDetailScreen({ barber, services, products, onBack, onBook, toast }) {
+function BarberDetailScreen({ barber, services, products, favoriteBarber, onToggleFav, onBack, onBook, toast }) {
   const [dtab, setDtab] = useState('about');
   const [more, setMore] = useState(false);
   const [viewer, setViewer] = useState(null);
   const shopProducts = (products || []).filter((p) => (p.stock || 0) > 0);
   const hasShop = barber.shopEnabled && shopProducts.length > 0;
+  const isFav = favoriteBarber === barber.id;
 
   return (
     <View style={{ flex: 1 }}>
@@ -1115,6 +1160,13 @@ function BarberDetailScreen({ barber, services, products, onBack, onBook, toast 
               <Feather name="chevron-left" size={19} color={C.text} />
             </TouchableOpacity>
             <View style={{ flex: 1 }} />
+            {onToggleFav && (
+              <TouchableOpacity style={s.circleBtn} hitSlop={6}
+                onPress={() => onToggleFav(barber.id)}>
+                <Feather name={isFav ? 'star' : 'star'} size={16}
+                  color={isFav ? C.gold : 'rgba(255,255,255,0.5)'} />
+              </TouchableOpacity>
+            )}
             {[['instagram', 'Instagram'], ['music', 'TikTok'], ['share-2', 'Partage du profil']].map(([ic, label]) => (
               <TouchableOpacity key={ic} style={s.circleBtn} hitSlop={6}
                 onPress={() => toast(`${label} de ${barber.name.split(' ')[0]} — relié dans la version connectée.`)}>
@@ -1128,8 +1180,15 @@ function BarberDetailScreen({ barber, services, products, onBack, onBook, toast 
         <View style={{ paddingHorizontal: PAD, paddingTop: 16 }}>
           <View style={[s.row, { gap: 10, alignItems: 'flex-start' }]}>
             <Text style={[s.title, { fontSize: 26, lineHeight: 30, marginBottom: 0, flex: 1 }]}>{barber.name}</Text>
-            <View style={[s.tag, { marginTop: 6 }]}>
-              <Text style={s.tagText}>{VENUES[barber.venue]}</Text>
+            <View style={{ gap: 6, alignItems: 'flex-end', marginTop: 4 }}>
+              <View style={[s.tag]}>
+                <Text style={s.tagText}>{VENUES[barber.venue]}</Text>
+              </View>
+              {isFav && (
+                <View style={[s.tag, { backgroundColor: 'rgba(200,169,106,0.18)', borderColor: C.gold }]}>
+                  <Text style={[s.tagText, { color: C.gold }]}>MON BARBER</Text>
+                </View>
+              )}
             </View>
           </View>
           <View style={[s.row, { gap: 12, marginTop: 8 }]}>
@@ -1417,7 +1476,8 @@ function BookScreen({ agenda, formulas, services, booking, setBooking, dayIdx, s
       {ready && (
         <>
           <Section note="point doré = disponibilités">Le jour</Section>
-          <Calendar sel={dayIdx} onSel={setDayIdx} markFor={(key) => {
+          <Calendar sel={dayIdx} onSel={setDayIdx} onlyMarked
+            markFor={(key) => {
             const list = booking.barber === 'any' ? BARBERS : BARBERS.filter((b) => b.id === booking.barber);
             for (const b of list) {
               const d = agenda[b.id]?.[key] || {};
@@ -1598,7 +1658,7 @@ function ShopScreen({ products, cat, setCat, cart, addCart, shopMode, toast }) {
   );
 }
 
-function MeScreen({ user, points, setPoints, barbers, upcoming, onLogout, toast }) {
+function MeScreen({ user, points, setPoints, barbers, upcoming, favoriteBarber, onLogout, toast }) {
   const [usedReward, setUsedReward] = React.useState(null);
   const loyaltyBarbers = barbers.filter((b) => b.loyalty);
   return (
@@ -1704,6 +1764,21 @@ function MeScreen({ user, points, setPoints, barbers, upcoming, onLogout, toast 
           })}
         </>
       )}
+
+      {favoriteBarber && barbers.filter((b) => b.id === favoriteBarber).map((b) => (
+        <View key={b.id} style={[s.card, { borderColor: C.lineGold }]}>
+          <Text style={s.statL}>MON BARBER</Text>
+          <View style={[s.row, { marginTop: 8 }]}>
+            <Ava b={b} />
+            <View style={s.grow}>
+              <Text style={s.bname}>{b.name}</Text>
+              <Text style={s.btags}>{b.salon}</Text>
+              <Badge status={b.delay} />
+            </View>
+            <Text style={s.rate}>★ {b.rating}</Text>
+          </View>
+        </View>
+      ))}
 
       <Section>À venir</Section>
       {upcoming.length === 0 ? (
@@ -3045,6 +3120,7 @@ function Main() {
   const [cat, setCat] = useState('ALL');
   const [cart, setCart] = useState(0);
   const [points, setPoints] = useState({ enzo: 86 }); // points fidélité par barber
+  const [favoriteBarber, setFavoriteBarber] = useState(null); // id du barber principal
   const [upcoming, setUpcoming] = useState([]);
   const [enzoDelay, setEnzoDelay] = useState('ON_TIME');
   const [toastMsg, setToastMsg] = useState(null);
@@ -3154,6 +3230,13 @@ function Main() {
           barber={barbersLive.find((b) => b.id === barberDetail.id)}
           products={products}
           services={services}
+          favoriteBarber={favoriteBarber}
+          onToggleFav={(id) => {
+            const wasFav = favoriteBarber === id;
+            setFavoriteBarber(wasFav ? null : id);
+            const name = barbersLive.find((b) => b.id === id)?.name.split(' ')[0] || 'Barber';
+            toast(wasFav ? `${name} retiré de vos favoris.` : `${name} défini comme votre barber principal.`);
+          }}
           toast={toast}
           onBack={() => setBarberDetail(null)}
           onBook={(id) => {
@@ -3163,14 +3246,14 @@ function Main() {
           }}
         />
       );
-    } else if (tab === 'explore') content = <ExploreScreen barbers={barbersLive} user={user} openBarber={setBarberDetail} toast={toast} />;
+    } else if (tab === 'explore') content = <ExploreScreen barbers={barbersLive} user={user} openBarber={setBarberDetail} favoriteBarber={favoriteBarber} toast={toast} />;
     else if (tab === 'book') content = (
       <BookScreen agenda={agenda} formulas={formulas} services={services} booking={booking} setBooking={setBooking}
         dayIdx={clientDay} setDayIdx={setClientDay} onConfirm={confirmBooking} />
     );
     else if (tab === 'cuts') content = <CutsScreen history={history} setHistory={setHistory} setBarbers={setBarbers} user={user} toast={toast} />;
     else if (tab === 'shop' && shopOn) content = <ShopScreen products={products} cat={cat} setCat={setCat} cart={cart} addCart={addCart} shopMode={barbers.find((b) => b.id === 'enzo')?.shopMode || 'vitrine'} toast={toast} />;
-    else content = <MeScreen user={user} points={points} setPoints={setPoints} barbers={barbers} upcoming={upcoming} onLogout={logout} toast={toast} />;
+    else content = <MeScreen user={user} points={points} setPoints={setPoints} barbers={barbers} upcoming={upcoming} favoriteBarber={favoriteBarber} onLogout={logout} toast={toast} />;
   } else if (role === 'barber') {
     if (tab === 'slots') content = (
       <SlotsScreen agenda={agenda} setAgenda={setAgenda} daycfg={daycfg} setDaycfg={setDaycfg}
