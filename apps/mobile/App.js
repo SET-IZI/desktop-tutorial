@@ -2628,12 +2628,11 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, clients, setC
         </View>
         <Toggle on={!!enzo.loyalty} onPress={() => {
           updateEnzo((b) => ({ loyalty: !b.loyalty }));
-          toast(enzo.loyalty ? 'Programme de fidélité désactivé.' : 'Programme de fidélité activé.');
+          toast(enzo.loyalty ? 'Programme désactivé.' : 'Programme de fidélité activé.');
         }} />
       </View>
       {!!enzo.loyalty && (
         <>
-          {/* Règle de conversion */}
           <View style={s.card}>
             <Text style={[s.bname, { fontSize: 13, marginBottom: 12 }]}>Règle de conversion</Text>
             <View style={[s.row, { gap: 10, alignItems: 'center' }]}>
@@ -2652,47 +2651,32 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, clients, setC
               </TouchableOpacity>
             </View>
           </View>
-
-          {/* Paliers de récompense */}
           <View style={s.card}>
             <Text style={[s.bname, { fontSize: 13, marginBottom: 10 }]}>Paliers de récompense</Text>
             {(enzo.loyaltyTiers || []).map((tier) => (
               <View key={tier.id} style={[s.row, { paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: C.line }]}>
-                <View style={s.tierBadge}>
-                  <Text style={s.tierBadgeText}>{tier.pts} pts</Text>
-                </View>
+                <View style={s.tierBadge}><Text style={s.tierBadgeText}>{tier.pts} pts</Text></View>
                 <Text style={[s.softText, s.grow]}>{tier.label}</Text>
                 <TouchableOpacity hitSlop={8} onPress={() => {
                   updateEnzo((b) => ({ loyaltyTiers: b.loyaltyTiers.filter((t) => t.id !== tier.id) }));
                   toast('Palier supprimé.');
-                }}>
-                  <Feather name="x" size={14} color={C.muted} />
-                </TouchableOpacity>
+                }}><Feather name="x" size={14} color={C.muted} /></TouchableOpacity>
               </View>
             ))}
             {addingTier ? (
               <View style={{ marginTop: 10, gap: 8 }}>
                 <View style={[s.row, { gap: 8 }]}>
-                  <View style={{ width: 80 }}>
-                    <Field label="POINTS" placeholder="100" keyboardType="numeric" value={tierPts} onChangeText={setTierPts} />
-                  </View>
-                  <View style={s.grow}>
-                    <Field label="RÉCOMPENSE" placeholder="10 € de réduction" value={tierLabel} onChangeText={setTierLabel} />
-                  </View>
+                  <View style={{ width: 80 }}><Field label="POINTS" placeholder="100" keyboardType="numeric" value={tierPts} onChangeText={setTierPts} /></View>
+                  <View style={s.grow}><Field label="RÉCOMPENSE" placeholder="10 € de réduction" value={tierLabel} onChangeText={setTierLabel} /></View>
                 </View>
                 <View style={[s.row, { gap: 8 }]}>
-                  <View style={s.grow}>
-                    <Btn label="AJOUTER" onPress={() => {
-                      const pts = parseInt(tierPts, 10);
-                      if (!pts || !tierLabel.trim()) { toast('Renseignez les deux champs.'); return; }
-                      updateEnzo((b) => ({ loyaltyTiers: [...(b.loyaltyTiers || []), { id: 't' + Date.now(), pts, label: tierLabel.trim() }] }));
-                      setTierPts(''); setTierLabel(''); setAddingTier(false);
-                      toast('Palier ajouté.');
-                    }} />
-                  </View>
-                  <View style={s.grow}>
-                    <Btn ghost label="ANNULER" onPress={() => { setAddingTier(false); setTierPts(''); setTierLabel(''); }} />
-                  </View>
+                  <View style={s.grow}><Btn label="AJOUTER" onPress={() => {
+                    const pts = parseInt(tierPts, 10);
+                    if (!pts || !tierLabel.trim()) { toast('Renseignez les deux champs.'); return; }
+                    updateEnzo((b) => ({ loyaltyTiers: [...(b.loyaltyTiers || []), { id: 't' + Date.now(), pts, label: tierLabel.trim() }] }));
+                    setTierPts(''); setTierLabel(''); setAddingTier(false); toast('Palier ajouté.');
+                  }} /></View>
+                  <View style={s.grow}><Btn ghost label="ANNULER" onPress={() => { setAddingTier(false); setTierPts(''); setTierLabel(''); }} /></View>
                 </View>
               </View>
             ) : (
@@ -2702,28 +2686,24 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, clients, setC
               </TouchableOpacity>
             )}
           </View>
-
-          {/* Points par client */}
           <View style={s.card}>
             <Text style={[s.bname, { fontSize: 13, marginBottom: 10 }]}>Points par client</Text>
-            {clients.map((c) => {
-              const pts = c.loyaltyPts || 0;
-              const nextTier = (enzo.loyaltyTiers || []).filter((t) => t.pts > pts).sort((a, b) => a.pts - b.pts)[0];
+            {clients.map((cl) => {
+              const pts = cl.loyaltyPts || 0;
+              const nxt = (enzo.loyaltyTiers || []).filter((t) => t.pts > pts).sort((a, b) => a.pts - b.pts)[0];
               return (
-                <View key={c.id} style={[s.row, { paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: C.line, gap: 10 }]}>
+                <View key={cl.id} style={[s.row, { paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: C.line, gap: 10 }]}>
                   <View style={s.grow}>
-                    <Text style={[s.bname, { fontSize: 12.5 }]}>{c.firstName} {c.lastName}</Text>
-                    <Text style={s.btags}>{pts} pts{nextTier ? ` · encore ${nextTier.pts - pts} pour « ${nextTier.label} »` : ' · tous les paliers atteints'}</Text>
+                    <Text style={[s.bname, { fontSize: 12.5 }]}>{cl.firstName} {cl.lastName}</Text>
+                    <Text style={s.btags}>{pts} pts{nxt ? ` · encore ${nxt.pts - pts} pts « ${nxt.label} »` : ''}</Text>
                   </View>
-                  <TouchableOpacity style={s.stockBtn} onPress={() => {
-                    setClients((cs) => cs.map((x) => x.id === c.id ? { ...x, loyaltyPts: Math.max(0, pts - 10) } : x));
-                  }} hitSlop={8}>
+                  <TouchableOpacity style={s.stockBtn} hitSlop={8}
+                    onPress={() => setClients((cs) => cs.map((x) => x.id === cl.id ? { ...x, loyaltyPts: Math.max(0, pts - 10) } : x))}>
                     <Feather name="minus" size={13} color={C.gold} />
                   </TouchableOpacity>
                   <Text style={[s.stockNum, { minWidth: 34, textAlign: 'center' }]}>{pts}</Text>
-                  <TouchableOpacity style={s.stockBtn} onPress={() => {
-                    setClients((cs) => cs.map((x) => x.id === c.id ? { ...x, loyaltyPts: pts + 10 } : x));
-                  }} hitSlop={8}>
+                  <TouchableOpacity style={s.stockBtn} hitSlop={8}
+                    onPress={() => setClients((cs) => cs.map((x) => x.id === cl.id ? { ...x, loyaltyPts: pts + 10 } : x))}>
                     <Feather name="plus" size={13} color={C.gold} />
                   </TouchableOpacity>
                 </View>
@@ -2740,14 +2720,14 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, clients, setC
           <Text style={[s.bname, { fontSize: 13.5 }]}>Boutique activée</Text>
           <Text style={[s.btags, { marginTop: 2 }]}>
             {enzo.shopEnabled !== false
-              ? 'Vos produits sont visibles dans l’onglet Boutique des clients.’
-              : 'L’onglet Boutique est masqué pour vos clients.’}
+              ? 'Vos produits sont visibles dans l’onglet Boutique des clients.'
+              : 'L’onglet Boutique est masqué pour vos clients.'}
           </Text>
         </View>
         <Toggle on={enzo.shopEnabled !== false} onPress={() => {
           const next = !(enzo.shopEnabled !== false);
           updateEnzo(() => ({ shopEnabled: next }));
-          toast(next ? 'Boutique activée — visible par vos clients.’ : 'Boutique désactivée.’);
+          toast(next ? 'Boutique activée — visible par vos clients.' : 'Boutique désactivée.');
         }} />
       </View>
       {enzo.shopEnabled !== false && (
@@ -2757,12 +2737,12 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, clients, setC
         <Text style={[s.bname, { fontSize: 13, marginBottom: 10 }]}>Mode de la boutique</Text>
         <View style={[s.row, { gap: 8 }]}>
           <TouchableOpacity
-            style={[s.modeBtn, enzo.shopMode !== 'ecommerce’ && s.modeBtnOn]}
-            onPress={() => { updateEnzo(() => ({ shopMode: 'vitrine’ })); toast('Mode Vitrine — les clients consultent, pas d’achat en ligne.’); }}
+            style={[s.modeBtn, enzo.shopMode !== 'ecommerce' && s.modeBtnOn]}
+            onPress={() => { updateEnzo(() => ({ shopMode: 'vitrine' })); toast('Mode Vitrine activé.'); }}
             activeOpacity={0.85}>
-            <Feather name="eye" size={14} color={enzo.shopMode !== 'ecommerce’ ? C.ink : C.gold} />
-            <Text style={[s.modeBtnText, enzo.shopMode !== 'ecommerce’ && { color: C.ink }]}>Vitrine</Text>
-            <Text style={[s.modeBtnSub, enzo.shopMode !== 'ecommerce’ && { color: 'rgba(14,13,11,0.6)’ }]}>Affichage seul</Text>
+            <Feather name="eye" size={14} color={enzo.shopMode !== 'ecommerce' ? C.ink : C.gold} />
+            <Text style={[s.modeBtnText, enzo.shopMode !== 'ecommerce' && { color: C.ink }]}>Vitrine</Text>
+            <Text style={[s.modeBtnSub, enzo.shopMode !== 'ecommerce' && { color: 'rgba(14,13,11,0.6)' }]}>Affichage seul</Text>
           </TouchableOpacity>
           <View style={[s.modeBtn, { opacity: 0.45 }]}>
             <Feather name="shopping-cart" size={14} color={C.muted} />
@@ -2771,9 +2751,9 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, clients, setC
           </View>
         </View>
         <Text style={[s.footnoteLeft, { marginTop: 8 }]}>
-          {enzo.shopMode !== 'ecommerce’
-            ? 'Les clients voient vos produits mais ne commandent pas en ligne — idéal pour présenter le catalogue.’
-            : 'Paiement en ligne activé — les clients commandent directement.’}
+          {enzo.shopMode !== 'ecommerce'
+            ? 'Les clients consultent vos produits sans commander en ligne.'
+            : 'Les clients commandent directement depuis l’app.'}
         </Text>
       </View>
       {/* Produits avec gestion de stock */}
@@ -2794,16 +2774,16 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, clients, setC
           <View style={[s.row, { gap: 10 }]}>
             <View style={s.grow}>
               <Text style={s.statL}>PRIX</Text>
-              <PriceField cents={p.price} onChange={(v) => { updateProductLocal(p.id, { price: v }); toast(`Prix mis à jour.`); }} />
+              <PriceField cents={p.price} onChange={(v) => { updateProductLocal(p.id, { price: v }); toast('Prix mis à jour.'); }} />
             </View>
             <View style={s.grow}>
               <Text style={s.statL}>STOCK</Text>
               <View style={[s.row, { gap: 10, marginTop: 8 }]}>
-                <TouchableOpacity style={s.stockBtn} onPress={() => { updateProductLocal(p.id, { stock: Math.max(0, p.stock - 1) }); }} hitSlop={8}>
+                <TouchableOpacity style={s.stockBtn} onPress={() => updateProductLocal(p.id, { stock: Math.max(0, p.stock - 1) })} hitSlop={8}>
                   <Feather name="minus" size={14} color={C.gold} />
                 </TouchableOpacity>
                 <Text style={s.stockNum}>{p.stock}</Text>
-                <TouchableOpacity style={s.stockBtn} onPress={() => { updateProductLocal(p.id, { stock: p.stock + 1 }); }} hitSlop={8}>
+                <TouchableOpacity style={s.stockBtn} onPress={() => updateProductLocal(p.id, { stock: p.stock + 1 })} hitSlop={8}>
                   <Feather name="plus" size={14} color={C.gold} />
                 </TouchableOpacity>
               </View>
@@ -2811,31 +2791,6 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, clients, setC
           </View>
         </View>
       ))}
-
-      {addingProduct ? (
-        <View style={[s.card, { borderColor: C.lineGold }]}>
-          <Text style={[s.bname, { marginBottom: 10 }]}>Nouveau produit</Text>
-          <Field label="NOM" placeholder="Ex. Baume après-rasage" value={pName} onChangeText={setPName} />
-          <Text style={s.fieldLabel}>CATÉGORIE</Text>
-          <View style={s.wrap}>
-            {CATS.filter(([k]) => k !== 'ALL').map(([k, l]) => (
-              <Chip key={k} mini label={l} on={pCat === k} onPress={() => setPCat(k)} />
-            ))}
-          </View>
-          <View style={[s.row, { gap: 11, alignItems: 'flex-start' }]}>
-            <View style={s.grow}>
-              <Field label="PRIX (€)" placeholder="19,90" keyboardType="numeric" value={pPrice} onChangeText={setPPrice} />
-            </View>
-            <View style={s.grow}>
-              <Field label="STOCK" placeholder="25" keyboardType="numeric" value={pStock} onChangeText={setPStock} />
-            </View>
-          </View>
-          <Btn label="AJOUTER À LA BOUTIQUE" onPress={saveProduct} />
-          <Btn ghost label="ANNULER" onPress={() => { setAddingProduct(false); setPName(''); setPPrice(''); setPStock(''); }} />
-        </View>
-      ) : (
-        <Btn ghost icon="plus" label="NOUVEAU PRODUIT" onPress={() => setAddingProduct(true)} />
-      )}
       </>
       )}
 
@@ -3480,38 +3435,28 @@ const s = StyleSheet.create({
   },
   clientRowOn: { borderColor: C.gold, backgroundColor: 'rgba(200,169,106,0.07)' },
 
+
   /* Mode vitrine / e-commerce */
   modeBtn: {
     flex: 1, borderWidth: 1, borderColor: C.line, borderRadius: 14,
-    padding: 13, gap: 4, alignItems: 'center',
+    padding: 13, gap: 4, alignItems: "center",
   },
   modeBtnOn: { backgroundColor: C.gold, borderColor: C.gold },
-  modeBtnText: { color: C.text, fontSize: 13, fontWeight: '600' },
+  modeBtnText: { color: C.text, fontSize: 13, fontWeight: "600" },
   modeBtnSub: { color: C.muted, fontSize: 10 },
-
-  /* Stock +/- */
   stockBtn: {
     width: 30, height: 30, borderRadius: 8,
     backgroundColor: C.surface2, borderWidth: 1, borderColor: C.lineGold,
-    alignItems: 'center', justifyContent: 'center',
+    alignItems: "center", justifyContent: "center",
   },
-  stockNum: { fontSize: 15, fontWeight: '600', color: C.text, minWidth: 24, textAlign: 'center' },
-
-  /* Paliers fidélité */
-  tierBadge: {
-    backgroundColor: 'rgba(200,169,106,0.14)', borderRadius: 8,
-    paddingHorizontal: 9, paddingVertical: 4, marginRight: 6,
-  },
-  tierBadgeText: { color: C.gold, fontSize: 11, fontWeight: '600' },
-
-  /* Vitrine tag (boutique côté client) */
-  vitrineTag: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4,
-    borderWidth: 1, borderColor: C.lineGold, borderRadius: 8, paddingVertical: 7, marginTop: 10,
-  },
-  vitrineTagText: { color: C.gold, fontSize: 9, letterSpacing: 1, fontWeight: '600' },
+  stockNum: { fontSize: 15, fontWeight: "600", color: C.text, minWidth: 24, textAlign: "center" },
+  tierBadge: { backgroundColor: "rgba(200,169,106,0.14)", borderRadius: 8, paddingHorizontal: 9, paddingVertical: 4, marginRight: 6 },
+  tierBadgeText: { color: C.gold, fontSize: 11, fontWeight: "600" },
+  vitrineTag: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, borderWidth: 1, borderColor: C.lineGold, borderRadius: 8, paddingVertical: 7, marginTop: 10 },
+  vitrineTagText: { color: C.gold, fontSize: 9, letterSpacing: 1, fontWeight: "600" },
 
   /* Connexion sociale */
+
   socialRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 18 },
   socialLine: { flex: 1, height: 1, backgroundColor: 'rgba(255,255,255,0.08)' },
   socialOr: { color: '#5A5852', fontSize: 11, letterSpacing: 1 },
