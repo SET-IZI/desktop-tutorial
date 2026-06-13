@@ -1094,10 +1094,12 @@ function ExploreScreen({ barbers, user, openBarber, toast }) {
   );
 }
 
-function BarberDetailScreen({ barber, services, onBack, onBook, toast }) {
+function BarberDetailScreen({ barber, services, products, onBack, onBook, toast }) {
   const [dtab, setDtab] = useState('about');
   const [more, setMore] = useState(false);
   const [viewer, setViewer] = useState(null);
+  const shopProducts = (products || []).filter((p) => (p.stock || 0) > 0);
+  const hasShop = barber.shopEnabled && shopProducts.length > 0;
 
   return (
     <View style={{ flex: 1 }}>
@@ -1142,7 +1144,7 @@ function BarberDetailScreen({ barber, services, onBack, onBook, toast }) {
 
         {/* Onglets */}
         <View style={s.dtabs}>
-          {[['about', 'À propos'], ['prest', 'Prestations'], ['avis', 'Avis']].map(([k, l]) => (
+          {[['about', 'À propos'], ['prest', 'Prestations'], ...(hasShop ? [['boutique', 'Boutique']] : []), ['avis', 'Avis']].map(([k, l]) => (
             <TouchableOpacity key={k} style={[s.dtab, dtab === k && s.dtabOn]} onPress={() => setDtab(k)}>
               <Text style={[s.dtabText, dtab === k && { color: C.gold2 }]}>{l}</Text>
             </TouchableOpacity>
@@ -1240,7 +1242,40 @@ function BarberDetailScreen({ barber, services, onBack, onBook, toast }) {
                     <View style={s.row}>
                       <Text style={[s.bname, s.grow, { fontSize: 13 }]}>{r.who}</Text>
                       <Stars n={r.note} />
-                    </View>
+            
+          {dtab === 'boutique' && hasShop && (
+            <>
+              <Section note={barber.shopMode === 'ecommerce' ? 'commande en ligne' : 'disponible en salon'}>
+                Produits
+              </Section>
+              {shopProducts.map((p) => (
+                <View key={p.id} style={[s.card, s.row]}>
+                  <View style={[s.prodIco, { marginRight: 12 }]}>
+                    <Feather name={p.ic || 'box'} size={18} color={C.gold} />
+                  </View>
+                  <View style={s.grow}>
+                    <Text style={[s.bname, { fontSize: 13.5 }]}>{p.name}</Text>
+                    <Text style={[s.btags, { marginTop: 2 }]}>{p.cat} · {p.stock} en stock</Text>
+                  </View>
+                  <View style={{ alignItems: 'flex-end', gap: 6 }}>
+                    <Text style={s.price}>{fmt(p.price)}</Text>
+                    {barber.shopMode === 'ecommerce' ? (
+                      <TouchableOpacity
+                        style={{ backgroundColor: C.gold, paddingHorizontal: 9, paddingVertical: 4, borderRadius: 6 }}
+                        onPress={() => toast(p.name + ' ajouté au panier.' )}>
+                        <Text style={{ color: '#000', fontSize: 10, fontWeight: '700' }}>AJOUTER</Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <View style={[s.vitrineTag, { paddingHorizontal: 7, paddingVertical: 3 }]}>
+                        <Text style={[s.vitrineTagText, { fontSize: 9 }]}>EN SALON</Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+              ))}
+            </>
+          )}
+        </View>
                     {r.txt ? <Text style={s.reviewTxt}>« {r.txt} »</Text> : null}
                   </View>
                 ))}
@@ -2972,7 +3007,6 @@ const CLIENT_TABS = [
   ['explore', 'search', 'Explorer'],
   ['book', 'calendar', 'Réserver'],
   ['cuts', 'image', 'Mes coupes'],
-  ['shop', 'shopping-bag', 'Boutique'],
   ['me', 'user', 'Profil'],
 ];
 const BARBER_TABS = [
@@ -3118,6 +3152,7 @@ function Main() {
       content = (
         <BarberDetailScreen
           barber={barbersLive.find((b) => b.id === barberDetail.id)}
+          products={products}
           services={services}
           toast={toast}
           onBack={() => setBarberDetail(null)}
@@ -3162,6 +3197,7 @@ function Main() {
     if (barberPreview) content = (
       <BarberDetailScreen
         barber={barbersLive.find((b) => b.id === 'enzo')}
+        products={products}
         services={services}
         toast={toast}
         onBack={() => setBarberPreview(false)}
@@ -3171,7 +3207,7 @@ function Main() {
   }
 
   const tabs = role === 'client'
-    ? CLIENT_TABS.filter(([k]) => k !== 'shop' || shopOn)
+    ? CLIENT_TABS
     : BARBER_TABS;
 
   return (
