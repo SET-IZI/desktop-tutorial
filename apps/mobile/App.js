@@ -1563,40 +1563,113 @@ function ShopScreen({ products, cat, setCat, cart, addCart, shopMode, toast }) {
   );
 }
 
-function MeScreen({ user, points, barbers, upcoming, onLogout }) {
-  // points uniquement chez les barbers qui ont activé la fidélité
-  const progs = barbers.filter((b) => b.loyalty && (points[b.id] || 0) > 0);
+function MeScreen({ user, points, setPoints, barbers, upcoming, onLogout, toast }) {
+  const [usedReward, setUsedReward] = React.useState(null);
+  const loyaltyBarbers = barbers.filter((b) => b.loyalty);
   return (
     <ScrollView style={s.screen} contentContainerStyle={s.screenPad}>
       <Kicker>ESPACE PERSONNEL</Kicker>
       <Title>{user ? user.firstName : 'Profil'}</Title>
       <Lead>{user ? user.email : 'Membre depuis mars 2026'}</Lead>
-      {progs.length === 0 ? (
-        <View style={[s.card, s.row]}>
-          <Feather name="gift" size={19} color={C.gold} />
-          <Text style={[s.softText, s.grow]}>
-            Pas encore de points — vous en cumulez à chaque réservation chez les barbers qui ont activé la fidélité.
-          </Text>
-        </View>
-      ) : (
-        progs.map((b) => (
-          <View key={b.id} style={[s.card, { borderColor: C.lineGold }]}>
-            <View style={s.row}>
-              <View style={s.grow}>
-                <Text style={s.statL}>FIDÉLITÉ · CHEZ {b.name.split(' ')[0].toUpperCase()}</Text>
-                <Text style={s.points}>
-                  {points[b.id]} <Text style={{ fontSize: 16 }}>points</Text>
+
+      {loyaltyBarbers.length > 0 && (
+        <>
+          <Section>Programme fidélité</Section>
+          {loyaltyBarbers.map((b) => {
+            const pts = points[b.id] || 0;
+            const tiers = (b.loyaltyTiers || []).slice().sort((a, x) => a.pts - x.pts);
+            const unlocked = tiers.filter((t) => pts >= t.pts);
+            const locked = tiers.filter((t) => pts < t.pts);
+            const nextTier = locked[0] || null;
+            const prevPts = unlocked.length > 0 ? unlocked[unlocked.length - 1].pts : 0;
+            const progress = nextTier ? Math.min(1, (pts - prevPts) / Math.max(1, nextTier.pts - prevPts)) : 1;
+            const barberName = b.name.split(' ')[0];
+            return (
+              <View key={b.id} style={[s.card, { borderColor: C.lineGold }]}>
+                <View style={s.row}>
+                  <View style={s.grow}>
+                    <Text style={s.statL}>FIDÉLITÉ · CHEZ {barberName.toUpperCase()}</Text>
+                    <View style={[s.row, { alignItems: 'baseline', gap: 6 }]}>
+                      <Text style={s.points}>{pts}</Text>
+                      <Text style={[s.softText, { fontSize: 14 }]}>points</Text>
+                    </View>
+                  </View>
+                  <View style={{ position: 'relative' }}>
+                    <Feather name="gift" size={26} color={C.gold} />
+                    {unlocked.length > 0 && (
+                      <View style={s.bellBadge}>
+                        <Text style={s.bellBadgeText}>{unlocked.length}</Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+
+                {nextTier ? (
+                  <View style={{ marginTop: 12 }}>
+                    <View style={[s.row, { justifyContent: 'space-between', marginBottom: 6 }]}>
+                      <Text style={[s.footnoteLeft, { color: C.textSub, flex: 1 }]}>
+                        Prochain : {nextTier.label}
+                      </Text>
+                      <Text style={[s.footnoteLeft, { color: C.gold }]}>
+                        {nextTier.pts - pts} pts
+                      </Text>
+                    </View>
+                    <View style={{ height: 5, backgroundColor: C.line, borderRadius: 3 }}>
+                      <View style={{ height: 5, backgroundColor: C.gold, borderRadius: 3, width: (Math.round(progress * 100)) + '%' }} />
+                    </View>
+                  </View>
+                ) : tiers.length === 0 ? null : (
+                  <View style={[s.row, { marginTop: 10, gap: 6 }]}>
+                    <Feather name="award" size={14} color={C.gold} />
+                    <Text style={[s.footnoteLeft, { color: C.gold }]}>Tous les paliers débloqués !</Text>
+                  </View>
+                )}
+
+                {unlocked.length > 0 && (
+                  <>
+                    <View style={s.divider} />
+                    <Text style={[s.statL, { marginBottom: 8 }]}>RÉCOMPENSES DISPONIBLES</Text>
+                    {unlocked.map((t) => (
+                      <View key={t.id} style={[s.row, { marginBottom: 8, backgroundColor: C.surface, borderRadius: 8, padding: 10 }]}>
+                        <Feather name="check-circle" size={15} color={C.gold} />
+                        <Text style={[s.bname, { flex: 1, marginLeft: 8, fontSize: 13 }]}>{t.label}</Text>
+                        <TouchableOpacity
+                          style={{ backgroundColor: C.gold, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6 }}
+                          onPress={() => {
+                            setPoints((p) => ({ ...p, [b.id]: Math.max(0, pts - t.pts) }));
+                            toast(t.label + ' utilisé ! Points déduits.');
+                          }}>
+                          <Text style={{ color: '#000', fontSize: 11, fontWeight: '700', letterSpacing: 0.5 }}>UTILISER</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </>
+                )}
+
+                {locked.length > 0 && (
+                  <>
+                    <View style={s.divider} />
+                    <Text style={[s.statL, { marginBottom: 6 }]}>À DÉBLOQUER</Text>
+                    {locked.map((t, i) => (
+                      <View key={t.id} style={[s.row, { marginBottom: 6, opacity: i === 0 ? 0.8 : 0.4 }]}>
+                        <Feather name={i === 0 ? 'unlock' : 'lock'} size={13} color={C.textSub} />
+                        <Text style={[s.softText, { flex: 1, marginLeft: 8, fontSize: 12 }]}>{t.label}</Text>
+                        <Text style={[s.footnoteLeft, { color: C.textSub }]}>{t.pts} pts</Text>
+                      </View>
+                    ))}
+                  </>
+                )}
+
+                <View style={s.divider} />
+                <Text style={s.footnoteLeft}>
+                  {b.loyaltyRate || 1} point par € dépensé — valable uniquement chez {b.name}.
                 </Text>
               </View>
-              <Feather name="gift" size={22} color={C.gold} />
-            </View>
-            <View style={s.divider} />
-            <Text style={s.footnoteLeft}>
-              1 € dépensé = 1 point, valable uniquement chez {b.name}. À échanger contre une réduction, un produit ou une coupe offerte.
-            </Text>
-          </View>
-        ))
+            );
+          })}
+        </>
       )}
+
       <Section>À venir</Section>
       {upcoming.length === 0 ? (
         <Text style={s.footnote}>
@@ -1627,7 +1700,6 @@ function MeScreen({ user, points, barbers, upcoming, onLogout }) {
     </ScrollView>
   );
 }
-
 /* ───────── Espace BARBER (connecté : Enzo Moreau) ───────── */
 const STEP_CHOICES = [15, 20, 30, 45, 60];
 
@@ -3026,7 +3098,7 @@ function Main() {
     );
     else if (tab === 'cuts') content = <CutsScreen history={history} setHistory={setHistory} setBarbers={setBarbers} user={user} toast={toast} />;
     else if (tab === 'shop' && shopOn) content = <ShopScreen products={products} cat={cat} setCat={setCat} cart={cart} addCart={addCart} shopMode={barbers.find((b) => b.id === 'enzo')?.shopMode || 'vitrine'} toast={toast} />;
-    else content = <MeScreen user={user} points={points} barbers={barbers} upcoming={upcoming} onLogout={logout} />;
+    else content = <MeScreen user={user} points={points} setPoints={setPoints} barbers={barbers} upcoming={upcoming} onLogout={logout} toast={toast} />;
   } else if (role === 'barber') {
     if (tab === 'slots') content = (
       <SlotsScreen agenda={agenda} setAgenda={setAgenda} daycfg={daycfg} setDaycfg={setDaycfg}
