@@ -1659,13 +1659,39 @@ function ShopScreen({ products, cat, setCat, cart, addCart, shopMode, toast }) {
 }
 
 function MeScreen({ user, points, setPoints, barbers, upcoming, favoriteBarber, onLogout, toast }) {
-  const [usedReward, setUsedReward] = React.useState(null);
+  const [confirmRedeem, setConfirmRedeem] = React.useState(null);
+  const [voucher, setVoucher] = React.useState(null);
   const loyaltyBarbers = barbers.filter((b) => b.loyalty);
+
+  const doRedeem = (b, t) => {
+    const suffix = Math.random().toString(36).slice(2, 6).toUpperCase();
+    const code = b.name.split(' ')[0].toUpperCase() + '-' + suffix;
+    setPoints((p) => ({ ...p, [b.id]: Math.max(0, (p[b.id] || 0) - t.pts) }));
+    setVoucher({ label: t.label, code, barberName: b.name, pts: t.pts });
+    setConfirmRedeem(null);
+  };
+
   return (
+    <>
     <ScrollView style={s.screen} contentContainerStyle={s.screenPad}>
       <Kicker>ESPACE PERSONNEL</Kicker>
       <Title>{user ? user.firstName : 'Profil'}</Title>
       <Lead>{user ? user.email : 'Membre depuis mars 2026'}</Lead>
+
+      {favoriteBarber && barbers.filter((b) => b.id === favoriteBarber).map((b) => (
+        <View key={b.id} style={[s.card, { borderColor: C.lineGold }]}>
+          <Text style={s.statL}>MON BARBER</Text>
+          <View style={[s.row, { marginTop: 8 }]}>
+            <Ava b={b} />
+            <View style={s.grow}>
+              <Text style={s.bname}>{b.name}</Text>
+              <Text style={s.btags}>{b.salon}</Text>
+              <Badge status={b.delay} />
+            </View>
+            <Text style={s.rate}>★ {b.rating}</Text>
+          </View>
+        </View>
+      ))}
 
       {loyaltyBarbers.length > 0 && (
         <>
@@ -1677,7 +1703,8 @@ function MeScreen({ user, points, setPoints, barbers, upcoming, favoriteBarber, 
             const locked = tiers.filter((t) => pts < t.pts);
             const nextTier = locked[0] || null;
             const prevPts = unlocked.length > 0 ? unlocked[unlocked.length - 1].pts : 0;
-            const progress = nextTier ? Math.min(1, (pts - prevPts) / Math.max(1, nextTier.pts - prevPts)) : 1;
+            const progress = nextTier
+              ? Math.min(1, (pts - prevPts) / Math.max(1, nextTier.pts - prevPts)) : 1;
             const barberName = b.name.split(' ')[0];
             return (
               <View key={b.id} style={[s.card, { borderColor: C.lineGold }]}>
@@ -1686,56 +1713,53 @@ function MeScreen({ user, points, setPoints, barbers, upcoming, favoriteBarber, 
                     <Text style={s.statL}>FIDÉLITÉ · CHEZ {barberName.toUpperCase()}</Text>
                     <View style={[s.row, { alignItems: 'baseline', gap: 6 }]}>
                       <Text style={s.points}>{pts}</Text>
-                      <Text style={[s.softText, { fontSize: 14 }]}>points</Text>
+                      <Text style={[s.softText, { fontSize: 14 }]}>pts</Text>
                     </View>
                   </View>
                   <View style={{ position: 'relative' }}>
                     <Feather name="gift" size={26} color={C.gold} />
                     {unlocked.length > 0 && (
-                      <View style={s.bellBadge}>
-                        <Text style={s.bellBadgeText}>{unlocked.length}</Text>
-                      </View>
+                      <View style={s.bellBadge}><Text style={s.bellBadgeText}>{unlocked.length}</Text></View>
                     )}
                   </View>
                 </View>
 
                 {nextTier ? (
-                  <View style={{ marginTop: 12 }}>
-                    <View style={[s.row, { justifyContent: 'space-between', marginBottom: 6 }]}>
-                      <Text style={[s.footnoteLeft, { color: C.textSub, flex: 1 }]}>
-                        Prochain : {nextTier.label}
-                      </Text>
-                      <Text style={[s.footnoteLeft, { color: C.gold }]}>
-                        {nextTier.pts - pts} pts
-                      </Text>
+                  <View style={{ marginTop: 10 }}>
+                    <View style={[s.row, { justifyContent: 'space-between', marginBottom: 5 }]}>
+                      <Text style={[s.footnoteLeft, { color: C.textSub, flex: 1 }]}>Prochain : {nextTier.label}</Text>
+                      <Text style={[s.footnoteLeft, { color: C.gold }]}>{nextTier.pts - pts} pts</Text>
                     </View>
                     <View style={{ height: 5, backgroundColor: C.line, borderRadius: 3 }}>
-                      <View style={{ height: 5, backgroundColor: C.gold, borderRadius: 3, width: (Math.round(progress * 100)) + '%' }} />
+                      <View style={{ height: 5, backgroundColor: C.gold, borderRadius: 3,
+                        width: Math.round(progress * 100) + '%' }} />
                     </View>
                   </View>
-                ) : tiers.length === 0 ? null : (
+                ) : tiers.length > 0 ? (
                   <View style={[s.row, { marginTop: 10, gap: 6 }]}>
                     <Feather name="award" size={14} color={C.gold} />
                     <Text style={[s.footnoteLeft, { color: C.gold }]}>Tous les paliers débloqués !</Text>
                   </View>
-                )}
+                ) : null}
 
                 {unlocked.length > 0 && (
                   <>
                     <View style={s.divider} />
                     <Text style={[s.statL, { marginBottom: 8 }]}>RÉCOMPENSES DISPONIBLES</Text>
                     {unlocked.map((t) => (
-                      <View key={t.id} style={[s.row, { marginBottom: 8, backgroundColor: C.surface, borderRadius: 8, padding: 10 }]}>
-                        <Feather name="check-circle" size={15} color={C.gold} />
-                        <Text style={[s.bname, { flex: 1, marginLeft: 8, fontSize: 13 }]}>{t.label}</Text>
-                        <TouchableOpacity
-                          style={{ backgroundColor: C.gold, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6 }}
-                          onPress={() => {
-                            setPoints((p) => ({ ...p, [b.id]: Math.max(0, pts - t.pts) }));
-                            toast(t.label + ' utilisé ! Points déduits.');
-                          }}>
-                          <Text style={{ color: '#000', fontSize: 11, fontWeight: '700', letterSpacing: 0.5 }}>UTILISER</Text>
-                        </TouchableOpacity>
+                      <View key={t.id} style={[s.card, { borderColor: C.lineGold, marginBottom: 8, padding: 12 }]}>
+                        <View style={[s.row, { marginBottom: 10 }]}>
+                          <Feather name="tag" size={14} color={C.gold} />
+                          <Text style={[s.bname, { flex: 1, marginLeft: 8, fontSize: 13 }]}>{t.label}</Text>
+                        </View>
+                        <View style={[s.row, { justifyContent: 'space-between', alignItems: 'center' }]}>
+                          <Text style={[s.footnoteLeft, { color: C.textSub }]}>Coût : {t.pts} pts</Text>
+                          <TouchableOpacity
+                            style={{ backgroundColor: C.gold, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 7 }}
+                            onPress={() => setConfirmRedeem({ b, t })}>
+                            <Text style={{ color: '#000', fontSize: 11, fontWeight: '700', letterSpacing: 0.8 }}>OBTENIR LE COUPON</Text>
+                          </TouchableOpacity>
+                        </View>
                       </View>
                     ))}
                   </>
@@ -1765,25 +1789,11 @@ function MeScreen({ user, points, setPoints, barbers, upcoming, favoriteBarber, 
         </>
       )}
 
-      {favoriteBarber && barbers.filter((b) => b.id === favoriteBarber).map((b) => (
-        <View key={b.id} style={[s.card, { borderColor: C.lineGold }]}>
-          <Text style={s.statL}>MON BARBER</Text>
-          <View style={[s.row, { marginTop: 8 }]}>
-            <Ava b={b} />
-            <View style={s.grow}>
-              <Text style={s.bname}>{b.name}</Text>
-              <Text style={s.btags}>{b.salon}</Text>
-              <Badge status={b.delay} />
-            </View>
-            <Text style={s.rate}>★ {b.rating}</Text>
-          </View>
-        </View>
-      ))}
-
       <Section>À venir</Section>
       {upcoming.length === 0 ? (
         <Text style={s.footnote}>
-          Aucun rendez-vous à venir.{'\n'}Réservez votre prochaine coupe dans l’onglet Réserver.
+          Aucun rendez-vous à venir.{'
+'}Réservez votre prochaine coupe dans l’onglet Réserver.
         </Text>
       ) : (
         upcoming.map((u, i) => (
@@ -1808,6 +1818,54 @@ function MeScreen({ user, points, setPoints, barbers, upcoming, favoriteBarber, 
       </View>
       <Btn ghost icon="log-out" label="SE DÉCONNECTER" onPress={onLogout} />
     </ScrollView>
+
+    {confirmRedeem && (
+      <View style={s.modalOverlay}>
+        <View style={s.modal}>
+          <Feather name="gift" size={28} color={C.gold} style={{ alignSelf: 'center', marginBottom: 10 }} />
+          <Text style={[s.bname, { fontFamily: SERIF, fontSize: 17, textAlign: 'center', marginBottom: 6 }]}>
+            {confirmRedeem.t.label}
+          </Text>
+          <Text style={[s.softText, { textAlign: 'center', marginBottom: 20 }]}>
+            Cela déduira {confirmRedeem.t.pts} points de votre solde chez {confirmRedeem.b.name.split(' ')[0]}.
+          </Text>
+          <Btn label="OBTENIR LE COUPON" onPress={() => doRedeem(confirmRedeem.b, confirmRedeem.t)} />
+          <Btn ghost label="ANNULER" onPress={() => setConfirmRedeem(null)} />
+        </View>
+      </View>
+    )}
+
+    {voucher && (
+      <View style={s.modalOverlay}>
+        <View style={[s.modal, { padding: 0, overflow: 'hidden' }]}>
+          <View style={{ backgroundColor: C.gold, padding: 20, alignItems: 'center' }}>
+            <Feather name="award" size={30} color="#000" />
+            <Text style={{ color: '#000', fontSize: 11, fontWeight: '800', letterSpacing: 2, marginTop: 8 }}>COUPON FIDÉLITÉ</Text>
+          </View>
+          <View style={{ padding: 24, alignItems: 'center' }}>
+            <Text style={[s.bname, { fontFamily: SERIF, fontSize: 19, textAlign: 'center', marginBottom: 6 }]}>
+              {voucher.label}
+            </Text>
+            <Text style={[s.softText, { marginBottom: 18 }]}>Chez {voucher.barberName}</Text>
+            <View style={{ borderWidth: 1, borderColor: C.lineGold, borderRadius: 10,
+              paddingVertical: 14, paddingHorizontal: 20, alignItems: 'center', width: '100%', marginBottom: 14 }}>
+              <Text style={[s.footnoteLeft, { letterSpacing: 1, marginBottom: 4 }]}>CODE</Text>
+              <Text style={{ fontFamily: SERIF, fontSize: 24, letterSpacing: 4, color: C.gold, fontWeight: '700' }}>
+                {voucher.code}
+              </Text>
+            </View>
+            <Text style={[s.footnoteLeft, { textAlign: 'center', marginBottom: 4 }]}>
+              Présentez ce coupon lors de votre prochain rendez-vous
+            </Text>
+            <Text style={[s.footnoteLeft, { textAlign: 'center', color: C.textSub, marginBottom: 20 }]}>
+              Valable 30 jours · {voucher.pts} pts déduits
+            </Text>
+            <Btn label="FERMER" onPress={() => setVoucher(null)} />
+          </View>
+        </View>
+      </View>
+    )}
+    </>
   );
 }
 /* ───────── Espace BARBER (connecté : Enzo Moreau) ───────── */
