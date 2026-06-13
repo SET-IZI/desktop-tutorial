@@ -2826,6 +2826,30 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, clients, setC
           </TouchableOpacity>
         </View>
       ))}
+      {addingProduct ? (
+        <View style={[s.card, { borderColor: C.lineGold }]}>
+          <Text style={[s.bname, { marginBottom: 10 }]}>Nouveau produit</Text>
+          <Field label="NOM" placeholder="Ex. Baume après-rasage" value={pName} onChangeText={setPName} />
+          <Text style={s.fieldLabel}>CATÉGORIE</Text>
+          <View style={s.wrap}>
+            {CATS.filter(([k]) => k !== 'ALL').map(([k, l]) => (
+              <Chip key={k} mini label={l} on={pCat === k} onPress={() => setPCat(k)} />
+            ))}
+          </View>
+          <View style={[s.row, { gap: 11, alignItems: 'flex-start' }]}>
+            <View style={s.grow}>
+              <Field label="PRIX (€)" placeholder="19,90" keyboardType="numeric" value={pPrice} onChangeText={setPPrice} />
+            </View>
+            <View style={s.grow}>
+              <Field label="STOCK" placeholder="25" keyboardType="numeric" value={pStock} onChangeText={setPStock} />
+            </View>
+          </View>
+          <Btn label="AJOUTER À LA BOUTIQUE" onPress={saveProduct} />
+          <Btn ghost label="ANNULER" onPress={() => { setAddingProduct(false); setPName(''); setPPrice(''); setPStock(''); }} />
+        </View>
+      ) : (
+        <Btn ghost icon="plus" label="NOUVEAU PRODUIT" onPress={() => setAddingProduct(true)} />
+      )}
       </>
       )}
 
