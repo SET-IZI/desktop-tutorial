@@ -81,7 +81,14 @@ const BARBERS = [
     salon: 'barbr — Le Salon', city: 'Lille Centre', dist: 0.8,
     venue: 'salon', address: '12 rue Nationale, 59000 Lille',
     clients: '1 240', prestations: '3 680', ponct: 97, delay: 'ON_TIME',
-    shopEnabled: true, loyalty: true,
+    shopEnabled: true, shopMode: 'vitrine', loyalty: true,
+    loyaltyRate: 1,
+    loyaltyTiers: [
+      { id: 't1', pts: 50, label: '5 € de réduction' },
+      { id: 't2', pts: 100, label: '10 € de réduction' },
+      { id: 't3', pts: 250, label: 'Coupe offerte' },
+      { id: 't4', pts: 500, label: 'Package Premium offert' },
+    ],
     tags: ['Burst Fade', 'Fade', 'Dégradé américain', 'Barbe'],
     bio: 'Spécialiste du burst fade et du dégradé américain depuis huit ans. Précision du trait, finitions au rasoir.',
     story: 'Tout a commencé à 16 ans, une tondeuse à la main, dans le garage familial. Après un CAP coiffure et cinq ans dans les salons du Vieux-Lille, j’ai rejoint barbr pour y imposer ma signature : des dégradés au millimètre, jamais pressés, toujours finis au rasoir. Chaque client repart avec des conseils d’entretien personnalisés.',
@@ -1483,7 +1490,7 @@ function CutsScreen({ history, setHistory, setBarbers, user, toast }) {
   );
 }
 
-function ShopScreen({ products, cat, setCat, cart, addCart, toast }) {
+function ShopScreen({ products, cat, setCat, cart, addCart, shopMode, toast }) {
   const list = products.filter((p) => cat === 'ALL' || p.cat === cat);
   return (
     <ScrollView style={s.screen} contentContainerStyle={s.screenPad}>
@@ -1504,9 +1511,16 @@ function ShopScreen({ products, cat, setCat, cart, addCart, toast }) {
             <Text style={s.pname} numberOfLines={2}>{p.name}</Text>
             <Text style={s.pprice}>{fmt(p.price)}</Text>
             <Text style={s.pstock}>{p.stock > 0 ? `${p.stock} en stock` : 'Épuisé'}</Text>
-            <TouchableOpacity style={s.add} onPress={() => addCart(p)} activeOpacity={0.8}>
-              <Text style={s.addText}>AJOUTER</Text>
-            </TouchableOpacity>
+            {shopMode === 'ecommerce' ? (
+              <TouchableOpacity style={s.add} onPress={() => addCart(p)} activeOpacity={0.8} disabled={p.stock === 0}>
+                <Text style={s.addText}>{p.stock === 0 ? 'ÉPUISÉ' : 'AJOUTER'}</Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={s.vitrineTag}>
+                <Feather name="map-pin" size={9} color={C.gold} />
+                <Text style={s.vitrineTagText}>EN SALON</Text>
+              </View>
+            )}
           </View>
         ))}
       </View>
@@ -1588,11 +1602,11 @@ const STEP_CHOICES = [15, 20, 30, 45, 60];
 
 // Base clients de démonstration — dans la version connectée, ce serait une vraie BDD
 const INIT_CLIENTS = [
-  { id: 'c1', firstName: 'Karim', lastName: 'Doukali', phone: '06 11 22 33 44', notes: 'Burst fade court sur les côtés' },
-  { id: 'c2', firstName: 'Lucas', lastName: 'Bernard', phone: '06 55 66 77 88', notes: 'Coupe classique, pas trop court' },
-  { id: 'c3', firstName: 'Mehdi', lastName: 'Ait', phone: '06 99 00 11 22', notes: 'Barbe uniquement' },
-  { id: 'c4', firstName: 'Sacha', lastName: 'Laurent', phone: '07 12 34 56 78', notes: 'Transformation — avant/après photos' },
-  { id: 'c5', firstName: 'Noah', lastName: 'Petit', phone: '07 98 76 54 32', notes: 'Coupe enfant' },
+  { id: 'c1', firstName: 'Karim', lastName: 'Doukali', phone: '06 11 22 33 44', notes: 'Burst fade court sur les côtés', loyaltyPts: 86 },
+  { id: 'c2', firstName: 'Lucas', lastName: 'Bernard', phone: '06 55 66 77 88', notes: 'Coupe classique, pas trop court', loyaltyPts: 42 },
+  { id: 'c3', firstName: 'Mehdi', lastName: 'Ait', phone: '06 99 00 11 22', notes: 'Barbe uniquement', loyaltyPts: 15 },
+  { id: 'c4', firstName: 'Sacha', lastName: 'Laurent', phone: '07 12 34 56 78', notes: 'Transformation — avant/après photos', loyaltyPts: 210 },
+  { id: 'c5', firstName: 'Noah', lastName: 'Petit', phone: '07 98 76 54 32', notes: 'Coupe enfant', loyaltyPts: 0 },
 ];
 
 function SlotsScreen({ agenda, setAgenda, daycfg, setDaycfg, clients, setClients, services, dayIdx, setDayIdx, toast }) {
@@ -2312,7 +2326,7 @@ function ActivityScreen({ agenda }) {
 }
 
 /* ───────── Gestion de la fiche barber ───────── */
-function FicheScreen({ barbers, setBarbers, products, setProducts, onPreview, toast }) {
+function FicheScreen({ barbers, setBarbers, products, setProducts, clients, setClients, onPreview, toast }) {
   const enzo = barbers.find((b) => b.id === 'enzo');
 
   const [bio, setBio] = useState(enzo.bio);
@@ -2327,6 +2341,10 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, onPreview, to
   const [stPonct, setStPonct] = useState(String(enzo.ponct));
   const [addingProduct, setAddingProduct] = useState(false);
   const [pName, setPName] = useState('');
+  const [loyaltyRateInput, setLoyaltyRateInput] = useState(String(enzo.loyaltyRate || 1));
+  const [addingTier, setAddingTier] = useState(false);
+  const [tierPts, setTierPts] = useState('');
+  const [tierLabel, setTierLabel] = useState('');
   const [pCat, setPCat] = useState('CIRE');
   const [pPrice, setPPrice] = useState('');
   const [pStock, setPStock] = useState('');
@@ -2598,13 +2616,13 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, onPreview, to
       <Btn ghost label="ENREGISTRER LES CHIFFRES" onPress={saveStats} />
 
       {/* ── Fidélité ── */}
-      <Section note="1 € dépensé = 1 point, cumulé uniquement chez vous">Fidélité</Section>
+      <Section note="gérez les règles et les points de vos clients">Fidélité</Section>
       <View style={[s.card, s.row, { gap: 10 }]}>
         <View style={s.grow}>
-          <Text style={[s.bname, { fontSize: 13.5 }]}>Points de fidélité</Text>
+          <Text style={[s.bname, { fontSize: 13.5 }]}>Programme activé</Text>
           <Text style={[s.btags, { marginTop: 2 }]}>
             {enzo.loyalty
-              ? 'Vos clients cumulent des points à chaque prestation chez vous.'
+              ? 'Vos clients cumulent des points à chaque prestation.'
               : 'Programme désactivé — vos clients ne cumulent pas de points.'}
           </Text>
         </View>
@@ -2613,6 +2631,107 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, onPreview, to
           toast(enzo.loyalty ? 'Programme de fidélité désactivé.' : 'Programme de fidélité activé.');
         }} />
       </View>
+      {!!enzo.loyalty && (
+        <>
+          {/* Règle de conversion */}
+          <View style={s.card}>
+            <Text style={[s.bname, { fontSize: 13, marginBottom: 12 }]}>Règle de conversion</Text>
+            <View style={[s.row, { gap: 10, alignItems: 'center' }]}>
+              <Text style={s.softText}>1 € dépensé =</Text>
+              <TextInput style={[s.input, { width: 60, textAlign: 'center', paddingVertical: 8 }]}
+                value={loyaltyRateInput} onChangeText={setLoyaltyRateInput}
+                keyboardType="numeric" placeholderTextColor="#5A5852" />
+              <Text style={s.softText}>point(s)</Text>
+              <TouchableOpacity style={[s.btn, { flex: 1, paddingVertical: 10, marginBottom: 0 }]}
+                onPress={() => {
+                  const v = parseFloat(loyaltyRateInput.replace(',', '.'));
+                  if (!isNaN(v) && v > 0) { updateEnzo(() => ({ loyaltyRate: v })); toast(`Règle : 1 € = ${v} point(s).`); }
+                  else toast('Valeur invalide.');
+                }} activeOpacity={0.85}>
+                <Text style={s.btnText}>OK</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Paliers de récompense */}
+          <View style={s.card}>
+            <Text style={[s.bname, { fontSize: 13, marginBottom: 10 }]}>Paliers de récompense</Text>
+            {(enzo.loyaltyTiers || []).map((tier) => (
+              <View key={tier.id} style={[s.row, { paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: C.line }]}>
+                <View style={s.tierBadge}>
+                  <Text style={s.tierBadgeText}>{tier.pts} pts</Text>
+                </View>
+                <Text style={[s.softText, s.grow]}>{tier.label}</Text>
+                <TouchableOpacity hitSlop={8} onPress={() => {
+                  updateEnzo((b) => ({ loyaltyTiers: b.loyaltyTiers.filter((t) => t.id !== tier.id) }));
+                  toast('Palier supprimé.');
+                }}>
+                  <Feather name="x" size={14} color={C.muted} />
+                </TouchableOpacity>
+              </View>
+            ))}
+            {addingTier ? (
+              <View style={{ marginTop: 10, gap: 8 }}>
+                <View style={[s.row, { gap: 8 }]}>
+                  <View style={{ width: 80 }}>
+                    <Field label="POINTS" placeholder="100" keyboardType="numeric" value={tierPts} onChangeText={setTierPts} />
+                  </View>
+                  <View style={s.grow}>
+                    <Field label="RÉCOMPENSE" placeholder="10 € de réduction" value={tierLabel} onChangeText={setTierLabel} />
+                  </View>
+                </View>
+                <View style={[s.row, { gap: 8 }]}>
+                  <View style={s.grow}>
+                    <Btn label="AJOUTER" onPress={() => {
+                      const pts = parseInt(tierPts, 10);
+                      if (!pts || !tierLabel.trim()) { toast('Renseignez les deux champs.'); return; }
+                      updateEnzo((b) => ({ loyaltyTiers: [...(b.loyaltyTiers || []), { id: 't' + Date.now(), pts, label: tierLabel.trim() }] }));
+                      setTierPts(''); setTierLabel(''); setAddingTier(false);
+                      toast('Palier ajouté.');
+                    }} />
+                  </View>
+                  <View style={s.grow}>
+                    <Btn ghost label="ANNULER" onPress={() => { setAddingTier(false); setTierPts(''); setTierLabel(''); }} />
+                  </View>
+                </View>
+              </View>
+            ) : (
+              <TouchableOpacity style={[s.row, { marginTop: 10, gap: 8 }]} onPress={() => setAddingTier(true)} hitSlop={6}>
+                <Feather name="plus" size={14} color={C.gold} />
+                <Text style={s.authLink}>Nouveau palier</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Points par client */}
+          <View style={s.card}>
+            <Text style={[s.bname, { fontSize: 13, marginBottom: 10 }]}>Points par client</Text>
+            {clients.map((c) => {
+              const pts = c.loyaltyPts || 0;
+              const nextTier = (enzo.loyaltyTiers || []).filter((t) => t.pts > pts).sort((a, b) => a.pts - b.pts)[0];
+              return (
+                <View key={c.id} style={[s.row, { paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: C.line, gap: 10 }]}>
+                  <View style={s.grow}>
+                    <Text style={[s.bname, { fontSize: 12.5 }]}>{c.firstName} {c.lastName}</Text>
+                    <Text style={s.btags}>{pts} pts{nextTier ? ` · encore ${nextTier.pts - pts} pour « ${nextTier.label} »` : ' · tous les paliers atteints'}</Text>
+                  </View>
+                  <TouchableOpacity style={s.stockBtn} onPress={() => {
+                    setClients((cs) => cs.map((x) => x.id === c.id ? { ...x, loyaltyPts: Math.max(0, pts - 10) } : x));
+                  }} hitSlop={8}>
+                    <Feather name="minus" size={13} color={C.gold} />
+                  </TouchableOpacity>
+                  <Text style={[s.stockNum, { minWidth: 34, textAlign: 'center' }]}>{pts}</Text>
+                  <TouchableOpacity style={s.stockBtn} onPress={() => {
+                    setClients((cs) => cs.map((x) => x.id === c.id ? { ...x, loyaltyPts: pts + 10 } : x));
+                  }} hitSlop={8}>
+                    <Feather name="plus" size={13} color={C.gold} />
+                  </TouchableOpacity>
+                </View>
+              );
+            })}
+          </View>
+        </>
+      )}
 
       {/* ── Boutique ── */}
       <Section note="désactivez-la si vous ne vendez pas de produits">Boutique — mes produits</Section>
@@ -2621,31 +2740,75 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, onPreview, to
           <Text style={[s.bname, { fontSize: 13.5 }]}>Boutique activée</Text>
           <Text style={[s.btags, { marginTop: 2 }]}>
             {enzo.shopEnabled !== false
-              ? 'Vos produits sont visibles dans l’onglet Boutique des clients.'
-              : 'L’onglet Boutique est masqué pour vos clients.'}
+              ? 'Vos produits sont visibles dans l’onglet Boutique des clients.’
+              : 'L’onglet Boutique est masqué pour vos clients.’}
           </Text>
         </View>
         <Toggle on={enzo.shopEnabled !== false} onPress={() => {
           const next = !(enzo.shopEnabled !== false);
           updateEnzo(() => ({ shopEnabled: next }));
-          toast(next ? 'Boutique activée — visible par vos clients.' : 'Boutique désactivée.');
+          toast(next ? 'Boutique activée — visible par vos clients.’ : 'Boutique désactivée.’);
         }} />
       </View>
       {enzo.shopEnabled !== false && (
       <>
-      {products.map((p) => (
-        <View key={p.id} style={[s.card, s.row, { gap: 10 }]}>
-          <View style={[s.pimg, { width: 44, height: 44, borderRadius: 10, flexShrink: 0 }]}>
-            <Feather name={p.ic} size={17} color="rgba(200,169,106,0.5)" />
-          </View>
-          <View style={s.grow}>
-            <Text style={[s.bname, { fontSize: 12.5 }]} numberOfLines={1}>{p.name}</Text>
-            <Text style={s.btags}>{CATS.find(([k]) => k === p.cat)?.[1] || p.cat} · {p.stock} en stock</Text>
-          </View>
-          <PriceField cents={p.price} onChange={(v) => { updateProductLocal(p.id, { price: v }); toast(`Prix de « ${p.name} » mis à jour.`); }} />
-          <TouchableOpacity onPress={() => { setProducts((ps) => ps.filter((x) => x.id !== p.id)); toast(`« ${p.name} » retiré de la boutique.`); }} hitSlop={8}>
-            <Feather name="trash-2" size={16} color={C.red} />
+      {/* Mode vitrine / e-commerce */}
+      <View style={s.card}>
+        <Text style={[s.bname, { fontSize: 13, marginBottom: 10 }]}>Mode de la boutique</Text>
+        <View style={[s.row, { gap: 8 }]}>
+          <TouchableOpacity
+            style={[s.modeBtn, enzo.shopMode !== 'ecommerce’ && s.modeBtnOn]}
+            onPress={() => { updateEnzo(() => ({ shopMode: 'vitrine’ })); toast('Mode Vitrine — les clients consultent, pas d’achat en ligne.’); }}
+            activeOpacity={0.85}>
+            <Feather name="eye" size={14} color={enzo.shopMode !== 'ecommerce’ ? C.ink : C.gold} />
+            <Text style={[s.modeBtnText, enzo.shopMode !== 'ecommerce’ && { color: C.ink }]}>Vitrine</Text>
+            <Text style={[s.modeBtnSub, enzo.shopMode !== 'ecommerce’ && { color: 'rgba(14,13,11,0.6)’ }]}>Affichage seul</Text>
           </TouchableOpacity>
+          <View style={[s.modeBtn, { opacity: 0.45 }]}>
+            <Feather name="shopping-cart" size={14} color={C.muted} />
+            <Text style={s.modeBtnText}>E-commerce</Text>
+            <Text style={s.modeBtnSub}>Bientôt disponible</Text>
+          </View>
+        </View>
+        <Text style={[s.footnoteLeft, { marginTop: 8 }]}>
+          {enzo.shopMode !== 'ecommerce’
+            ? 'Les clients voient vos produits mais ne commandent pas en ligne — idéal pour présenter le catalogue.’
+            : 'Paiement en ligne activé — les clients commandent directement.’}
+        </Text>
+      </View>
+      {/* Produits avec gestion de stock */}
+      {products.map((p) => (
+        <View key={p.id} style={[s.card, { gap: 9 }]}>
+          <View style={[s.row, { gap: 10 }]}>
+            <View style={[s.pimg, { width: 44, height: 44, borderRadius: 10, flexShrink: 0 }]}>
+              <Feather name={p.ic} size={17} color="rgba(200,169,106,0.5)" />
+            </View>
+            <View style={s.grow}>
+              <Text style={[s.bname, { fontSize: 12.5 }]} numberOfLines={1}>{p.name}</Text>
+              <Text style={s.btags}>{CATS.find(([k]) => k === p.cat)?.[1] || p.cat}</Text>
+            </View>
+            <TouchableOpacity onPress={() => { setProducts((ps) => ps.filter((x) => x.id !== p.id)); toast(`« ${p.name} » retiré.`); }} hitSlop={8}>
+              <Feather name="trash-2" size={15} color={C.red} />
+            </TouchableOpacity>
+          </View>
+          <View style={[s.row, { gap: 10 }]}>
+            <View style={s.grow}>
+              <Text style={s.statL}>PRIX</Text>
+              <PriceField cents={p.price} onChange={(v) => { updateProductLocal(p.id, { price: v }); toast(`Prix mis à jour.`); }} />
+            </View>
+            <View style={s.grow}>
+              <Text style={s.statL}>STOCK</Text>
+              <View style={[s.row, { gap: 10, marginTop: 8 }]}>
+                <TouchableOpacity style={s.stockBtn} onPress={() => { updateProductLocal(p.id, { stock: Math.max(0, p.stock - 1) }); }} hitSlop={8}>
+                  <Feather name="minus" size={14} color={C.gold} />
+                </TouchableOpacity>
+                <Text style={s.stockNum}>{p.stock}</Text>
+                <TouchableOpacity style={s.stockBtn} onPress={() => { updateProductLocal(p.id, { stock: p.stock + 1 }); }} hitSlop={8}>
+                  <Feather name="plus" size={14} color={C.gold} />
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
         </View>
       ))}
 
@@ -2846,7 +3009,7 @@ function Main() {
         dayIdx={clientDay} setDayIdx={setClientDay} onConfirm={confirmBooking} />
     );
     else if (tab === 'cuts') content = <CutsScreen history={history} setHistory={setHistory} setBarbers={setBarbers} user={user} toast={toast} />;
-    else if (tab === 'shop' && shopOn) content = <ShopScreen products={products} cat={cat} setCat={setCat} cart={cart} addCart={addCart} toast={toast} />;
+    else if (tab === 'shop' && shopOn) content = <ShopScreen products={products} cat={cat} setCat={setCat} cart={cart} addCart={addCart} shopMode={barbers.find((b) => b.id === 'enzo')?.shopMode || 'vitrine'} toast={toast} />;
     else content = <MeScreen user={user} points={points} barbers={barbers} upcoming={upcoming} onLogout={logout} />;
   } else if (role === 'barber') {
     if (tab === 'slots') content = (
@@ -2866,6 +3029,7 @@ function Main() {
     );
     else if (tab === 'fiche') content = (
       <FicheScreen barbers={barbers} setBarbers={setBarbers} products={products} setProducts={setProducts}
+        clients={clients} setClients={setClients}
         onPreview={() => setBarberPreview(true)} toast={toast} />
     );
     else content = <ActivityScreen agenda={agenda} />;
@@ -3014,9 +3178,9 @@ const s = StyleSheet.create({
   locInput: { flex: 1, color: C.text, fontSize: 12.5, padding: 0 },
 
   /* Cartes carrousel (Explorer) */
-  bigCard: { width: Math.floor(Math.min(SCREEN_W, 500) * 0.58), marginRight: 12 },
+  bigCard: { width: Math.floor(Math.min(SCREEN_W, 500) * 0.68), marginRight: 12 },
   bigArt: {
-    height: 190, borderRadius: 20, borderWidth: 1, borderColor: C.line,
+    height: 230, borderRadius: 20, borderWidth: 1, borderColor: C.line,
     alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
   },
   bigIni: { fontFamily: SERIF, fontSize: 52, fontWeight: '600', color: 'rgba(230,207,160,0.5)', marginTop: -44 },
@@ -3315,6 +3479,37 @@ const s = StyleSheet.create({
     marginBottom: 6,
   },
   clientRowOn: { borderColor: C.gold, backgroundColor: 'rgba(200,169,106,0.07)' },
+
+  /* Mode vitrine / e-commerce */
+  modeBtn: {
+    flex: 1, borderWidth: 1, borderColor: C.line, borderRadius: 14,
+    padding: 13, gap: 4, alignItems: 'center',
+  },
+  modeBtnOn: { backgroundColor: C.gold, borderColor: C.gold },
+  modeBtnText: { color: C.text, fontSize: 13, fontWeight: '600' },
+  modeBtnSub: { color: C.muted, fontSize: 10 },
+
+  /* Stock +/- */
+  stockBtn: {
+    width: 30, height: 30, borderRadius: 8,
+    backgroundColor: C.surface2, borderWidth: 1, borderColor: C.lineGold,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  stockNum: { fontSize: 15, fontWeight: '600', color: C.text, minWidth: 24, textAlign: 'center' },
+
+  /* Paliers fidélité */
+  tierBadge: {
+    backgroundColor: 'rgba(200,169,106,0.14)', borderRadius: 8,
+    paddingHorizontal: 9, paddingVertical: 4, marginRight: 6,
+  },
+  tierBadgeText: { color: C.gold, fontSize: 11, fontWeight: '600' },
+
+  /* Vitrine tag (boutique côté client) */
+  vitrineTag: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4,
+    borderWidth: 1, borderColor: C.lineGold, borderRadius: 8, paddingVertical: 7, marginTop: 10,
+  },
+  vitrineTagText: { color: C.gold, fontSize: 9, letterSpacing: 1, fontWeight: '600' },
 
   /* Connexion sociale */
   socialRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 18 },
