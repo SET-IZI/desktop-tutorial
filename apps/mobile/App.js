@@ -2716,6 +2716,7 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, clients, setC
   const curCover = enzo.coverColor || TEX[enzo.tex];
 
   return (
+    <>
     <ScrollView style={s.screen} contentContainerStyle={s.screenPad} keyboardShouldPersistTaps="handled">
       <Kicker>ESPACE BARBER · ENZO MOREAU</Kicker>
       <Title em="fiche">Ma </Title>
@@ -3155,6 +3156,7 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, clients, setC
         </View>
       </View>
     )}
+    </>
   );
 }
 
