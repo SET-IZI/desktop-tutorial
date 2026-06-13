@@ -1823,11 +1823,11 @@ const SCHEDULE_PRESETS = [
 
 // Base clients de démonstration — dans la version connectée, ce serait une vraie BDD
 const INIT_CLIENTS = [
-  { id: 'c1', firstName: 'Karim', lastName: 'Doukali', phone: '06 11 22 33 44', notes: 'Burst fade court sur les côtés', loyaltyPts: 86 },
-  { id: 'c2', firstName: 'Lucas', lastName: 'Bernard', phone: '06 55 66 77 88', notes: 'Coupe classique, pas trop court', loyaltyPts: 42 },
-  { id: 'c3', firstName: 'Mehdi', lastName: 'Ait', phone: '06 99 00 11 22', notes: 'Barbe uniquement', loyaltyPts: 15 },
-  { id: 'c4', firstName: 'Sacha', lastName: 'Laurent', phone: '07 12 34 56 78', notes: 'Transformation — avant/après photos', loyaltyPts: 210 },
-  { id: 'c5', firstName: 'Noah', lastName: 'Petit', phone: '07 98 76 54 32', notes: 'Coupe enfant', loyaltyPts: 0 },
+  { id: 'c1', firstName: 'Karim', lastName: 'Doukali', phone: '06 11 22 33 44', notes: 'Burst fade court sur les côtés', loyaltyPts: 86, blocked: false },
+  { id: 'c2', firstName: 'Lucas', lastName: 'Bernard', phone: '06 55 66 77 88', notes: 'Coupe classique, pas trop court', loyaltyPts: 42, blocked: false },
+  { id: 'c3', firstName: 'Mehdi', lastName: 'Ait', phone: '06 99 00 11 22', notes: 'Barbe uniquement', loyaltyPts: 15, blocked: false },
+  { id: 'c4', firstName: 'Sacha', lastName: 'Laurent', phone: '07 12 34 56 78', notes: 'Transformation — avant/après photos', loyaltyPts: 210, blocked: false },
+  { id: 'c5', firstName: 'Noah', lastName: 'Petit', phone: '07 98 76 54 32', notes: 'Coupe enfant', loyaltyPts: 0, blocked: false },
 ];
 
 function SlotsScreen({ agenda, setAgenda, daycfg, setDaycfg, clients, setClients, services, dayIdx, setDayIdx, toast }) {
@@ -1907,9 +1907,10 @@ function SlotsScreen({ agenda, setAgenda, daycfg, setDaycfg, clients, setClients
     toast(`${c.firstName} ${c.lastName} ajouté à la base clients.`);
   };
 
-  const filteredClients = clientSearch.trim()
+  const filteredClients = (clientSearch.trim()
     ? clients.filter((c) => `${c.firstName} ${c.lastName} ${c.phone}`.toLowerCase().includes(clientSearch.toLowerCase()))
-    : clients;
+    : clients).filter((c) => !c.blocked);
+  const blockedClients = clients.filter((c) => c.blocked);
 
   // Changement de durée : les réservations sont conservées, les créneaux
   // ouverts/pauses alignés sur la nouvelle grille aussi.
@@ -2100,6 +2101,20 @@ function SlotsScreen({ agenda, setAgenda, daycfg, setDaycfg, clients, setClients
                     ))}
                   </ScrollView>
                 </View>
+                {blockedClients.length > 0 && (
+                  <View style={{ marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: C.line }}>
+                    <Text style={[s.fieldLabel, { color: '#E05252', marginBottom: 6 }]}>CLIENTS BLOQUÉS</Text>
+                    {blockedClients.map((c) => (
+                      <View key={c.id} style={[s.clientRow, { opacity: 0.5 }]}>
+                        <Feather name="slash" size={13} color="#E05252" />
+                        <View style={[s.grow, { marginLeft: 8 }]}>
+                          <Text style={[s.bname, { fontSize: 13 }]}>{c.firstName} {c.lastName}</Text>
+                          {c.blockReason && <Text style={[s.btags, { color: '#E05252', fontSize: 10 }]}>{c.blockReason}</Text>}
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                )}
                 <TouchableOpacity onPress={() => setAddingClient(true)} style={{ marginTop: 8 }} hitSlop={6}>
                   <Text style={s.authLink}>+ Nouveau client</Text>
                 </TouchableOpacity>
@@ -2576,6 +2591,14 @@ function ActivityScreen({ agenda }) {
 }
 
 /* ───────── Gestion de la fiche barber ───────── */
+const BLOCK_REASONS = [
+  'Retards répétés',
+  'Annulations de dernière minute',
+  'Comportement inapproprié',
+  'Impayé',
+  'Autre',
+];
+
 function FicheScreen({ barbers, setBarbers, products, setProducts, clients, setClients, onPreview, toast }) {
   const enzo = barbers.find((b) => b.id === 'enzo');
 
@@ -2592,6 +2615,7 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, clients, setC
   const [addingProduct, setAddingProduct] = useState(false);
   const [pName, setPName] = useState('');
   const [loyaltyRateInput, setLoyaltyRateInput] = useState(String(enzo.loyaltyRate || 1));
+  const [blockingClient, setBlockingClient] = useState(null); // { id, firstName, lastName } | null
   const [ptSearch, setPtSearch] = useState('');
   const [addingTier, setAddingTier] = useState(false);
   const [tierPts, setTierPts] = useState('');
@@ -2956,19 +2980,41 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, clients, setC
               const pts = cl.loyaltyPts || 0;
               const nxt = (enzo.loyaltyTiers || []).filter((t) => t.pts > pts).sort((a, b) => a.pts - b.pts)[0];
               return (
-                <View key={cl.id} style={[s.row, { paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: C.line, gap: 10 }]}>
+                <View key={cl.id} style={[s.row, { paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: C.line, gap: 10, opacity: cl.blocked ? 0.55 : 1 }]}>
                   <View style={s.grow}>
-                    <Text style={[s.bname, { fontSize: 12.5 }]}>{cl.firstName} {cl.lastName}</Text>
-                    <Text style={s.btags}>{pts} pts{nxt ? ` · encore ${nxt.pts - pts} pts « ${nxt.label} »` : ''}</Text>
+                    <View style={[s.row, { gap: 6 }]}>
+                      {cl.blocked && <Feather name="slash" size={12} color={C.red || '#E05252'} />}
+                      <Text style={[s.bname, { fontSize: 12.5 }]}>{cl.firstName} {cl.lastName}</Text>
+                    </View>
+                    {cl.blocked
+                      ? <Text style={[s.btags, { color: C.red || '#E05252' }]}>BLOQUÉ{cl.blockReason ? ' · ' + cl.blockReason : ''}</Text>
+                      : <Text style={s.btags}>{pts} pts{nxt ? ` · encore ${nxt.pts - pts} pts pour « ${nxt.label} »` : ''}</Text>
+                    }
                   </View>
-                  <TouchableOpacity style={s.stockBtn} hitSlop={8}
-                    onPress={() => setClients((cs) => cs.map((x) => x.id === cl.id ? { ...x, loyaltyPts: Math.max(0, pts - 10) } : x))}>
-                    <Feather name="minus" size={13} color={C.gold} />
-                  </TouchableOpacity>
-                  <Text style={[s.stockNum, { minWidth: 34, textAlign: 'center' }]}>{pts}</Text>
-                  <TouchableOpacity style={s.stockBtn} hitSlop={8}
-                    onPress={() => setClients((cs) => cs.map((x) => x.id === cl.id ? { ...x, loyaltyPts: pts + 10 } : x))}>
-                    <Feather name="plus" size={13} color={C.gold} />
+                  {!cl.blocked ? (
+                    <>
+                      <TouchableOpacity style={s.stockBtn} hitSlop={8}
+                        onPress={() => setClients((cs) => cs.map((x) => x.id === cl.id ? { ...x, loyaltyPts: Math.max(0, pts - 10) } : x))}>
+                        <Feather name="minus" size={13} color={C.gold} />
+                      </TouchableOpacity>
+                      <Text style={[s.stockNum, { minWidth: 34, textAlign: 'center' }]}>{pts}</Text>
+                      <TouchableOpacity style={s.stockBtn} hitSlop={8}
+                        onPress={() => setClients((cs) => cs.map((x) => x.id === cl.id ? { ...x, loyaltyPts: pts + 10 } : x))}>
+                        <Feather name="plus" size={13} color={C.gold} />
+                      </TouchableOpacity>
+                    </>
+                  ) : null}
+                  <TouchableOpacity hitSlop={8}
+                    style={[s.stockBtn, { borderColor: cl.blocked ? C.gold : (C.red || '#E05252'), paddingHorizontal: 8 }]}
+                    onPress={() => {
+                      if (cl.blocked) {
+                        setClients((cs) => cs.map((x) => x.id === cl.id ? { ...x, blocked: false, blockReason: null } : x));
+                        toast(`${cl.firstName} ${cl.lastName} débloqué.`);
+                      } else {
+                        setBlockingClient(cl);
+                      }
+                    }}>
+                    <Feather name={cl.blocked ? 'unlock' : 'slash'} size={12} color={cl.blocked ? C.gold : (C.red || '#E05252')} />
                   </TouchableOpacity>
                 </View>
               );
@@ -3074,6 +3120,41 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, clients, setC
 
       <Text style={s.footnote}>Modifications visibles immédiatement côté client.</Text>
     </ScrollView>
+
+    {/* ── Modale blocage client ── */}
+    {blockingClient && (
+      <View style={s.modalOverlay}>
+        <View style={s.modal}>
+          <View style={[s.row, { marginBottom: 14 }]}>
+            <Text style={[s.bname, { fontFamily: SERIF, fontSize: 16, flex: 1 }]}>
+              Bloquer {blockingClient.firstName} {blockingClient.lastName}
+            </Text>
+            <TouchableOpacity onPress={() => setBlockingClient(null)} hitSlop={10}>
+              <Feather name="x" size={20} color={C.muted} />
+            </TouchableOpacity>
+          </View>
+          <Text style={[s.fieldLabel, { marginBottom: 10 }]}>MOTIF DU BLOCAGE</Text>
+          <View style={[s.wrap, { gap: 8, marginBottom: 16 }]}>
+            {BLOCK_REASONS.map((reason) => (
+              <TouchableOpacity key={reason}
+                style={[s.chip, { borderColor: '#E05252' }]}
+                onPress={() => {
+                  setClients((cs) => cs.map((x) => x.id === blockingClient.id
+                    ? { ...x, blocked: true, blockReason: reason } : x));
+                  toast(`${blockingClient.firstName} ${blockingClient.lastName} bloqué · ${reason}.`);
+                  setBlockingClient(null);
+                }}>
+                <Text style={[s.chipText, { color: '#E05252' }]}>{reason}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <Text style={[s.footnoteLeft, { marginBottom: 12 }]}>
+            Le client ne pourra plus être sélectionné lors des réservations manuelles.
+          </Text>
+          <Btn ghost label="ANNULER" onPress={() => setBlockingClient(null)} />
+        </View>
+      </View>
+    )}
   );
 }
 
