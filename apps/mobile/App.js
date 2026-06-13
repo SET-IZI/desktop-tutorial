@@ -1702,6 +1702,14 @@ function MeScreen({ user, points, setPoints, barbers, upcoming, onLogout, toast 
 }
 /* ───────── Espace BARBER (connecté : Enzo Moreau) ───────── */
 const STEP_CHOICES = [15, 20, 30, 45, 60];
+const SCHEDULE_PRESETS = [
+  { label: '8h – 13h', start: 8, end: 13 },
+  { label: '9h – 18h', start: 9, end: 18 },
+  { label: '10h – 19h', start: 10, end: 19 },
+  { label: '14h – 18h', start: 14, end: 18 },
+  { label: '9h – 22h', start: 9, end: 22 },
+  { label: '8h – 20h', start: 8, end: 20 },
+];
 
 // Base clients de démonstration — dans la version connectée, ce serait une vraie BDD
 const INIT_CLIENTS = [
@@ -1747,6 +1755,7 @@ function SlotsScreen({ agenda, setAgenda, daycfg, setDaycfg, clients, setClients
   };
 
   // ── Réservation manuelle par le barber ──
+  const [multiDay, setMultiDay] = useState(1); // nb jours consécutifs pour les actions rapides
   const [bookModal, setBookModal] = useState(null); // { time } | null
   const [clientSearch, setClientSearch] = useState('');
   const [selectedClient, setSelectedClient] = useState(null);
@@ -1810,15 +1819,27 @@ function SlotsScreen({ agenda, setAgenda, daycfg, setDaycfg, clients, setClients
   };
 
   const bulk = (label, predicate, mode) => {
-    update((d) => {
-      gridTimes.forEach((time) => {
-        if (!predicate(Number(time.slice(0, 2)))) return;
-        if (d[time] && d[time].status === 'booked') return;
-        if (mode) d[time] = { status: mode };
-        else delete d[time];
-      });
+    setAgenda((a) => {
+      let newEnzo = { ...a.enzo };
+      for (let i = 0; i < multiDay; i++) {
+        const dIdx = dayIdx + i;
+        if (dIdx >= DAYS.length) break;
+        const dKey = DAYS[dIdx].key;
+        const dStep = daycfg[dKey] || step;
+        const grid = timesFor(dStep);
+        const copy = { ...(newEnzo[dKey] || {}) };
+        grid.forEach((time) => {
+          if (!predicate(Number(time.slice(0, 2)))) return;
+          if (copy[time] && copy[time].status === 'booked') return;
+          if (mode) copy[time] = { status: mode };
+          else delete copy[time];
+        });
+        newEnzo[dKey] = copy;
+      }
+      return { ...a, enzo: newEnzo };
     });
-    toast(label);
+    const suffix = multiDay > 1 ? ' (' + multiDay + ' jours)' : '';
+    toast(label + suffix);
   };
 
   return (
@@ -1836,6 +1857,15 @@ function SlotsScreen({ agenda, setAgenda, daycfg, setDaycfg, clients, setClients
         return null;
       }} />
       <Text style={[s.btags, { marginTop: 10 }]}>{DAYS[dayIdx].label}</Text>
+      <Text style={s.fieldLabel}>APPLIQUER SUR</Text>
+      <View style={[s.wrap, { marginBottom: 4 }]}>
+        {[1, 2, 3, 5, 7].map((n) => (
+          <Chip key={n} mini
+            label={n === 1 ? 'Ce jour' : n + ' jours'}
+            on={multiDay === n}
+            onPress={() => setMultiDay(n)} />
+        ))}
+      </View>
 
       <Text style={s.fieldLabel}>DURÉE PAR CRÉNEAU — SELON VOTRE RYTHME</Text>
       <View style={s.wrap}>
@@ -1893,11 +1923,18 @@ function SlotsScreen({ agenda, setAgenda, daycfg, setDaycfg, clients, setClients
         Appui long sur un créneau ouvert pour réserver directement pour un client.
       </Text>
 
+      <Section>Plages horaires</Section>
+      <View style={s.wrap}>
+        {SCHEDULE_PRESETS.map((p) => (
+          <Chip key={p.label} mini label={p.label}
+            onPress={() => bulk('Ouvert ' + p.label, (h) => h >= p.start && h < p.end, 'open')} />
+        ))}
+      </View>
       <Section>Actions rapides</Section>
       <View style={s.wrap}>
-        <Chip mini label="Ouvrir la journée (9h–18h)" onPress={() => bulk('Journée ouverte — 9h à 18h.', (h) => h >= 9 && h < 18, 'open')} />
-        <Chip mini label="Ouvrir la soirée (20h–23h)" onPress={() => bulk('Soirée ouverte — tarifs soirée/nuit appliqués.', (h) => h >= 20, 'open')} />
-        <Chip mini label="Pause déjeuner (12h–14h)" onPress={() => bulk('Pause déjeuner posée — 12h à 14h.', (h) => h >= 12 && h < 14, 'pause')} />
+        <Chip mini label="Tout ouvrir (9h–22h)" onPress={() => bulk('Tout ouvert — 9h à 22h.', (h) => h >= 9 && h < 22, 'open')} />
+        <Chip mini label="Soirée (20h–22h)" onPress={() => bulk('Soirée ouverte — tarifs soirée/nuit appliqués.', (h) => h >= 20, 'open')} />
+        <Chip mini label="Pause déjeuner" onPress={() => bulk('Pause déjeuner posée — 12h à 14h.', (h) => h >= 12 && h < 14, 'pause')} />
         <Chip mini label="Tout fermer" onPress={() => bulk('Tous les créneaux libres ont été fermés.', () => true, null)} />
       </View>
       <Text style={s.footnote}>
