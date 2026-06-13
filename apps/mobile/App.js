@@ -607,6 +607,37 @@ const Logo = ({ size = 22 }) => (
   />
 );
 
+/* ───────── Écran d'ouverture animé ───────── */
+function IntroScreen({ onDone }) {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0.88)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, { toValue: 1, duration: 900, useNativeDriver: true }),
+      Animated.spring(scaleAnim, { toValue: 1, friction: 7, tension: 40, useNativeDriver: true }),
+    ]).start();
+    const t = setTimeout(onDone, 2400);
+    return () => clearTimeout(t);
+  }, []);
+
+  return (
+    <View style={s.introWrap}>
+      <Animated.View style={[s.introInner, { opacity: fadeAnim, transform: [{ scale: scaleAnim }] }]}>
+        <Logo size={52} />
+        <View style={s.welcomeRule} />
+        <Text style={s.introTag}>L’art de la coupe, à l’heure juste.</Text>
+      </Animated.View>
+      <Animated.View style={[s.introDots, { opacity: fadeAnim }]}>
+        {[0, 1, 2].map((i) => (
+          <View key={i} style={[s.introDot, i === 1 && { backgroundColor: C.gold, transform: [{ scale: 1.4 }] }]} />
+        ))}
+      </Animated.View>
+    </View>
+  );
+}
+
+
 function WelcomeScreen({ choose }) {
   return (
     <View style={s.welcome}>
@@ -2342,6 +2373,7 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, clients, setC
   const [addingProduct, setAddingProduct] = useState(false);
   const [pName, setPName] = useState('');
   const [loyaltyRateInput, setLoyaltyRateInput] = useState(String(enzo.loyaltyRate || 1));
+  const [ptSearch, setPtSearch] = useState('');
   const [addingTier, setAddingTier] = useState(false);
   const [tierPts, setTierPts] = useState('');
   const [tierLabel, setTierLabel] = useState('');
@@ -2687,8 +2719,21 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, clients, setC
             )}
           </View>
           <View style={s.card}>
-            <Text style={[s.bname, { fontSize: 13, marginBottom: 10 }]}>Points par client</Text>
-            {clients.map((cl) => {
+            <View style={[s.row, { marginBottom: 12 }]}>
+              <Text style={[s.bname, { fontSize: 13, flex: 1 }]}>Points par client</Text>
+              <Text style={s.muted}>{clients.length} client{clients.length > 1 ? 's' : ''}</Text>
+            </View>
+            <View style={[s.search, { marginBottom: 12 }]}>
+              <Feather name="search" size={14} color={C.muted} />
+              <TextInput style={s.searchInput} placeholder="Rechercher un client..." placeholderTextColor="#5A5852"
+                value={ptSearch} onChangeText={setPtSearch} />
+              {ptSearch.length > 0 && (
+                <TouchableOpacity onPress={() => setPtSearch('')} hitSlop={8}>
+                  <Feather name="x" size={14} color={C.muted} />
+                </TouchableOpacity>
+              )}
+            </View>
+            {clients.filter((cl) => !ptSearch || `${cl.firstName} ${cl.lastName}`.toLowerCase().includes(ptSearch.toLowerCase())).map((cl) => {
               const pts = cl.loyaltyPts || 0;
               const nxt = (enzo.loyaltyTiers || []).filter((t) => t.pts > pts).sort((a, b) => a.pts - b.pts)[0];
               return (
@@ -2758,37 +2803,27 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, clients, setC
       </View>
       {/* Produits avec gestion de stock */}
       {products.map((p) => (
-        <View key={p.id} style={[s.card, { gap: 9 }]}>
-          <View style={[s.row, { gap: 10 }]}>
-            <View style={[s.pimg, { width: 44, height: 44, borderRadius: 10, flexShrink: 0 }]}>
-              <Feather name={p.ic} size={17} color="rgba(200,169,106,0.5)" />
-            </View>
-            <View style={s.grow}>
-              <Text style={[s.bname, { fontSize: 12.5 }]} numberOfLines={1}>{p.name}</Text>
-              <Text style={s.btags}>{CATS.find(([k]) => k === p.cat)?.[1] || p.cat}</Text>
-            </View>
-            <TouchableOpacity onPress={() => { setProducts((ps) => ps.filter((x) => x.id !== p.id)); toast(`« ${p.name} » retiré.`); }} hitSlop={8}>
-              <Feather name="trash-2" size={15} color={C.red} />
+        <View key={p.id} style={[s.card, s.row, { gap: 10, alignItems: 'center' }]}>
+          <View style={[s.pimg, { width: 40, height: 40, borderRadius: 10, flexShrink: 0 }]}>
+            <Feather name={p.ic} size={16} color="rgba(200,169,106,0.5)" />
+          </View>
+          <View style={s.grow}>
+            <Text style={[s.bname, { fontSize: 12 }]} numberOfLines={1}>{p.name}</Text>
+            <Text style={s.btags}>{CATS.find(([k]) => k === p.cat)?.[1] || p.cat}</Text>
+          </View>
+          <PriceField cents={p.price} onChange={(v) => { updateProductLocal(p.id, { price: v }); toast('Prix mis à jour.'); }} />
+          <View style={[s.row, { gap: 6 }]}>
+            <TouchableOpacity style={s.stockBtn} onPress={() => updateProductLocal(p.id, { stock: Math.max(0, p.stock - 1) })} hitSlop={8}>
+              <Feather name="minus" size={13} color={C.gold} />
+            </TouchableOpacity>
+            <Text style={[s.stockNum, { minWidth: 22 }]}>{p.stock}</Text>
+            <TouchableOpacity style={s.stockBtn} onPress={() => updateProductLocal(p.id, { stock: p.stock + 1 })} hitSlop={8}>
+              <Feather name="plus" size={13} color={C.gold} />
             </TouchableOpacity>
           </View>
-          <View style={[s.row, { gap: 10 }]}>
-            <View style={s.grow}>
-              <Text style={s.statL}>PRIX</Text>
-              <PriceField cents={p.price} onChange={(v) => { updateProductLocal(p.id, { price: v }); toast('Prix mis à jour.'); }} />
-            </View>
-            <View style={s.grow}>
-              <Text style={s.statL}>STOCK</Text>
-              <View style={[s.row, { gap: 10, marginTop: 8 }]}>
-                <TouchableOpacity style={s.stockBtn} onPress={() => updateProductLocal(p.id, { stock: Math.max(0, p.stock - 1) })} hitSlop={8}>
-                  <Feather name="minus" size={14} color={C.gold} />
-                </TouchableOpacity>
-                <Text style={s.stockNum}>{p.stock}</Text>
-                <TouchableOpacity style={s.stockBtn} onPress={() => updateProductLocal(p.id, { stock: p.stock + 1 })} hitSlop={8}>
-                  <Feather name="plus" size={14} color={C.gold} />
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
+          <TouchableOpacity onPress={() => { setProducts((ps) => ps.filter((x) => x.id !== p.id)); toast(`« ${p.name} » retiré.`); }} hitSlop={8}>
+            <Feather name="trash-2" size={15} color={C.red} />
+          </TouchableOpacity>
         </View>
       ))}
       </>
@@ -2826,6 +2861,7 @@ export default function App() {
 
 function Main() {
   const insets = useSafeAreaInsets();
+  const [splashDone, setSplashDone] = useState(false);
   const [role, setRole] = useState(null); // null | 'client' | 'barber'
   const [user, setUser] = useState(null); // { firstName, lastName, email, role, plan }
   const [authStep, setAuthStep] = useState(null); // null | { role } — flow connexion/inscription
@@ -2858,6 +2894,7 @@ function Main() {
 
   const barbersLive = barbers.map((b) => (b.id === 'enzo' ? { ...b, delay: enzoDelay } : b));
   const notifUnread = notifs.filter((n) => n.unread).length;
+  if (!splashDone) return <IntroScreen onDone={() => setSplashDone(true)} />;
 
   const toast = (msg) => {
     setToastMsg(msg);
@@ -3073,6 +3110,13 @@ function Main() {
 
 /* ───────── Styles ───────── */
 const s = StyleSheet.create({
+
+  introWrap: { flex: 1, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center', gap: 0 },
+  introInner: { alignItems: 'center' },
+  introTag: { fontFamily: 'serif', fontStyle: 'italic', color: C.soft, fontSize: 14, marginTop: 4 },
+  introDots: { flexDirection: 'row', gap: 8, position: 'absolute', bottom: 48 },
+  introDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: C.line },
+
   root: { flex: 1, backgroundColor: C.bg },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
