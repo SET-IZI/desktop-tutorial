@@ -2180,11 +2180,30 @@ function SlotsScreen({ agenda, setAgenda, daycfg, setDaycfg, clients, setClients
     });
   };
 
-  // Touchez : fermé → ouvert → pause → fermé. Les réservations sont verrouillées.
+  const cancelBooking = (time) => {
+    const sl = slots[time];
+    if (!sl || sl.status !== 'booked') return;
+    Alert.alert(
+      `Annuler le RDV de ${sl.who} ?`,
+      `${sl.serv} · ${time} · ${fmt(sl.price)}`,
+      [
+        { text: 'Garder', style: 'cancel' },
+        {
+          text: 'Annuler le rendez-vous', style: 'destructive',
+          onPress: () => {
+            update((d) => { d[time] = { status: 'open' }; });
+            toast(`RDV ${time} annulé — créneau remis en ouvert.`);
+          },
+        },
+      ]
+    );
+  };
+
+  // Touchez : fermé → ouvert → pause → fermé. Réservations = appui long pour annuler.
   const cycle = (time) => {
     const cur = slots[time];
     if (cur && cur.status === 'booked') {
-      toast(`${time} — déjà réservé par ${cur.who}.`);
+      cancelBooking(time);
       return;
     }
     update((d) => {
@@ -2206,7 +2225,7 @@ function SlotsScreen({ agenda, setAgenda, daycfg, setDaycfg, clients, setClients
   const [newCPh, setNewCPh] = useState('');
 
   const openBookModal = (time) => {
-    if (slots[time]?.status === 'booked') { toast(`${time} — déjà réservé.`); return; }
+    if (slots[time]?.status === 'booked') { cancelBooking(time); return; }
     if (!slots[time] || slots[time].status === 'closed') {
       toast('Ouvrez d\'abord ce créneau.'); return;
     }
