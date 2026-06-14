@@ -6,6 +6,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   Dimensions,
   Image,
@@ -729,6 +730,57 @@ function Field({ label, ...props }) {
   );
 }
 
+function LegalModal({ mode, onClose }) {
+  const isTerms = mode === 'terms';
+  const termsContent = [
+    ['Objet', "L'application barbr permet aux clients de réserver des prestations de barbier et aux professionnels de gérer leur activité. L'utilisation de l'application implique l'acceptation des présentes conditions."],
+    ['Compte utilisateur', "Vous êtes responsable de la confidentialité de vos identifiants. Toute activité effectuée depuis votre compte vous est imputable. Vous devez avoir au moins 16 ans pour créer un compte."],
+    ['Réservations', "Une réservation confirmée engage le client. Tout annulation doit être effectuée au moins 2h avant le rendez-vous. Des frais d'annulation tardive peuvent s'appliquer selon la politique du barber."],
+    ['Paiement', "Les paiements sont traités par Stripe (CB, Apple Pay, Google Pay) ou en espèces sur place. Les prix affichés incluent les majorations dynamiques (soirée, nuit, week-end, urgence)."],
+    ['Résiliation', "Vous pouvez supprimer votre compte à tout moment depuis votre profil. Nous nous réservons le droit de suspendre tout compte en cas d'utilisation frauduleuse ou abusive."],
+    ['Droit applicable', "Les présentes CGU sont soumises au droit français. Tout litige sera porté devant les tribunaux compétents de Paris."],
+  ];
+  const privacyContent = [
+    ['Données collectées', "Nous collectons : prénom, nom, e-mail, numéro de téléphone, historique des réservations, photos de prestations (avec votre accord), localisation approximative (recherche de barbers)."],
+    ['Finalité', "Vos données sont utilisées pour : gérer vos réservations, vous envoyer des notifications (rappels, alertes), faire fonctionner le programme de fidélité, améliorer nos services."],
+    ['Conservation', "Vos données sont conservées pendant la durée de votre compte, puis 3 ans après suppression pour des obligations légales. Les photos peuvent être supprimées à tout moment."],
+    ['Partage', "Vos données ne sont jamais vendues à des tiers. Elles sont partagées uniquement avec votre barber pour la gestion des rendez-vous, et avec nos prestataires techniques (Firebase, Stripe, AWS S3)."],
+    ['Vos droits (RGPD)', "Vous disposez d'un droit d'accès, de rectification, de suppression et de portabilité de vos données. Pour exercer ces droits : privacy@barbr.app"],
+    ['Cookies', "L'application utilise des identifiants techniques (tokens, device ID) nécessaires au fonctionnement. Aucun cookie publicitaire n'est utilisé."],
+    ['Contact', "DPO : privacy@barbr.app — Siège : barbr SAS, 12 rue Nationale, 75001 Paris."],
+  ];
+  const content = isTerms ? termsContent : privacyContent;
+  return (
+    <View style={s.modalOverlay}>
+      <View style={[s.modal, { maxHeight: '88%', padding: 0, overflow: 'hidden' }]}>
+        <View style={{ backgroundColor: C.surface, padding: 20, borderBottomWidth: 1, borderBottomColor: C.line }}>
+          <View style={s.row}>
+            <Text style={[s.bname, { fontFamily: SERIF, fontSize: 17, flex: 1 }]}>
+              {isTerms ? "Conditions d'utilisation" : 'Politique de confidentialité'}
+            </Text>
+            <TouchableOpacity onPress={onClose} hitSlop={10}>
+              <Feather name="x" size={20} color={C.muted} />
+            </TouchableOpacity>
+          </View>
+          <Text style={[s.btags, { marginTop: 4 }]}>barbr SAS · Version 1.0 · Juin 2026</Text>
+        </View>
+        <ScrollView style={{ padding: 20 }} showsVerticalScrollIndicator={false}>
+          {content.map(([title, body]) => (
+            <View key={title} style={{ marginBottom: 20 }}>
+              <Text style={[s.bname, { fontSize: 13.5, marginBottom: 6, color: C.gold }]}>{title}</Text>
+              <Text style={[s.softText, { lineHeight: 20, fontSize: 13 }]}>{body}</Text>
+            </View>
+          ))}
+          <View style={{ height: 30 }} />
+        </ScrollView>
+        <View style={{ padding: 16, borderTopWidth: 1, borderTopColor: C.line }}>
+          <Btn label="J'AI LU ET COMPRIS" onPress={onClose} />
+        </View>
+      </View>
+    </View>
+  );
+}
+
 function AuthScreen({ role, onSuccess, onBack }) {
   const [mode, setMode] = useState('login');
   const [firstName, setFirstName] = useState('');
@@ -737,6 +789,8 @@ function AuthScreen({ role, onSuccess, onBack }) {
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [legalOpen, setLegalOpen] = useState(null); // 'terms' | 'privacy' | null
   const signup = mode === 'signup';
 
   const submit = () => {
@@ -750,6 +804,10 @@ function AuthScreen({ role, onSuccess, onBack }) {
     }
     if (signup && role === 'barber' && !phone.trim()) {
       setError('Le téléphone est requis — vos clients doivent pouvoir vous joindre.');
+      return;
+    }
+    if (signup && !termsAccepted) {
+      setError('Veuillez accepter les CGU et la politique de confidentialité.');
       return;
     }
     setError(null);
@@ -766,6 +824,7 @@ function AuthScreen({ role, onSuccess, onBack }) {
   };
 
   return (
+    <>
     <ScrollView style={s.screen} contentContainerStyle={[s.screenPad, { paddingTop: 8 }]} keyboardShouldPersistTaps="handled">
       <TouchableOpacity style={[s.circleBtn, { marginBottom: 22 }]} onPress={onBack} hitSlop={8}>
         <Feather name="arrow-left" size={18} color={C.text} />
@@ -794,6 +853,28 @@ function AuthScreen({ role, onSuccess, onBack }) {
       )}
       <Field label="MOT DE PASSE" placeholder="••••••••" secureTextEntry
         value={password} onChangeText={setPassword} />
+
+      {signup && (
+        <View style={[s.row, { marginTop: 14, alignItems: 'flex-start', gap: 10 }]}>
+          <TouchableOpacity onPress={() => setTermsAccepted(v => !v)} hitSlop={6}
+            style={{ width: 20, height: 20, borderRadius: 4, borderWidth: 1.5,
+              borderColor: termsAccepted ? C.gold : C.muted,
+              backgroundColor: termsAccepted ? C.gold : 'transparent',
+              alignItems: 'center', justifyContent: 'center', marginTop: 2 }}>
+            {termsAccepted && <Feather name="check" size={13} color="#000" />}
+          </TouchableOpacity>
+          <Text style={[s.softText, { flex: 1, fontSize: 12.5, lineHeight: 18 }]}>
+            {`J’accepte les `}
+            <Text style={{ color: C.gold, textDecorationLine: 'underline' }} onPress={() => setLegalOpen('terms')}>
+              {`Conditions d’utilisation`}
+            </Text>
+            {` et la `}
+            <Text style={{ color: C.gold, textDecorationLine: 'underline' }} onPress={() => setLegalOpen('privacy')}>
+              {`Politique de confidentialité`}
+            </Text>
+          </Text>
+        </View>
+      )}
 
       {error && <Text style={s.authError}>{error}</Text>}
 
@@ -826,6 +907,8 @@ function AuthScreen({ role, onSuccess, onBack }) {
         </Text>
       </TouchableOpacity>
     </ScrollView>
+    {legalOpen && <LegalModal mode={legalOpen} onClose={() => setLegalOpen(null)} />}
+    </>
   );
 }
 
@@ -1714,6 +1797,7 @@ function ShopScreen({ products, cat, setCat, cart, addCart, shopMode, toast }) {
 function MeScreen({ user, points, setPoints, barbers, upcoming, favoriteBarber, onLogout, toast }) {
   const [confirmRedeem, setConfirmRedeem] = React.useState(null);
   const [voucher, setVoucher] = React.useState(null);
+  const [legalOpenMe, setLegalOpenMe] = React.useState(null);
   const loyaltyBarbers = barbers.filter((b) => b.loyalty);
 
   const doRedeem = (b, t) => {
@@ -1869,6 +1953,32 @@ function MeScreen({ user, points, setPoints, barbers, upcoming, favoriteBarber, 
           Carte bancaire, Apple Pay, Google Pay ou sur place. Acompte selon la prestation.
         </Text>
       </View>
+      <Section>Informations légales</Section>
+      <TouchableOpacity style={[s.card, s.row]} onPress={() => setLegalOpenMe('terms')} activeOpacity={0.8}>
+        <Feather name="file-text" size={18} color={C.gold} />
+        <Text style={[s.softText, s.grow]}>{`Conditions d’utilisation`}</Text>
+        <Feather name="chevron-right" size={16} color={C.muted} />
+      </TouchableOpacity>
+      <TouchableOpacity style={[s.card, s.row, { marginTop: 8 }]} onPress={() => setLegalOpenMe('privacy')} activeOpacity={0.8}>
+        <Feather name="shield" size={18} color={C.gold} />
+        <Text style={[s.softText, s.grow]}>{`Politique de confidentialité`}</Text>
+        <Feather name="chevron-right" size={16} color={C.muted} />
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[s.card, s.row, { marginTop: 8, borderColor: 'rgba(220,50,50,0.3)' }]}
+        onPress={() => Alert.alert(
+          'Supprimer mon compte',
+          'Toutes vos données seront effacées. Cette action est irréversible.',
+          [
+            { text: 'Annuler', style: 'cancel' },
+            { text: 'Supprimer', style: 'destructive', onPress: onLogout },
+          ]
+        )}
+        activeOpacity={0.8}>
+        <Feather name="trash-2" size={18} color="#e05050" />
+        <Text style={[s.softText, s.grow, { color: '#e05050' }]}>Supprimer mon compte</Text>
+        <Feather name="chevron-right" size={16} color="#e05050" />
+      </TouchableOpacity>
       <Btn ghost icon="log-out" label="SE DÉCONNECTER" onPress={onLogout} />
     </ScrollView>
 
@@ -1918,6 +2028,7 @@ function MeScreen({ user, points, setPoints, barbers, upcoming, favoriteBarber, 
         </View>
       </View>
     )}
+    {legalOpenMe && <LegalModal mode={legalOpenMe} onClose={() => setLegalOpenMe(null)} />}
     </>
   );
 }
