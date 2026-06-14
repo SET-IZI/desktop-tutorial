@@ -1929,8 +1929,7 @@ function MeScreen({ user, points, setPoints, barbers, upcoming, favoriteBarber, 
       <Section>À venir</Section>
       {upcoming.length === 0 ? (
         <Text style={s.footnote}>
-          Aucun rendez-vous à venir.{'
-'}Réservez votre prochaine coupe dans l’onglet Réserver.
+          {`Aucun rendez-vous à venir.\nRéservez votre prochaine coupe dans l’onglet Réserver.`}
         </Text>
       ) : (
         upcoming.map((u, i) => (
