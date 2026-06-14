@@ -1719,7 +1719,6 @@ function BookScreen({ agenda, formulas, services, booking, setBooking, dayIdx, s
           </TouchableOpacity>
         ) : null;
       })()}
-      </View>
 
       <Section>La formule</Section>
       {available.map((f) => {
