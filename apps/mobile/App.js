@@ -1271,16 +1271,34 @@ function ExploreScreen({ barbers, user, openBarber, favoriteBarber, onProCTA, to
             data={sorted.filter((b) => b.tags.some((t) => FADE_TAGS.includes(t)))} />
           {onProCTA && (
             <TouchableOpacity
-              style={[s.card, { borderColor: C.lineGold, flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 4 }]}
+              style={{
+                marginTop: 28, borderRadius: 20, borderWidth: 1, borderColor: C.lineGold,
+                backgroundColor: 'rgba(200,169,106,0.07)', overflow: 'hidden',
+              }}
               onPress={onProCTA} activeOpacity={0.85}>
-              <View style={[s.ava, { backgroundColor: 'rgba(200,169,106,0.12)' }]}>
-                <Feather name="scissors" size={20} color={C.gold} />
+              <View style={{ padding: 22, gap: 14 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+                  <View style={{ width: 52, height: 52, borderRadius: 26,
+                    backgroundColor: 'rgba(200,169,106,0.15)', alignItems: 'center', justifyContent: 'center' }}>
+                    <Feather name="scissors" size={24} color={C.gold} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: C.gold, fontSize: 10, fontWeight: '700', letterSpacing: 1.2, marginBottom: 4 }}>
+                      ESPACE PRO
+                    </Text>
+                    <Text style={[s.bname, { fontSize: 16 }]}>Vous êtes professionnel ?</Text>
+                  </View>
+                  <Feather name="arrow-right" size={20} color={C.gold} />
+                </View>
+                <Text style={[s.softText, { lineHeight: 18 }]}>
+                  Créez votre fiche barber, gérez votre agenda, vos formules et développez votre clientèle sur barbr.
+                </Text>
+                <View style={{ backgroundColor: C.gold, borderRadius: 10, paddingVertical: 12, alignItems: 'center' }}>
+                  <Text style={{ color: C.ink, fontWeight: '800', fontSize: 13, letterSpacing: 0.8 }}>
+                    REJOINDRE BARBR PRO
+                  </Text>
+                </View>
               </View>
-              <View style={s.grow}>
-                <Text style={[s.bname, { fontSize: 13.5 }]}>Vous êtes professionnel ?</Text>
-                <Text style={[s.btags, { marginTop: 3, lineHeight: 16 }]}>Créez votre espace barber, gérez votre agenda et développez votre clientèle.</Text>
-              </View>
-              <Feather name="arrow-right" size={18} color={C.gold} />
             </TouchableOpacity>
           )}
         </>
