@@ -172,24 +172,21 @@ const SERVICES = [
 
 /* Formules de rendez-vous — créées et activées par le barber */
 const WINDOWS = { all: 'Libre', day: 'Journée', evening: 'Soirée', night: 'Nuit' };
-const DEFAULT_PRICING_GRID = {
-  day: 2500, evening: 3500, night: 4500, weekendPct: 15, urgencyPct: 20,
-};
 
 function initFormulas() {
   return [
     { id: 'f1', name: 'Classique', icon: 'scissors', dur: 30, window: 'all',
-      price: null, recur: false, active: true,
-      desc: 'Prestation standard — prix selon la grille tarifaire.' },
+      price: 2500, surE: true, surN: true, surW: true, surU: true,
+      recur: false, active: true, desc: 'Prestation standard — majorations activables.' },
     { id: 'f2', name: 'Nocturne', icon: 'moon', dur: 45, window: 'night',
-      price: 3500, recur: false, active: true,
-      desc: 'Séance nocturne — créneaux après 20 h, tarif tout compris.' },
+      price: 3500, surE: false, surN: false, surW: false, surU: false,
+      recur: false, active: true, desc: 'Séance nocturne — tarif tout compris.' },
     { id: 'f3', name: 'Transformation', icon: 'star', dur: 120, window: 'day',
-      price: 9000, recur: false, active: true,
-      desc: 'Refonte complète du style — 2 h, photos avant/après offertes.' },
+      price: 9000, surE: false, surN: false, surW: false, surU: false,
+      recur: false, active: true, desc: 'Refonte complète — 2 h, photos avant/après.' },
     { id: 'f4', name: 'Hebdomadaire', icon: 'refresh-cw', dur: 30, window: 'all',
-      price: null, recur: true, active: false,
-      desc: 'Même créneau chaque semaine — fidélité récompensée.' },
+      price: 2000, surE: false, surN: false, surW: false, surU: false,
+      recur: true, active: false, desc: 'Même créneau chaque semaine — fidélité -15 %.' },
   ];
 }
 
@@ -337,23 +334,16 @@ function initAgenda() {
   return agenda;
 }
 
-/* Tarification par formule — prix fixe ou grille tarifaire */
-function quoteFor(formula, _service, slotDate, now, grid) {
-  const g = grid || DEFAULT_PRICING_GRID;
-  let price;
+/* Tarification par formule : prix fixe + majorations optionnelles */
+function quoteFor(formula, _service, slotDate, now) {
+  let price = formula.price ?? 0;
   const rules = [];
   const h = slotDate.getHours();
   const d = slotDate.getDay();
-  if (formula.price != null) {
-    price = formula.price;
-    rules.push('Formule ' + formula.name);
-  } else {
-    if (h >= 22) { price = g.night; rules.push('Tarif nuit après 22h'); }
-    else if (h >= 20) { price = g.evening; rules.push('Tarif soirée après 20h'); }
-    else { price = g.day; }
-    if (d === 0 || d === 6) { price = Math.round(price * (1 + g.weekendPct / 100)); rules.push('Week-end +' + g.weekendPct + ' %'); }
-    if ((slotDate - now) / 60000 < 120 && slotDate > now) { price = Math.round(price * (1 + g.urgencyPct / 100)); rules.push('Urgence +' + g.urgencyPct + ' %'); }
-  }
+  if (formula.surN && h >= 22) { price += 2500; rules.push('+25 € nuit'); }
+  else if (formula.surE && h >= 20) { price += 1000; rules.push('+10 € soirée'); }
+  if (formula.surW && (d === 0 || d === 6)) { price = Math.round(price * 1.15); rules.push('Week-end +15 %'); }
+  if (formula.surU && (slotDate - now) / 60000 < 120 && slotDate > now) { price = Math.round(price * 1.2); rules.push('Urgence +20 %'); }
   if (formula.recur) { price = Math.round(price * 0.85); rules.push('Hebdo -15 %'); }
   return { price, rules };
 }
@@ -1607,7 +1597,7 @@ function openSlotsFor(agenda, dayIdx, barberId, window) {
   return out.sort((a, b) => a.time.localeCompare(b.time));
 }
 
-function BookScreen({ agenda, formulas, services, booking, setBooking, dayIdx, setDayIdx, onConfirm, barbers: allBarbers, favoriteBarber, pricingGrid }) {
+function BookScreen({ agenda, formulas, services, booking, setBooking, dayIdx, setDayIdx, onConfirm, barbers: allBarbers, favoriteBarber }) {
   if (booking.done) {
     const d = booking.done;
     return (
@@ -1777,7 +1767,7 @@ function BookScreen({ agenda, formulas, services, booking, setBooking, dayIdx, s
           ) : (
             <>
               {slots.map((sl) => {
-                const q = quoteFor(formula, service, sl.date, now, pricingGrid);
+                const q = quoteFor(formula, service, sl.date, now);
                 return (
                   <TouchableOpacity key={sl.barber.id + sl.time} style={[s.card, s.row]}
                     onPress={() => onConfirm(formula, service, sl, q)} activeOpacity={0.8}>
@@ -2751,21 +2741,28 @@ function PriceField({ cents, onChange }) {
   );
 }
 
-function FormulasScreen({ formulas, setFormulas, services, setServices, pricingGrid, setPricingGrid, toast }) {
-  const grid = pricingGrid || DEFAULT_PRICING_GRID;
+function FormulasScreen({ formulas, setFormulas, services, setServices, toast }) {
   const [creating, setCreating] = React.useState(false);
   const [name, setName] = React.useState('');
   const [dur, setDur] = React.useState(45);
   const [windowSel, setWindowSel] = React.useState('all');
-  const [useGrid, setUseGrid] = React.useState(true);
   const [priceTxt, setPriceTxt] = React.useState('');
+  const [surE, setSurE] = React.useState(false);
+  const [surN, setSurN] = React.useState(false);
+  const [surW, setSurW] = React.useState(false);
+  const [surU, setSurU] = React.useState(false);
   const [recur, setRecur] = React.useState(false);
   const [addingServ, setAddingServ] = React.useState(false);
   const [svName, setSvName] = React.useState('');
   const [svDur, setSvDur] = React.useState(30);
   const [svPrice, setSvPrice] = React.useState('');
 
-  const updateGrid = (key, val) => setPricingGrid({ ...grid, [key]: val });
+  const SUR_DEFS = [
+    { key: 'surE', label: 'Soirée', detail: '+10 € après 20h' },
+    { key: 'surN', label: 'Nuit', detail: '+25 € après 22h' },
+    { key: 'surW', label: 'Week-end', detail: '+15 % sam./dim.' },
+    { key: 'surU', label: 'Urgence', detail: '+20 % si < 2h' },
+  ];
 
   const createService = () => {
     const label = svName.trim();
@@ -2790,88 +2787,36 @@ function FormulasScreen({ formulas, setFormulas, services, setServices, pricingG
     }));
   };
 
+  const toggleSur = (fid, key) =>
+    setFormulas((fs) => fs.map((f) => f.id !== fid ? f : { ...f, [key]: !f[key] }));
+
   const create = () => {
     const label = name.trim();
     if (!label) { toast('Donnez un nom à votre formule.'); return; }
-    let price = null;
-    if (!useGrid) {
-      const v = parseFloat(priceTxt.replace(',', '.'));
-      if (isNaN(v) || v <= 0) { toast('Indiquez un prix valide.'); return; }
-      price = Math.round(v * 100);
-    }
+    const v = parseFloat(priceTxt.replace(',', '.'));
+    if (isNaN(v) || v <= 0) { toast('Indiquez un prix de base valide.'); return; }
+    const price = Math.round(v * 100);
     setFormulas((fs) => [...fs, {
       id: 'f' + (fs.length + 1) + Date.now(), name: label,
       icon: recur ? 'refresh-cw' : ICON_FOR_WINDOW[windowSel],
-      dur, window: windowSel, price, recur, active: true,
+      dur, window: windowSel, price, surE, surN, surW, surU, recur, active: true,
       desc: label + ' · ' + dur + ' min',
     }]);
     setCreating(false);
-    setName(''); setDur(45); setWindowSel('all'); setUseGrid(true); setPriceTxt(''); setRecur(false);
+    setName(''); setDur(45); setWindowSel('all'); setPriceTxt('');
+    setSurE(false); setSurN(false); setSurW(false); setSurU(false); setRecur(false);
     toast('Formule créée.');
   };
-
-  const GRID_ROWS = [
-    { key: 'day', label: 'Journée', sub: '9h – 20h' },
-    { key: 'evening', label: 'Soirée', sub: '20h – 22h' },
-    { key: 'night', label: 'Nuit', sub: 'après 22h' },
-  ];
 
   return (
     <ScrollView style={s.screen} contentContainerStyle={s.screenPad} keyboardShouldPersistTaps="handled">
       <Kicker>ESPACE BARBER · ENZO MOREAU</Kicker>
       <Title em="formules">Mes </Title>
       <Lead>
-        Définissez votre grille tarifaire par créneau, puis créez vos formules.
+        Définissez vos tarifs et créez vos formules. Chaque formule a son prix — les majorations sont optionnelles.
       </Lead>
 
-      <Section note="prix selon l'horaire du créneau">Grille tarifaire</Section>
-      <View style={s.card}>
-        {GRID_ROWS.map(({ key, label, sub }, i) => (
-          <View key={key} style={[s.row, { gap: 12, paddingVertical: 10,
-            borderTopWidth: i > 0 ? 1 : 0, borderTopColor: C.line }]}>
-            <View style={s.grow}>
-              <Text style={[s.bname, { fontSize: 13.5 }]}>{label}</Text>
-              <Text style={[s.btags, { marginTop: 1 }]}>{sub}</Text>
-            </View>
-            <PriceField cents={grid[key]} onChange={(v) => { updateGrid(key, v); toast('Tarif mis à jour.'); }} />
-          </View>
-        ))}
-        <View style={[s.row, { gap: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: C.line }]}>
-          <View style={s.grow}>
-            <Text style={[s.bname, { fontSize: 13.5 }]}>Majoration week-end</Text>
-            <Text style={[s.btags, { marginTop: 1 }]}>sam. & dim.</Text>
-          </View>
-          <View style={[s.row, { gap: 4 }]}>
-            <TextInput
-              style={[s.input, { width: 52, marginBottom: 0, textAlign: 'center', paddingHorizontal: 8 }]}
-              keyboardType="numeric"
-              value={String(grid.weekendPct)}
-              onChangeText={(t) => { const v = parseInt(t); if (!isNaN(v) && v >= 0) updateGrid('weekendPct', v); }}
-            />
-            <Text style={{ color: C.gold, fontFamily: SERIF, fontSize: 15, fontWeight: '700' }}>%</Text>
-          </View>
-        </View>
-        <View style={[s.row, { gap: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: C.line }]}>
-          <View style={s.grow}>
-            <Text style={[s.bname, { fontSize: 13.5 }]}>Majoration urgence</Text>
-            <Text style={[s.btags, { marginTop: 1 }]}>résa moins de 2h</Text>
-          </View>
-          <View style={[s.row, { gap: 4 }]}>
-            <TextInput
-              style={[s.input, { width: 52, marginBottom: 0, textAlign: 'center', paddingHorizontal: 8 }]}
-              keyboardType="numeric"
-              value={String(grid.urgencyPct)}
-              onChangeText={(t) => { const v = parseInt(t); if (!isNaN(v) && v >= 0) updateGrid('urgencyPct', v); }}
-            />
-            <Text style={{ color: C.gold, fontFamily: SERIF, fontSize: 15, fontWeight: '700' }}>%</Text>
-          </View>
-        </View>
-      </View>
-      <Text style={s.footnote}>
-        Ces tarifs s'appliquent aux formules sans prix fixe. Le week-end et l'urgence s'ajoutent en pourcentage.
-      </Text>
-
-      <Section note="vos types de coupe avec tarif indicatif">Mes prestations</Section>
+      <Section note="vos types de coupe et leur tarif">Mes prestations</Section>
       {services.map((sv) => (
         <View key={sv.id} style={[s.card, s.row, { gap: 12 }]}>
           <View style={s.grow}>
@@ -2886,7 +2831,6 @@ function FormulasScreen({ formulas, setFormulas, services, setServices, pricingG
           </TouchableOpacity>
         </View>
       ))}
-
       {addingServ ? (
         <View style={[s.card, { borderColor: C.lineGold }]}>
           <Text style={[s.bname, { marginBottom: 10 }]}>Nouvelle prestation</Text>
@@ -2898,7 +2842,7 @@ function FormulasScreen({ formulas, setFormulas, services, setServices, pricingG
               <Chip key={d} mini label={d + ' min'} on={svDur === d} onPress={() => setSvDur(d)} />
             ))}
           </View>
-          <Field label="PRIX INDICATIF (€)" placeholder="35" keyboardType="numeric"
+          <Field label="PRIX (€)" placeholder="35" keyboardType="numeric"
             value={svPrice} onChangeText={setSvPrice} />
           <Btn label="CRÉER LA PRESTATION" onPress={createService} />
           <Btn ghost label="ANNULER" onPress={() => setAddingServ(false)} />
@@ -2907,7 +2851,7 @@ function FormulasScreen({ formulas, setFormulas, services, setServices, pricingG
         <Btn ghost icon="plus" label="NOUVELLE PRESTATION" onPress={() => setAddingServ(true)} />
       )}
 
-      <Section note="types de rendez-vous proposés aux clients">Mes formules</Section>
+      <Section note="types de résa avec tarif et majorations optionnelles">Mes formules</Section>
       {formulas.map((f) => (
         <View key={f.id} style={[s.card, !f.active && { opacity: 0.55 }]}>
           <View style={[s.row, { gap: 12, alignItems: 'flex-start' }]}>
@@ -2918,17 +2862,22 @@ function FormulasScreen({ formulas, setFormulas, services, setServices, pricingG
                 {f.dur} min · {WINDOWS[f.window]}{f.recur ? ' · hebdo' : ''}
               </Text>
             </View>
-            {f.price != null ? (
-              <PriceField cents={f.price} onChange={(v) =>
-                setFormulas((fs) => fs.map((x) => x.id === f.id ? { ...x, price: v } : x))
-              } />
-            ) : (
-              <View style={{ paddingHorizontal: 8, paddingVertical: 4, backgroundColor: 'rgba(200,169,106,0.12)',
-                borderWidth: 1, borderColor: C.lineGold, borderRadius: 8 }}>
-                <Text style={{ color: C.gold, fontSize: 10, fontWeight: '700', letterSpacing: 0.5 }}>GRILLE</Text>
-              </View>
-            )}
+            <PriceField cents={f.price ?? 0} onChange={(v) =>
+              setFormulas((fs) => fs.map((x) => x.id === f.id ? { ...x, price: v } : x))
+            } />
             <Toggle on={f.active} onPress={() => toggleActive(f.id)} />
+          </View>
+          <Text style={[s.fieldLabel, { marginTop: 12, marginBottom: 6 }]}>MAJORATIONS OPTIONNELLES</Text>
+          <View style={[s.wrap, { gap: 6 }]}>
+            {SUR_DEFS.map(({ key, label, detail }) => (
+              <TouchableOpacity key={key}
+                style={[s.surChip, f[key] && s.surChipOn]}
+                onPress={() => toggleSur(f.id, key)}
+                activeOpacity={0.75}>
+                <Text style={[s.surChipTxt, f[key] && { color: C.ink }]}>{label}</Text>
+                <Text style={[s.surChipSub, f[key] && { color: C.ink }]}>{detail}</Text>
+              </TouchableOpacity>
+            ))}
           </View>
         </View>
       ))}
@@ -2951,19 +2900,29 @@ function FormulasScreen({ formulas, setFormulas, services, setServices, pricingG
               <Chip key={k} mini label={l} on={windowSel === k} onPress={() => setWindowSel(k)} />
             ))}
           </View>
-          <Text style={s.fieldLabel}>TARIF</Text>
-          <View style={[s.wrap, { marginBottom: 10 }]}>
-            <Chip mini label="Grille tarifaire" on={useGrid} onPress={() => setUseGrid(true)} />
-            <Chip mini label="Prix fixe" on={!useGrid} onPress={() => setUseGrid(false)} />
+          <Text style={s.fieldLabel}>PRIX DE BASE (€)</Text>
+          <View style={[s.row, { marginBottom: 12, gap: 8 }]}>
+            <TextInput style={[s.input, { flex: 1, marginBottom: 0 }]}
+              keyboardType="numeric" placeholder="Ex. 35"
+              placeholderTextColor="#5A5852" value={priceTxt} onChangeText={setPriceTxt} />
+            <Text style={{ color: C.gold, fontFamily: SERIF, fontSize: 17, fontWeight: '700', alignSelf: 'center' }}>€</Text>
           </View>
-          {!useGrid && (
-            <View style={[s.row, { marginBottom: 12, gap: 8 }]}>
-              <TextInput style={[s.input, { flex: 1, marginBottom: 0 }]}
-                keyboardType="numeric" placeholder="Ex. 45"
-                placeholderTextColor="#5A5852" value={priceTxt} onChangeText={setPriceTxt} />
-              <Text style={{ color: C.gold, fontFamily: SERIF, fontSize: 17, fontWeight: '700', alignSelf: 'center' }}>€</Text>
-            </View>
-          )}
+          <Text style={s.fieldLabel}>MAJORATIONS OPTIONNELLES</Text>
+          <View style={[s.wrap, { gap: 6, marginBottom: 12 }]}>
+            {SUR_DEFS.map(({ key, label, detail }) => {
+              const vals = { surE, surN, surW, surU };
+              const sets = { surE: setSurE, surN: setSurN, surW: setSurW, surU: setSurU };
+              return (
+                <TouchableOpacity key={key}
+                  style={[s.surChip, vals[key] && s.surChipOn]}
+                  onPress={() => sets[key](!vals[key])}
+                  activeOpacity={0.75}>
+                  <Text style={[s.surChipTxt, vals[key] && { color: C.ink }]}>{label}</Text>
+                  <Text style={[s.surChipSub, vals[key] && { color: C.ink }]}>{detail}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
           <Text style={s.fieldLabel}>RÉCURRENCE</Text>
           <View style={[s.wrap, { marginBottom: 12 }]}>
             <Chip mini label="Ponctuelle" on={!recur} onPress={() => setRecur(false)} />
@@ -2976,7 +2935,7 @@ function FormulasScreen({ formulas, setFormulas, services, setServices, pricingG
         <Btn ghost icon="plus" label="NOUVELLE FORMULE" onPress={() => setCreating(true)} />
       )}
       <Text style={s.footnote}>
-        Une formule avec prix fixe ne tient pas compte de la grille tarifaire.
+        Cliquez sur une majoration pour l'activer ou la désactiver sur cette formule.
       </Text>
     </ScrollView>
   );
@@ -3938,7 +3897,6 @@ function Main() {
   const [agenda, setAgenda] = useState(initAgenda);
   const [daycfg, setDaycfg] = useState({}); // durée des créneaux par jour (Enzo)
   const [formulas, setFormulas] = useState(initFormulas);
-  const [pricingGrid, setPricingGrid] = useState(DEFAULT_PRICING_GRID);
   const [services, setServices] = useState(() => [...SERVICES]);
   const [booking, setBooking] = useState({ barber: 'any', formula: null, service: null, done: null });
   const [clientDay, setClientDay] = useState(0);
@@ -4071,7 +4029,7 @@ function Main() {
       );
     } else if (tab === 'explore') content = <ExploreScreen barbers={barbersLive} user={user} openBarber={setBarberDetail} favoriteBarber={favoriteBarber} onProCTA={logout} toast={toast} />;
     else if (tab === 'book') content = (
-      <BookScreen agenda={agenda} formulas={formulas} services={services} booking={booking} setBooking={setBooking} pricingGrid={pricingGrid}
+      <BookScreen agenda={agenda} formulas={formulas} services={services} booking={booking} setBooking={setBooking}
         dayIdx={clientDay} setDayIdx={setClientDay} onConfirm={confirmBooking}
         barbers={barbersLive} favoriteBarber={favoriteBarber} />
     );
@@ -4086,7 +4044,7 @@ function Main() {
         dayIdx={barberDay} setDayIdx={setBarberDay} toast={toast} />
     );
     else if (tab === 'formulas') content = (
-      <FormulasScreen formulas={formulas} setFormulas={setFormulas} services={services} setServices={setServices} pricingGrid={pricingGrid} setPricingGrid={setPricingGrid} toast={toast} />
+      <FormulasScreen formulas={formulas} setFormulas={setFormulas} services={services} setServices={setServices} toast={toast} />
     );
     else if (tab === 'planning') content = (
       <PlanningScreen agenda={agenda} setAgenda={setAgenda} dayIdx={barberDay} setDayIdx={setBarberDay} delay={enzoDelay} setHistory={setHistory} toast={toast} />
