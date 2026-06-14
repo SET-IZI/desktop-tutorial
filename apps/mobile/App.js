@@ -1074,7 +1074,7 @@ const EXPLORE_TIPS = [
   { icon: 'image', title: 'Photos avant/après', sub: 'Retrouvez toutes vos coupes dans "Mes coupes".' },
 ];
 
-function ExploreScreen({ barbers, user, openBarber, favoriteBarber, toast }) {
+function ExploreScreen({ barbers, user, openBarber, favoriteBarber, onProCTA, toast }) {
   const [query, setQuery] = useState('');
   const [style, setStyle] = useState(null);
   const [city, setCity] = useState('');
@@ -1227,18 +1227,6 @@ function ExploreScreen({ barbers, user, openBarber, favoriteBarber, toast }) {
         </>
       ) : (
         <>
-          <Section>Conseils</Section>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}
-            style={{ marginHorizontal: -PAD, marginBottom: 4 }}
-            contentContainerStyle={{ paddingHorizontal: PAD, gap: 10 }}>
-            {EXPLORE_TIPS.map((tip) => (
-              <View key={tip.icon} style={[s.card, { width: 190, marginBottom: 0, borderColor: C.line }]}>
-                <Feather name={tip.icon} size={18} color={C.gold} style={{ marginBottom: 8 }} />
-                <Text style={[s.bname, { fontSize: 13, marginBottom: 4 }]}>{tip.title}</Text>
-                <Text style={[s.softText, { fontSize: 11.5, lineHeight: 16 }]}>{tip.sub}</Text>
-              </View>
-            ))}
-          </ScrollView>
           {favoriteBarber && (
             <>
               <Section>Mon barber</Section>
@@ -1268,6 +1256,32 @@ function ExploreScreen({ barbers, user, openBarber, favoriteBarber, toast }) {
           <Row title="À domicile" note="ils se déplacent" data={sorted.filter((b) => b.venue === 'domicile')} />
           <Row title="Spécialistes fade" note="burst, taper, dégradés"
             data={sorted.filter((b) => b.tags.some((t) => FADE_TAGS.includes(t)))} />
+          <Section>Conseils</Section>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}
+            style={{ marginHorizontal: -PAD, marginBottom: 4 }}
+            contentContainerStyle={{ paddingHorizontal: PAD, gap: 10 }}>
+            {EXPLORE_TIPS.map((tip) => (
+              <View key={tip.icon} style={[s.card, { width: 190, marginBottom: 0, borderColor: C.line }]}>
+                <Feather name={tip.icon} size={18} color={C.gold} style={{ marginBottom: 8 }} />
+                <Text style={[s.bname, { fontSize: 13, marginBottom: 4 }]}>{tip.title}</Text>
+                <Text style={[s.softText, { fontSize: 11.5, lineHeight: 16 }]}>{tip.sub}</Text>
+              </View>
+            ))}
+          </ScrollView>
+          {onProCTA && (
+            <TouchableOpacity
+              style={[s.card, { borderColor: C.lineGold, flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 4 }]}
+              onPress={onProCTA} activeOpacity={0.85}>
+              <View style={[s.ava, { backgroundColor: 'rgba(200,169,106,0.12)' }]}>
+                <Feather name="scissors" size={20} color={C.gold} />
+              </View>
+              <View style={s.grow}>
+                <Text style={[s.bname, { fontSize: 13.5 }]}>Vous êtes professionnel ?</Text>
+                <Text style={[s.btags, { marginTop: 3, lineHeight: 16 }]}>Créez votre espace barber, gérez votre agenda et développez votre clientèle.</Text>
+              </View>
+              <Feather name="arrow-right" size={18} color={C.gold} />
+            </TouchableOpacity>
+          )}
         </>
       )}
     </ScrollView>
@@ -3550,7 +3564,7 @@ function Main() {
           }}
         />
       );
-    } else if (tab === 'explore') content = <ExploreScreen barbers={barbersLive} user={user} openBarber={setBarberDetail} favoriteBarber={favoriteBarber} toast={toast} />;
+    } else if (tab === 'explore') content = <ExploreScreen barbers={barbersLive} user={user} openBarber={setBarberDetail} favoriteBarber={favoriteBarber} onProCTA={logout} toast={toast} />;
     else if (tab === 'book') content = (
       <BookScreen agenda={agenda} formulas={formulas} services={services} booking={booking} setBooking={setBooking}
         dayIdx={clientDay} setDayIdx={setClientDay} onConfirm={confirmBooking} />
