@@ -1321,12 +1321,20 @@ function BarberDetailScreen({ barber, services, products, favoriteBarber, onTogg
                   color={isFav ? C.gold : 'rgba(255,255,255,0.5)'} />
               </TouchableOpacity>
             )}
-            {[['instagram', 'Instagram'], ['music', 'TikTok'], ['share-2', 'Partage du profil']].map(([ic, label]) => (
+            {[
+              ['instagram', barber.instagram],
+              ['music', barber.tiktok],
+              ['facebook', barber.facebook],
+            ].map(([ic, url]) => url ? (
               <TouchableOpacity key={ic} style={s.circleBtn} hitSlop={6}
-                onPress={() => toast(`${label} de ${barber.name.split(' ')[0]} — relié dans la version connectée.`)}>
-                <Feather name={ic} size={16} color={C.text} />
+                onPress={() => Linking.openURL(url)} activeOpacity={0.8}>
+                <Feather name={ic} size={16} color={C.gold2} />
               </TouchableOpacity>
-            ))}
+            ) : null)}
+            <TouchableOpacity style={s.circleBtn} hitSlop={6}
+              onPress={() => toast(`Partage du profil de ${barber.name.split(' ')[0]} — relié dans la version connectée.`)}>
+              <Feather name="share-2" size={16} color={C.text} />
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -1408,6 +1416,26 @@ function BarberDetailScreen({ barber, services, products, favoriteBarber, onTogg
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
+              )}
+
+              {(barber.instagram || barber.tiktok || barber.facebook) && (
+                <>
+                  <Section>Réseaux sociaux</Section>
+                  <View style={[s.row, { gap: 10, flexWrap: 'wrap' }]}>
+                    {[
+                      ['instagram', 'Instagram', barber.instagram],
+                      ['music', 'TikTok', barber.tiktok],
+                      ['facebook', 'Facebook', barber.facebook],
+                    ].filter(([,, url]) => url).map(([ic, label, url]) => (
+                      <TouchableOpacity key={ic}
+                        style={[s.card, s.row, { gap: 8, paddingVertical: 10, paddingHorizontal: 14, marginBottom: 0, borderColor: C.lineGold }]}
+                        onPress={() => Linking.openURL(url)} activeOpacity={0.8}>
+                        <Feather name={ic} size={15} color={C.gold} />
+                        <Text style={[s.btags, { color: C.gold2, fontSize: 13 }]}>{label}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </>
               )}
 
               <Section>Compétences</Section>
@@ -2858,6 +2886,9 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, clients, setC
   const [addingProduct, setAddingProduct] = useState(false);
   const [pName, setPName] = useState('');
   const [loyaltyRateInput, setLoyaltyRateInput] = useState(String(enzo.loyaltyRate || 1));
+  const [igLink, setIgLink] = useState(enzo.instagram || '');
+  const [ttLink, setTtLink] = useState(enzo.tiktok || '');
+  const [fbLink, setFbLink] = useState(enzo.facebook || '');
   const [blockingClient, setBlockingClient] = useState(null); // { id, firstName, lastName } | null
   const [ptSearch, setPtSearch] = useState('');
   const [addingTier, setAddingTier] = useState(false);
@@ -3044,6 +3075,38 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, clients, setC
         multiline value={bio} onChangeText={setBio}
         placeholder="Votre bio courte…" placeholderTextColor="#5A5852" />
       <Btn ghost label="ENREGISTRER LA BIO" onPress={() => { updateEnzo(() => ({ bio: bio.trim() })); toast('Bio mise à jour.'); }} />
+
+      {/* ── Réseaux sociaux ── */}
+      <Section>Réseaux sociaux</Section>
+      <View style={[s.row, { gap: 8, marginBottom: 8, alignItems: 'center' }]}>
+        <Feather name="instagram" size={16} color={C.gold} style={{ width: 20 }} />
+        <TextInput style={[s.input, s.grow, { marginBottom: 0 }]}
+          value={igLink} onChangeText={setIgLink}
+          placeholder="https://instagram.com/votre_compte" placeholderTextColor="#5A5852"
+          autoCapitalize="none" keyboardType="url" />
+      </View>
+      <View style={[s.row, { gap: 8, marginBottom: 8, alignItems: 'center' }]}>
+        <Feather name="music" size={16} color={C.gold} style={{ width: 20 }} />
+        <TextInput style={[s.input, s.grow, { marginBottom: 0 }]}
+          value={ttLink} onChangeText={setTtLink}
+          placeholder="https://tiktok.com/@votre_compte" placeholderTextColor="#5A5852"
+          autoCapitalize="none" keyboardType="url" />
+      </View>
+      <View style={[s.row, { gap: 8, marginBottom: 8, alignItems: 'center' }]}>
+        <Feather name="facebook" size={16} color={C.gold} style={{ width: 20 }} />
+        <TextInput style={[s.input, s.grow, { marginBottom: 0 }]}
+          value={fbLink} onChangeText={setFbLink}
+          placeholder="https://facebook.com/votre_page" placeholderTextColor="#5A5852"
+          autoCapitalize="none" keyboardType="url" />
+      </View>
+      <Btn ghost label="ENREGISTRER LES LIENS" onPress={() => {
+        updateEnzo(() => ({
+          instagram: igLink.trim() || null,
+          tiktok: ttLink.trim() || null,
+          facebook: fbLink.trim() || null,
+        }));
+        toast('Réseaux sociaux mis à jour.');
+      }} />
 
       {/* ── Spécialités ── */}
       <Section>Spécialités</Section>
