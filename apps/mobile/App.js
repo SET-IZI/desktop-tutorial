@@ -1,4 +1,11 @@
-// barbr — application mobile (démo autonome, sans serveur)
+// barbr — applic
+          <View style={s.row}>
+            <Text style={[s.fieldLabel, { flex: 1, marginTop: 0 }]}>FIN DE JOURNÉE</Text>
+            {[22, 23, 24, 25].map((h) => (
+              <Chip key={h} mini label={h >= 24 ? String(h - 24).padStart(2,'0') + 'h' : h + 'h'}
+                on={(endHour ?? 23) === h} onPress={() => setEndHour(h)} />
+            ))}
+          </View>ation mobile (démo autonome, sans serveur)
 // Deux interfaces reliées par un agenda partagé :
 //  · Client : recherche par position & style, réservation dans les créneaux ouverts
 //  · Barber : ouverture des créneaux, formules de rendez-vous, planning, statut, activité
@@ -179,7 +186,7 @@ function initFormulas() {
       price: 2500, surE: true, surN: true, surW: true, surU: true,
       recur: false, active: true, desc: 'Prestation standard — majorations activables.' },
     { id: 'f2', name: 'Nocturne', icon: 'moon', dur: 45, window: 'night',
-      price: 3500, surE: false, surN: false, surW: false, surU: false,
+      price: 3500, fromH: 20, surE: false, surN: false, surW: false, surU: false,
       recur: false, active: true, desc: 'Séance nocturne — tarif tout compris.' },
     { id: 'f3', name: 'Transformation', icon: 'star', dur: 120, window: 'day',
       price: 9000, surE: false, surN: false, surW: false, surU: false,
@@ -259,14 +266,16 @@ const MO = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'a
 const MO_SHORT = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
 const HORIZON = 60; // jours réservables / ouvrables à l’avance
 /* Grille horaire 9h → 23h, au pas choisi par le barber (15 à 60 min) */
-function timesFor(step) {
+function timesFor(step, endH) {
+  const e = (endH ?? 23) * 60;
   const out = [];
-  for (let t = 9 * 60; t + step <= 23 * 60; t += step) {
-    out.push(`${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`);
+  for (let t = 9 * 60; t + step <= e; t += step) {
+    const h = Math.floor(t / 60) % 24;
+    out.push(`${String(h).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`);
   }
   return out;
 }
-const TIMES = timesFor(30); // grille par défaut
+const TIMES = timesFor(30, 23); // grille par défaut
 function makeDays() {
   const out = [];
   for (let i = 0; i < HORIZON; i++) {
@@ -288,11 +297,11 @@ const timeToDate = (day, time) => {
   d.setHours(h, m, 0, 0);
   return d;
 };
-const inWindow = (time, window) => {
+const inWindow = (time, window, fromH) => {
   const h = Number(time.slice(0, 2));
-  if (window === 'day') return h < 20;
-  if (window === 'evening') return h >= 18;
-  if (window === 'night') return h >= 20;
+  if (window === 'day') return h < (fromH ?? 20);
+  if (window === 'evening') return h >= (fromH ?? 18);
+  if (window === 'night') return h >= (fromH ?? 20);
   return true;
 };
 
@@ -1578,7 +1587,7 @@ function BarberDetailScreen({ barber, services, products, favoriteBarber, onTogg
 
 /* Créneaux ouverts, filtrés par fenêtre horaire de la formule.
    On lit directement l’agenda : chaque barber peut avoir sa propre grille. */
-function openSlotsFor(agenda, dayIdx, barberId, window) {
+function openSlotsFor(agenda, dayIdx, barberId, window, fromH) {
   const day = DAYS[dayIdx];
   const now = new Date();
   const list = barberId === 'any' ? BARBERS : BARBERS.filter((b) => b.id === barberId);
@@ -1587,7 +1596,7 @@ function openSlotsFor(agenda, dayIdx, barberId, window) {
   for (const b of list) {
     const slots = agenda[b.id]?.[day.key] || {};
     for (const [time, sl] of Object.entries(slots)) {
-      if (sl.status !== 'open' || !inWindow(time, window) || seen[time]) continue;
+      if (sl.status !== 'open' || !inWindow(time, window, fromH) || seen[time]) continue;
       const date = timeToDate(day, time);
       if (date < now) continue;
       seen[time] = true;
@@ -1696,7 +1705,7 @@ function BookScreen({ agenda, formulas, services, booking, setBooking, dayIdx, s
   const formula = available.find((f) => f.id === booking.formula) || null;
   const service = services.find((x) => x.id === booking.service);
   const ready = !!formula;
-  const slots = ready ? openSlotsFor(agenda, dayIdx, booking.barber, formula.window) : [];
+  const slots = ready ? openSlotsFor(agenda, dayIdx, booking.barber, formula.window, formula.fromH) : [];
   const now = new Date();
 
   return (
@@ -2230,11 +2239,12 @@ const INIT_CLIENTS = [
   { id: 'c5', firstName: 'Noah', lastName: 'Petit', phone: '07 98 76 54 32', notes: 'Coupe enfant', loyaltyPts: 0, blocked: false },
 ];
 
-function SlotsScreen({ agenda, setAgenda, daycfg, setDaycfg, clients, setClients, services, dayIdx, setDayIdx, toast }) {
+function SlotsScreen({ agenda, setAgenda, daycfg, setDaycfg, endHour, setEndHour, clients, setClients, services, dayIdx, setDayIdx, toast }) {
   const day = DAYS[dayIdx];
   const step = daycfg[day.key] || 30;
   const slots = agenda.enzo[day.key] || {};
-  const gridTimes = timesFor(step);
+  const eH = endHour ?? 23;
+  const gridTimes = timesFor(step, eH);
   // Les réservations prises sur une ancienne grille restent visibles
   const offGrid = Object.keys(slots).filter((t) => slots[t].status === 'booked' && !gridTimes.includes(t));
   const allTimes = [...gridTimes, ...offGrid].sort();
@@ -2752,6 +2762,7 @@ function FormulasScreen({ formulas, setFormulas, services, setServices, toast })
   const [surW, setSurW] = React.useState(false);
   const [surU, setSurU] = React.useState(false);
   const [recur, setRecur] = React.useState(false);
+  const [fromHSel, setFromHSel] = React.useState(null);
   const [addingServ, setAddingServ] = React.useState(false);
   const [svName, setSvName] = React.useState('');
   const [svDur, setSvDur] = React.useState(30);
@@ -2796,14 +2807,15 @@ function FormulasScreen({ formulas, setFormulas, services, setServices, toast })
     const v = parseFloat(priceTxt.replace(',', '.'));
     if (isNaN(v) || v <= 0) { toast('Indiquez un prix de base valide.'); return; }
     const price = Math.round(v * 100);
+    const fromH = (windowSel === 'evening' || windowSel === 'night') ? (fromHSel ?? (windowSel === 'evening' ? 18 : 20)) : null;
     setFormulas((fs) => [...fs, {
       id: 'f' + (fs.length + 1) + Date.now(), name: label,
       icon: recur ? 'refresh-cw' : ICON_FOR_WINDOW[windowSel],
-      dur, window: windowSel, price, surE, surN, surW, surU, recur, active: true,
+      dur, window: windowSel, price, fromH, surE, surN, surW, surU, recur, active: true,
       desc: label + ' · ' + dur + ' min',
     }]);
     setCreating(false);
-    setName(''); setDur(45); setWindowSel('all'); setPriceTxt('');
+    setName(''); setDur(45); setWindowSel('all'); setPriceTxt(''); setFromHSel(null);
     setSurE(false); setSurN(false); setSurW(false); setSurU(false); setRecur(false);
     toast('Formule créée.');
   };
@@ -2859,7 +2871,7 @@ function FormulasScreen({ formulas, setFormulas, services, setServices, toast })
             <View style={s.grow}>
               <Text style={[s.bname, { fontSize: 14.5 }]}>{f.name}</Text>
               <Text style={[s.btags, { marginTop: 2 }]}>
-                {f.dur} min · {WINDOWS[f.window]}{f.recur ? ' · hebdo' : ''}
+                {f.dur} min · {WINDOWS[f.window]}{f.fromH != null ? ' à partir de ' + f.fromH + 'h' : ''}{f.recur ? ' · hebdo' : ''}
               </Text>
             </View>
             <PriceField cents={f.price ?? 0} onChange={(v) =>
@@ -2900,6 +2912,17 @@ function FormulasScreen({ formulas, setFormulas, services, setServices, toast })
               <Chip key={k} mini label={l} on={windowSel === k} onPress={() => setWindowSel(k)} />
             ))}
           </View>
+          {(windowSel === 'evening' || windowSel === 'night') && (
+            <>
+              <Text style={s.fieldLabel}>DÉBUTE À</Text>
+              <View style={[s.wrap, { marginBottom: 4 }]}>
+                {[18, 19, 20, 21, 22].map((h) => (
+                  <Chip key={h} mini label={h + 'h'} on={(fromHSel ?? (windowSel === 'evening' ? 18 : 20)) === h}
+                    onPress={() => setFromHSel(h)} />
+                ))}
+              </View>
+            </>
+          )}
           <Text style={s.fieldLabel}>PRIX DE BASE (€)</Text>
           <View style={[s.row, { marginBottom: 12, gap: 8 }]}>
             <TextInput style={[s.input, { flex: 1, marginBottom: 0 }]}
@@ -3895,7 +3918,8 @@ function Main() {
   const [tab, setTab] = useState('explore');
   const [barberDetail, setBarberDetail] = useState(null);
   const [agenda, setAgenda] = useState(initAgenda);
-  const [daycfg, setDaycfg] = useState({}); // durée des créneaux par jour (Enzo)
+  const [daycfg, setDaycfg] = useState({});
+  const [endHour, setEndHour] = useState(23); // durée des créneaux par jour (Enzo)
   const [formulas, setFormulas] = useState(initFormulas);
   const [services, setServices] = useState(() => [...SERVICES]);
   const [booking, setBooking] = useState({ barber: 'any', formula: null, service: null, done: null });
@@ -4038,7 +4062,7 @@ function Main() {
     else content = <MeScreen user={user} points={points} setPoints={setPoints} barbers={barbers} upcoming={upcoming} favoriteBarber={favoriteBarber} onLogout={logout} toast={toast} />;
   } else if (role === 'barber') {
     if (tab === 'slots') content = (
-      <SlotsScreen agenda={agenda} setAgenda={setAgenda} daycfg={daycfg} setDaycfg={setDaycfg}
+      <SlotsScreen agenda={agenda} setAgenda={setAgenda} daycfg={daycfg} setDaycfg={setDaycfg} endHour={endHour} setEndHour={setEndHour}
         clients={clients} setClients={setClients}
         services={services}
         dayIdx={barberDay} setDayIdx={setBarberDay} toast={toast} />
@@ -4099,8 +4123,10 @@ function Main() {
         <>
           <View style={s.header}>
             {role === 'client' ? (
-              <TouchableOpacity style={s.switchBtn} onPress={() => setNotifOpen(true)} hitSlop={10}>
-                <Feather name="bell" size={15} color={notifUnread > 0 ? C.gold2 : C.muted} />
+              <TouchableOpacity
+                style={[s.switchBtn, notifUnread > 0 && { borderColor: C.lineGold, backgroundColor: 'rgba(200,169,106,0.10)' }]}
+                onPress={() => setNotifOpen(true)} hitSlop={10}>
+                <Feather name="bell" size={16} color={notifUnread > 0 ? C.gold : C.muted} />
                 {notifUnread > 0 && (
                   <View style={s.bellBadge}>
                     <Text style={s.bellBadgeText}>{notifUnread}</Text>
