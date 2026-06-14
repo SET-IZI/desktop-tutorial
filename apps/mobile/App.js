@@ -852,6 +852,10 @@ function AuthScreen({ role, onSuccess, onBack }) {
         <Field label="TÉLÉPHONE" placeholder="06 12 34 56 78" keyboardType="phone-pad"
           value={phone} onChangeText={setPhone} />
       )}
+      {signup && role === 'client' && (
+        <Field label="TÉLÉPHONE (facultatif)" placeholder="06 12 34 56 78" keyboardType="phone-pad"
+          value={phone} onChangeText={setPhone} />
+      )}
       <Field label="MOT DE PASSE" placeholder="••••••••" secureTextEntry
         value={password} onChangeText={setPassword} />
 
@@ -1936,6 +1940,11 @@ function ShopScreen({ products, cat, setCat, cart, addCart, shopMode, toast }) {
 
 function MeScreen({ user, points, setPoints, barbers, upcoming, favoriteBarber, onLogout, toast }) {
   const [confirmRedeem, setConfirmRedeem] = React.useState(null);
+  const [notifSms, setNotifSms] = React.useState(true);
+  const [notifEmail, setNotifEmail] = React.useState(true);
+  const [notifPush, setNotifPush] = React.useState(true);
+  const [clientPhone, setClientPhone] = React.useState(user?.phone || '');
+  const [editingPhone, setEditingPhone] = React.useState(false);
   const [voucher, setVoucher] = React.useState(null);
   const [legalOpenMe, setLegalOpenMe] = React.useState(null);
   const loyaltyBarbers = barbers.filter((b) => b.loyalty);
@@ -2085,6 +2094,47 @@ function MeScreen({ user, points, setPoints, barbers, upcoming, favoriteBarber, 
           </View>
         ))
       )}
+      <Section>Rappels & notifications</Section>
+      <View style={s.card}>
+        {[
+          ['push', 'Notifications push', 'Rappels via l’application', notifPush, setNotifPush],
+          ['message-square', 'SMS', 'Rappel J-1 et H-1 par SMS', notifSms, setNotifSms],
+          ['mail', 'E-mail', 'Confirmation et rappels par e-mail', notifEmail, setNotifEmail],
+        ].map(([icon, label, sub, val, setter]) => (
+          <View key={icon} style={[s.row, { paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: C.line }]}>
+            <Feather name={icon} size={16} color={C.gold} />
+            <View style={s.grow}>
+              <Text style={[s.bname, { fontSize: 13 }]}>{label}</Text>
+              <Text style={[s.btags, { marginTop: 2 }]}>{sub}</Text>
+            </View>
+            <Toggle on={val} onPress={() => setter(v => !v)} />
+          </View>
+        ))}
+        <View style={{ paddingTop: 14 }}>
+          <Text style={[s.statL, { marginBottom: 6 }]}>
+            {clientPhone ? 'NUMÉRO SMS' : 'AJOUTER UN NUMÉRO SMS (facultatif)'}
+          </Text>
+          {editingPhone ? (
+            <View style={[s.row, { gap: 8 }]}>
+              <TextInput style={[s.input, s.grow, { marginBottom: 0 }]}
+                value={clientPhone} onChangeText={setClientPhone}
+                keyboardType="phone-pad" placeholder="06 12 34 56 78"
+                placeholderTextColor="#5A5852" autoFocus />
+              <TouchableOpacity style={[s.btn, { paddingVertical: 10, paddingHorizontal: 16, marginBottom: 0 }]}
+                onPress={() => setEditingPhone(false)} activeOpacity={0.85}>
+                <Text style={s.btnText}>OK</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity onPress={() => setEditingPhone(true)} hitSlop={8}>
+              <Text style={[s.softText, { color: clientPhone ? C.text : C.gold }]}>
+                {clientPhone || '+ Ajouter un numéro'}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+
       <Section>Paiement</Section>
       <View style={[s.card, s.row]}>
         <Feather name="credit-card" size={18} color={C.gold} />
