@@ -1864,7 +1864,7 @@ function MeScreen({ user, points, setPoints, barbers, upcoming, favoriteBarber, 
                 {nextTier ? (
                   <View style={{ marginTop: 10 }}>
                     <View style={[s.row, { justifyContent: 'space-between', marginBottom: 5 }]}>
-                      <Text style={[s.footnoteLeft, { color: C.textSub, flex: 1 }]}>Prochain : {nextTier.label}</Text>
+                      <Text style={[s.footnoteLeft, { color: C.muted, flex: 1 }]}>Prochain : {nextTier.label}</Text>
                       <Text style={[s.footnoteLeft, { color: C.gold }]}>{nextTier.pts - pts} pts</Text>
                     </View>
                     <View style={{ height: 5, backgroundColor: C.line, borderRadius: 3 }}>
@@ -1890,7 +1890,7 @@ function MeScreen({ user, points, setPoints, barbers, upcoming, favoriteBarber, 
                           <Text style={[s.bname, { flex: 1, marginLeft: 8, fontSize: 13 }]}>{t.label}</Text>
                         </View>
                         <View style={[s.row, { justifyContent: 'space-between', alignItems: 'center' }]}>
-                          <Text style={[s.footnoteLeft, { color: C.textSub }]}>Coût : {t.pts} pts</Text>
+                          <Text style={[s.footnoteLeft, { color: C.muted }]}>Coût : {t.pts} pts</Text>
                           <TouchableOpacity
                             style={{ backgroundColor: C.gold, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 7 }}
                             onPress={() => setConfirmRedeem({ b, t })}>
@@ -1908,9 +1908,9 @@ function MeScreen({ user, points, setPoints, barbers, upcoming, favoriteBarber, 
                     <Text style={[s.statL, { marginBottom: 6 }]}>À DÉBLOQUER</Text>
                     {locked.map((t, i) => (
                       <View key={t.id} style={[s.row, { marginBottom: 6, opacity: i === 0 ? 0.8 : 0.4 }]}>
-                        <Feather name={i === 0 ? 'unlock' : 'lock'} size={13} color={C.textSub} />
+                        <Feather name={i === 0 ? 'unlock' : 'lock'} size={13} color={C.muted} />
                         <Text style={[s.softText, { flex: 1, marginLeft: 8, fontSize: 12 }]}>{t.label}</Text>
-                        <Text style={[s.footnoteLeft, { color: C.textSub }]}>{t.pts} pts</Text>
+                        <Text style={[s.footnoteLeft, { color: C.muted }]}>{t.pts} pts</Text>
                       </View>
                     ))}
                   </>
@@ -2019,7 +2019,7 @@ function MeScreen({ user, points, setPoints, barbers, upcoming, favoriteBarber, 
             <Text style={[s.footnoteLeft, { textAlign: 'center', marginBottom: 4 }]}>
               Présentez ce coupon lors de votre prochain rendez-vous
             </Text>
-            <Text style={[s.footnoteLeft, { textAlign: 'center', color: C.textSub, marginBottom: 20 }]}>
+            <Text style={[s.footnoteLeft, { textAlign: 'center', color: C.muted, marginBottom: 20 }]}>
               Valable 30 jours · {voucher.pts} pts déduits
             </Text>
             <Btn label="FERMER" onPress={() => setVoucher(null)} />
