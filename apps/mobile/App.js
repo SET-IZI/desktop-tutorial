@@ -2294,7 +2294,9 @@ function SlotsScreen({ agenda, setAgenda, daycfg, setDaycfg, clients, setClients
   };
 
   // ── Réservation manuelle par le barber ──
-  const [multiDay, setMultiDay] = useState(1); // nb jours consécutifs pour les actions rapides
+  const [viewMode, setViewMode] = useState('day'); // 'day' | 'month'
+  const [monthOff, setMonthOff] = useState(0);
+  const [multiDay, setMultiDay] = useState(1);
   const [bookModal, setBookModal] = useState(null); // { time } | null
   const [clientSearch, setClientSearch] = useState('');
   const [selectedClient, setSelectedClient] = useState(null);
@@ -2358,6 +2360,58 @@ function SlotsScreen({ agenda, setAgenda, daycfg, setDaycfg, clients, setClients
     toast(`Créneaux de ${v} min — ${day.label.toLowerCase()}.`);
   };
 
+  const bulkMonth = (preset, dowFilter) => {
+    const base = new Date();
+    base.setDate(1);
+    base.setMonth(base.getMonth() + monthOff);
+    const m = base.getMonth();
+    const y = base.getFullYear();
+    let count = 0;
+    setAgenda((a) => {
+      let newEnzo = { ...a.enzo };
+      DAYS.forEach((day) => {
+        const d = day.date;
+        if (d.getMonth() !== m || d.getFullYear() !== y) return;
+        if (dowFilter && !dowFilter.includes(d.getDay())) return;
+        const dStep = daycfg[day.key] || step;
+        const grid = timesFor(dStep);
+        const copy = { ...(newEnzo[day.key] || {}) };
+        grid.forEach((time) => {
+          const h = Number(time.slice(0, 2));
+          if (h < preset.start || h >= preset.end) return;
+          if (copy[time] && copy[time].status === 'booked') return;
+          copy[time] = { status: 'open' };
+        });
+        newEnzo[day.key] = copy;
+        count++;
+      });
+      return { ...a, enzo: newEnzo };
+    });
+    toast(preset.label + ' sur ' + count + ' jours.');
+  };
+
+  const closeMonth = () => {
+    const base = new Date();
+    base.setDate(1);
+    base.setMonth(base.getMonth() + monthOff);
+    const m = base.getMonth();
+    const y = base.getFullYear();
+    setAgenda((a) => {
+      let newEnzo = { ...a.enzo };
+      DAYS.forEach((day) => {
+        const d = day.date;
+        if (d.getMonth() !== m || d.getFullYear() !== y) return;
+        const dStep = daycfg[day.key] || step;
+        const grid = timesFor(dStep);
+        const copy = { ...(newEnzo[day.key] || {}) };
+        grid.forEach((time) => { if (copy[time] && copy[time].status !== 'booked') delete copy[time]; });
+        newEnzo[day.key] = copy;
+      });
+      return { ...a, enzo: newEnzo };
+    });
+    toast('Créneaux libres fermés sur le mois.');
+  };
+
   const bulk = (label, predicate, mode) => {
     setAgenda((a) => {
       let newEnzo = { ...a.enzo };
@@ -2386,7 +2440,100 @@ function SlotsScreen({ agenda, setAgenda, daycfg, setDaycfg, clients, setClients
     <ScrollView style={s.screen} contentContainerStyle={s.screenPad}>
       <Kicker>ESPACE BARBER · ENZO MOREAU</Kicker>
       <Title em="créneaux">Mes </Title>
-      <Lead>
+
+      <View style={[s.row, { gap: 8, marginBottom: 14 }]}>
+        {[['day', 'Vue jour'], ['month', 'Vue mois']].map(([m, l]) => (
+          <Chip key={m} label={l} on={viewMode === m} onPress={() => setViewMode(m)} />
+        ))}
+      </View>
+
+      {viewMode === 'month' ? (
+        <>
+          <View style={[s.row, { marginBottom: 12 }]}>
+            <TouchableOpacity onPress={() => setMonthOff(Math.max(0, monthOff - 1))} hitSlop={10}
+              style={{ opacity: monthOff === 0 ? 0.3 : 1 }}>
+              <Feather name="chevron-left" size={20} color={C.text} />
+            </TouchableOpacity>
+            <Text style={[s.calMonth, { flex: 1, textAlign: 'center' }]}>
+              {(() => {
+                const b = new Date(); b.setDate(1); b.setMonth(b.getMonth() + monthOff);
+                return MO[b.getMonth()] + ' ' + b.getFullYear();
+              })()}
+            </Text>
+            <TouchableOpacity onPress={() => setMonthOff(Math.min(2, monthOff + 1))} hitSlop={10}
+              style={{ opacity: monthOff >= 2 ? 0.3 : 1 }}>
+              <Feather name="chevron-right" size={20} color={C.text} />
+            </TouchableOpacity>
+          </View>
+
+          <View style={{ flexDirection: 'row', marginBottom: 6 }}>
+            {['L','M','M','J','V','S','D'].map((d, i) => (
+              <Text key={i} style={{ flex: 1, textAlign: 'center', color: C.muted, fontSize: 11, fontWeight: '600' }}>{d}</Text>
+            ))}
+          </View>
+
+          {(() => {
+            const base = new Date(); base.setDate(1); base.setMonth(base.getMonth() + monthOff);
+            const m = base.getMonth(); const y = base.getFullYear();
+            const firstDow = (base.getDay() + 6) % 7;
+            const nDays = new Date(y, m + 1, 0).getDate();
+            const cells = [];
+            for (let i = 0; i < firstDow; i++) cells.push(null);
+            for (let d = 1; d <= nDays; d++) cells.push(new Date(y, m, d));
+            const rows = [];
+            for (let i = 0; i < cells.length; i += 7) rows.push(cells.slice(i, i + 7));
+            return rows.map((row, ri) => (
+              <View key={ri} style={{ flexDirection: 'row', marginBottom: 4 }}>
+                {row.map((date, ci) => {
+                  if (!date) return <View key={ci} style={{ flex: 1 }} />;
+                  const key = date.toDateString();
+                  const dayI = DAY_INDEX[key];
+                  const vals = Object.values(agenda.enzo[key] || {});
+                  const nB = vals.filter((v) => v.status === 'booked').length;
+                  const nO = vals.filter((v) => v.status === 'open').length;
+                  const isPast = dayI == null;
+                  const isToday = date.toDateString() === new Date().toDateString();
+                  return (
+                    <TouchableOpacity key={ci} disabled={isPast} activeOpacity={0.7}
+                      style={{ flex: 1, alignItems: 'center', paddingVertical: 7, borderRadius: 10,
+                        backgroundColor: isToday ? 'rgba(200,169,106,0.12)' : 'transparent',
+                        opacity: isPast ? 0.3 : 1 }}
+                      onPress={() => { if (dayI != null) { setDayIdx(dayI); setViewMode('day'); } }}>
+                      <Text style={{ color: isToday ? C.gold : C.text, fontSize: 13, fontWeight: isToday ? '700' : '400' }}>
+                        {date.getDate()}
+                      </Text>
+                      <View style={{ flexDirection: 'row', gap: 3, marginTop: 3, height: 5 }}>
+                        {nO > 0 && <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: C.gold }} />}
+                        {nB > 0 && <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: C.green }} />}
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            ));
+          })()}
+
+          <View style={[s.row, { marginTop: 8, marginBottom: 16, gap: 14 }]}>
+            <View style={s.row}><View style={[s.dot, { backgroundColor: C.gold }]} /><Text style={s.legend}>Ouvert</Text></View>
+            <View style={s.row}><View style={[s.dot, { backgroundColor: C.green }]} /><Text style={s.legend}>Réservé</Text></View>
+          </View>
+
+          <Text style={s.fieldLabel}>OUVRIR SUR TOUT LE MOIS</Text>
+          <View style={[s.wrap, { marginBottom: 10 }]}>
+            {SCHEDULE_PRESETS.map((p) => (
+              <Chip key={p.label} mini label={p.label} onPress={() => bulkMonth(p)} />
+            ))}
+          </View>
+          <Text style={s.fieldLabel}>FILTRER PAR TYPE DE JOUR</Text>
+          <View style={[s.wrap, { marginBottom: 14 }]}>
+            <Chip mini label="Lun–Ven" onPress={() => bulkMonth(SCHEDULE_PRESETS[1], [1,2,3,4,5])} />
+            <Chip mini label="Week-end" onPress={() => bulkMonth(SCHEDULE_PRESETS[1], [0,6])} />
+          </View>
+          <Btn ghost label="FERMER LES CRÉNEAUX LIBRES DU MOIS" onPress={closeMonth} />
+        </>
+      ) : (
+        <>
+          <Lead>
         Votre agenda, vos règles : choisissez une date sur le calendrier — jusqu’à deux mois à l’avance —
         puis ouvrez, fermez ou posez des pauses. Touchez une case : fermé → ouvert → pause.
       </Lead>
@@ -2462,6 +2609,8 @@ function SlotsScreen({ agenda, setAgenda, daycfg, setDaycfg, clients, setClients
       <Text style={[s.footnote, { marginTop: 4 }]}>
         Appui long sur un créneau ouvert pour réserver directement pour un client.
       </Text>
+        </>
+      )}
 
       <Section>Plages horaires</Section>
       <View style={s.wrap}>
