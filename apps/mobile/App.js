@@ -1258,8 +1258,6 @@ function ExploreScreen({ barbers, user, openBarber, favoriteBarber, onProCTA, to
           <Row title="Autour de vous" note="du plus proche au plus loin" data={sorted} />
           <Row title="Studios privés" note="un client à la fois" data={sorted.filter((b) => b.venue === 'studio')} />
           <Row title="À domicile" note="ils se déplacent" data={sorted.filter((b) => b.venue === 'domicile')} />
-          <Row title="Spécialistes fade" note="burst, taper, dégradés"
-            data={sorted.filter((b) => b.tags.some((t) => FADE_TAGS.includes(t)))} />
           <Section>Conseils</Section>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}
             style={{ marginHorizontal: -PAD, marginBottom: 4 }}
@@ -1272,6 +1270,8 @@ function ExploreScreen({ barbers, user, openBarber, favoriteBarber, onProCTA, to
               </View>
             ))}
           </ScrollView>
+          <Row title="Spécialistes fade" note="burst, taper, dégradés"
+            data={sorted.filter((b) => b.tags.some((t) => FADE_TAGS.includes(t)))} />
           {onProCTA && (
             <TouchableOpacity
               style={[s.card, { borderColor: C.lineGold, flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 4 }]}
@@ -1561,7 +1561,7 @@ function openSlotsFor(agenda, dayIdx, barberId, window) {
   return out.sort((a, b) => a.time.localeCompare(b.time));
 }
 
-function BookScreen({ agenda, formulas, services, booking, setBooking, dayIdx, setDayIdx, onConfirm }) {
+function BookScreen({ agenda, formulas, services, booking, setBooking, dayIdx, setDayIdx, onConfirm, barbers: allBarbers, favoriteBarber }) {
   if (booking.done) {
     const d = booking.done;
     return (
@@ -1598,6 +1598,59 @@ function BookScreen({ agenda, formulas, services, booking, setBooking, dayIdx, s
     );
   }
 
+  const bList = allBarbers || BARBERS;
+
+  // Étape 1 : sélection du barber
+  if (booking.barber === 'any') {
+    const fav = bList.find((b) => b.id === favoriteBarber) || null;
+    const others = bList.filter((b) => b.id !== favoriteBarber);
+    return (
+      <ScrollView style={s.screen} contentContainerStyle={s.screenPad}>
+        <Kicker>RENDEZ-VOUS</Kicker>
+        <Title em="qui">Avec </Title>
+        <Lead>Choisissez votre artiste pour voir ses créneaux disponibles.</Lead>
+        {fav && (
+          <>
+            <Section>Mon barber</Section>
+            <TouchableOpacity style={[s.card, { borderColor: C.lineGold }]}
+              onPress={() => setBooking({ ...booking, barber: fav.id, formula: null })} activeOpacity={0.85}>
+              <View style={s.row}>
+                <Ava b={fav} />
+                <View style={s.grow}>
+                  <Text style={s.bname}>{fav.name}</Text>
+                  <Text style={s.btags}>{fav.salon} · {String(fav.dist).replace('.', ',')} km</Text>
+                  <View style={[s.row, { gap: 10, marginTop: 5 }]}>
+                    <Badge status={fav.delay} />
+                    <Text style={s.rate}>★ {fav.rating}</Text>
+                  </View>
+                </View>
+                <Feather name="chevron-right" size={18} color={C.gold} />
+              </View>
+            </TouchableOpacity>
+          </>
+        )}
+        <Section>Tous les artistes</Section>
+        {others.map((b) => (
+          <TouchableOpacity key={b.id} style={s.card}
+            onPress={() => setBooking({ ...booking, barber: b.id, formula: null })} activeOpacity={0.85}>
+            <View style={s.row}>
+              <Ava b={b} />
+              <View style={s.grow}>
+                <Text style={s.bname}>{b.name}</Text>
+                <Text style={s.btags}>{b.salon} · {String(b.dist).replace('.', ',')} km</Text>
+                <View style={[s.row, { gap: 10, marginTop: 5 }]}>
+                  <Badge status={b.delay} />
+                  <Text style={s.rate}>★ {b.rating}</Text>
+                </View>
+              </View>
+              <Feather name="chevron-right" size={18} color={C.muted} />
+            </View>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    );
+  }
+
   // Formules proposées : celles du barber choisi (toutes actives), génériques sinon
   const available = booking.barber === 'enzo'
     ? formulas.filter((f) => f.active)
@@ -1615,16 +1668,22 @@ function BookScreen({ agenda, formulas, services, booking, setBooking, dayIdx, s
     <ScrollView style={s.screen} contentContainerStyle={s.screenPad}>
       <Kicker>RENDEZ-VOUS</Kicker>
       <Title>Réserver</Title>
-      <Lead>L’artiste, la formule, puis le créneau — parmi ceux que vos barbers ont ouverts.</Lead>
+      <Lead>La formule, puis le créneau — parmi les disponibilités ouvertes.</Lead>
 
-      <Section>L’artiste</Section>
-      <View style={s.wrap}>
-        <Chip label="Premier disponible" on={booking.barber === 'any'}
-          onPress={() => setBooking({ ...booking, barber: 'any', formula: null })} />
-        {BARBERS.map((b) => (
-          <Chip key={b.id} label={b.name.split(' ')[0]} on={booking.barber === b.id}
-            onPress={() => setBooking({ ...booking, barber: b.id, formula: null })} />
-        ))}
+      {(() => {
+        const selB = bList.find((b) => b.id === booking.barber);
+        return selB ? (
+          <TouchableOpacity style={[s.card, s.row, { borderColor: C.lineGold }]}
+            onPress={() => setBooking({ ...booking, barber: 'any', formula: null })} activeOpacity={0.85}>
+            <Ava b={selB} />
+            <View style={s.grow}>
+              <Text style={s.bname}>{selB.name}</Text>
+              <Text style={s.btags}>{selB.salon}</Text>
+            </View>
+            <Text style={[s.authLink, { fontSize: 12 }]}>Changer</Text>
+          </TouchableOpacity>
+        ) : null;
+      })()}
       </View>
 
       <Section>La formule</Section>
@@ -3638,7 +3697,8 @@ function Main() {
     } else if (tab === 'explore') content = <ExploreScreen barbers={barbersLive} user={user} openBarber={setBarberDetail} favoriteBarber={favoriteBarber} onProCTA={logout} toast={toast} />;
     else if (tab === 'book') content = (
       <BookScreen agenda={agenda} formulas={formulas} services={services} booking={booking} setBooking={setBooking}
-        dayIdx={clientDay} setDayIdx={setClientDay} onConfirm={confirmBooking} />
+        dayIdx={clientDay} setDayIdx={setClientDay} onConfirm={confirmBooking}
+        barbers={barbersLive} favoriteBarber={favoriteBarber} />
     );
     else if (tab === 'cuts') content = <CutsScreen history={history} setHistory={setHistory} setBarbers={setBarbers} user={user} toast={toast} />;
     else if (tab === 'shop' && shopOn) content = <ShopScreen products={products} cat={cat} setCat={setCat} cart={cart} addCart={addCart} shopMode={barbers.find((b) => b.id === 'enzo')?.shopMode || 'vitrine'} toast={toast} />;
