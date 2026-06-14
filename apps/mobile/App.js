@@ -172,32 +172,24 @@ const SERVICES = [
 
 /* Formules de rendez-vous — créées et activées par le barber */
 const WINDOWS = { all: 'Libre', day: 'Journée', evening: 'Soirée', night: 'Nuit' };
+const DEFAULT_PRICING_GRID = {
+  day: 2500, evening: 3500, night: 4500, weekendPct: 15, urgencyPct: 20,
+};
+
 function initFormulas() {
   return [
-    {
-      id: 'f1', name: 'Classique', icon: 'scissors', dur: 30, window: 'all',
-      price: 2500, surE: true, surN: true, surW: true, surU: true,
-      recur: false, active: true,
-      desc: 'Prestation standard — majorations soirée, nuit et week-end actives.',
-    },
-    {
-      id: 'f2', name: 'Nocturne', icon: 'moon', dur: 45, window: 'night',
-      price: 3500, surE: false, surN: false, surW: false, surU: false,
-      recur: false, active: true,
-      desc: 'Séance nocturne — créneaux après 20 h, tarif tout compris.',
-    },
-    {
-      id: 'f3', name: 'Transformation', icon: 'star', dur: 120, window: 'day',
-      price: 9000, surE: false, surN: false, surW: false, surU: false,
-      recur: false, active: true,
-      desc: 'Refonte complète du style — 2 h, photos avant/après offertes.',
-    },
-    {
-      id: 'f4', name: 'Hebdomadaire', icon: 'refresh-cw', dur: 30, window: 'all',
-      price: 2100, surE: false, surN: false, surW: false, surU: false,
-      recur: true, active: false,
-      desc: 'Même créneau chaque semaine — fidélité récompensée.',
-    },
+    { id: 'f1', name: 'Classique', icon: 'scissors', dur: 30, window: 'all',
+      price: null, recur: false, active: true,
+      desc: 'Prestation standard — prix selon la grille tarifaire.' },
+    { id: 'f2', name: 'Nocturne', icon: 'moon', dur: 45, window: 'night',
+      price: 3500, recur: false, active: true,
+      desc: 'Séance nocturne — créneaux après 20 h, tarif tout compris.' },
+    { id: 'f3', name: 'Transformation', icon: 'star', dur: 120, window: 'day',
+      price: 9000, recur: false, active: true,
+      desc: 'Refonte complète du style — 2 h, photos avant/après offertes.' },
+    { id: 'f4', name: 'Hebdomadaire', icon: 'refresh-cw', dur: 30, window: 'all',
+      price: null, recur: true, active: false,
+      desc: 'Même créneau chaque semaine — fidélité récompensée.' },
   ];
 }
 
@@ -345,16 +337,23 @@ function initAgenda() {
   return agenda;
 }
 
-/* Tarification par formule — prix fixe + majorations optionnelles */
-function quoteFor(formula, _service, slotDate, now) {
-  let price = formula.price ?? 0;
+/* Tarification par formule — prix fixe ou grille tarifaire */
+function quoteFor(formula, _service, slotDate, now, grid) {
+  const g = grid || DEFAULT_PRICING_GRID;
+  let price;
   const rules = [];
   const h = slotDate.getHours();
   const d = slotDate.getDay();
-  if (formula.surN && h >= 22) { price += 2500; rules.push('Majoration nuit après 22h'); }
-  else if (formula.surE && h >= 20) { price += 1000; rules.push('Majoration soirée après 20h'); }
-  if (formula.surW && (d === 0 || d === 6)) { price = Math.round(price * 1.15); rules.push('Week-end +15 %'); }
-  if (formula.surU && (slotDate - now) / 60000 < 120 && slotDate > now) { price = Math.round(price * 1.2); rules.push('Urgence +20 %'); }
+  if (formula.price != null) {
+    price = formula.price;
+    rules.push('Formule ' + formula.name);
+  } else {
+    if (h >= 22) { price = g.night; rules.push('Tarif nuit après 22h'); }
+    else if (h >= 20) { price = g.evening; rules.push('Tarif soirée après 20h'); }
+    else { price = g.day; }
+    if (d === 0 || d === 6) { price = Math.round(price * (1 + g.weekendPct / 100)); rules.push('Week-end +' + g.weekendPct + ' %'); }
+    if ((slotDate - now) / 60000 < 120 && slotDate > now) { price = Math.round(price * (1 + g.urgencyPct / 100)); rules.push('Urgence +' + g.urgencyPct + ' %'); }
+  }
   if (formula.recur) { price = Math.round(price * 0.85); rules.push('Hebdo -15 %'); }
   return { price, rules };
 }
@@ -1590,7 +1589,7 @@ function openSlotsFor(agenda, dayIdx, barberId, window) {
   return out.sort((a, b) => a.time.localeCompare(b.time));
 }
 
-function BookScreen({ agenda, formulas, services, booking, setBooking, dayIdx, setDayIdx, onConfirm, barbers: allBarbers, favoriteBarber }) {
+function BookScreen({ agenda, formulas, services, booking, setBooking, dayIdx, setDayIdx, onConfirm, barbers: allBarbers, favoriteBarber, pricingGrid }) {
   if (booking.done) {
     const d = booking.done;
     return (
@@ -1760,7 +1759,7 @@ function BookScreen({ agenda, formulas, services, booking, setBooking, dayIdx, s
           ) : (
             <>
               {slots.map((sl) => {
-                const q = quoteFor(formula, service, sl.date, now);
+                const q = quoteFor(formula, service, sl.date, now, pricingGrid);
                 return (
                   <TouchableOpacity key={sl.barber.id + sl.time} style={[s.card, s.row]}
                     onPress={() => onConfirm(formula, service, sl, q)} activeOpacity={0.8}>
@@ -2620,20 +2619,6 @@ function SlotsScreen({ agenda, setAgenda, daycfg, setDaycfg, clients, setClients
         </>
       )}
 
-      <Section>Plages horaires</Section>
-      <View style={s.wrap}>
-        {SCHEDULE_PRESETS.map((p) => (
-          <Chip key={p.label} mini label={p.label}
-            onPress={() => bulk('Ouvert ' + p.label, (h) => h >= p.start && h < p.end, 'open')} />
-        ))}
-      </View>
-      <Section>Actions rapides</Section>
-      <View style={s.wrap}>
-        <Chip mini label="Tout ouvrir (9h–22h)" onPress={() => bulk('Tout ouvert — 9h à 22h.', (h) => h >= 9 && h < 22, 'open')} />
-        <Chip mini label="Soirée (20h–22h)" onPress={() => bulk('Soirée ouverte — tarifs soirée/nuit appliqués.', (h) => h >= 20, 'open')} />
-        <Chip mini label="Pause déjeuner" onPress={() => bulk('Pause déjeuner posée — 12h à 14h.', (h) => h >= 12 && h < 14, 'pause')} />
-        <Chip mini label="Tout fermer" onPress={() => bulk('Tous les créneaux libres ont été fermés.', () => true, null)} />
-      </View>
       <Text style={s.footnote}>
         La durée se règle jour par jour — 20 min pour les coupes rapides, 60 min pour les transformations.
         Les pauses et les créneaux fermés sont invisibles côté client ; les réservations existantes sont toujours conservées.
@@ -2748,28 +2733,21 @@ function PriceField({ cents, onChange }) {
   );
 }
 
-function FormulasScreen({ formulas, setFormulas, services, setServices, toast }) {
+function FormulasScreen({ formulas, setFormulas, services, setServices, pricingGrid, setPricingGrid, toast }) {
+  const grid = pricingGrid || DEFAULT_PRICING_GRID;
   const [creating, setCreating] = React.useState(false);
   const [name, setName] = React.useState('');
   const [dur, setDur] = React.useState(45);
   const [windowSel, setWindowSel] = React.useState('all');
+  const [useGrid, setUseGrid] = React.useState(true);
   const [priceTxt, setPriceTxt] = React.useState('');
-  const [surE, setSurE] = React.useState(false);
-  const [surN, setSurN] = React.useState(false);
-  const [surW, setSurW] = React.useState(false);
-  const [surU, setSurU] = React.useState(false);
   const [recur, setRecur] = React.useState(false);
   const [addingServ, setAddingServ] = React.useState(false);
   const [svName, setSvName] = React.useState('');
   const [svDur, setSvDur] = React.useState(30);
   const [svPrice, setSvPrice] = React.useState('');
 
-  const SUR_LABELS = [
-    { key: 'surE', label: 'Soirée +10 €', sub: 'après 20h' },
-    { key: 'surN', label: 'Nuit +25 €', sub: 'après 22h' },
-    { key: 'surW', label: 'Week-end +15 %', sub: 'sam. & dim.' },
-    { key: 'surU', label: 'Urgence +20 %', sub: 'résa < 2h' },
-  ];
+  const updateGrid = (key, val) => setPricingGrid({ ...grid, [key]: val });
 
   const createService = () => {
     const label = svName.trim();
@@ -2794,37 +2772,88 @@ function FormulasScreen({ formulas, setFormulas, services, setServices, toast })
     }));
   };
 
-  const toggleSur = (fid, key) => {
-    setFormulas((fs) => fs.map((f) => f.id !== fid ? f : { ...f, [key]: !f[key] }));
-  };
-
   const create = () => {
     const label = name.trim();
     if (!label) { toast('Donnez un nom à votre formule.'); return; }
-    const v = parseFloat(priceTxt.replace(',', '.'));
-    if (isNaN(v) || v <= 0) { toast('Indiquez un prix valide.'); return; }
-    const price = Math.round(v * 100);
+    let price = null;
+    if (!useGrid) {
+      const v = parseFloat(priceTxt.replace(',', '.'));
+      if (isNaN(v) || v <= 0) { toast('Indiquez un prix valide.'); return; }
+      price = Math.round(v * 100);
+    }
     setFormulas((fs) => [...fs, {
       id: 'f' + (fs.length + 1) + Date.now(), name: label,
       icon: recur ? 'refresh-cw' : ICON_FOR_WINDOW[windowSel],
-      dur, window: windowSel, price, surE, surN, surW, surU, recur, active: true,
+      dur, window: windowSel, price, recur, active: true,
       desc: label + ' · ' + dur + ' min',
     }]);
     setCreating(false);
-    setName(''); setDur(45); setWindowSel('all'); setPriceTxt('');
-    setSurE(false); setSurN(false); setSurW(false); setSurU(false); setRecur(false);
+    setName(''); setDur(45); setWindowSel('all'); setUseGrid(true); setPriceTxt(''); setRecur(false);
     toast('Formule créée.');
   };
+
+  const GRID_ROWS = [
+    { key: 'day', label: 'Journée', sub: '9h – 20h' },
+    { key: 'evening', label: 'Soirée', sub: '20h – 22h' },
+    { key: 'night', label: 'Nuit', sub: 'après 22h' },
+  ];
 
   return (
     <ScrollView style={s.screen} contentContainerStyle={s.screenPad} keyboardShouldPersistTaps="handled">
       <Kicker>ESPACE BARBER · ENZO MOREAU</Kicker>
       <Title em="formules">Mes </Title>
       <Lead>
-        Définissez vos tarifs et vos types de rendez-vous. Chaque formule a son propre prix — les majorations sont optionnelles.
+        Définissez votre grille tarifaire par créneau, puis créez vos formules.
       </Lead>
 
-      <Section note="vos prestations et leur tarif de base">Mes prestations</Section>
+      <Section note="prix selon l'horaire du créneau">Grille tarifaire</Section>
+      <View style={s.card}>
+        {GRID_ROWS.map(({ key, label, sub }, i) => (
+          <View key={key} style={[s.row, { gap: 12, paddingVertical: 10,
+            borderTopWidth: i > 0 ? 1 : 0, borderTopColor: C.line }]}>
+            <View style={s.grow}>
+              <Text style={[s.bname, { fontSize: 13.5 }]}>{label}</Text>
+              <Text style={[s.btags, { marginTop: 1 }]}>{sub}</Text>
+            </View>
+            <PriceField cents={grid[key]} onChange={(v) => { updateGrid(key, v); toast('Tarif mis à jour.'); }} />
+          </View>
+        ))}
+        <View style={[s.row, { gap: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: C.line }]}>
+          <View style={s.grow}>
+            <Text style={[s.bname, { fontSize: 13.5 }]}>Majoration week-end</Text>
+            <Text style={[s.btags, { marginTop: 1 }]}>sam. & dim.</Text>
+          </View>
+          <View style={[s.row, { gap: 4 }]}>
+            <TextInput
+              style={[s.input, { width: 52, marginBottom: 0, textAlign: 'center', paddingHorizontal: 8 }]}
+              keyboardType="numeric"
+              value={String(grid.weekendPct)}
+              onChangeText={(t) => { const v = parseInt(t); if (!isNaN(v) && v >= 0) updateGrid('weekendPct', v); }}
+            />
+            <Text style={{ color: C.gold, fontFamily: SERIF, fontSize: 15, fontWeight: '700' }}>%</Text>
+          </View>
+        </View>
+        <View style={[s.row, { gap: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: C.line }]}>
+          <View style={s.grow}>
+            <Text style={[s.bname, { fontSize: 13.5 }]}>Majoration urgence</Text>
+            <Text style={[s.btags, { marginTop: 1 }]}>résa moins de 2h</Text>
+          </View>
+          <View style={[s.row, { gap: 4 }]}>
+            <TextInput
+              style={[s.input, { width: 52, marginBottom: 0, textAlign: 'center', paddingHorizontal: 8 }]}
+              keyboardType="numeric"
+              value={String(grid.urgencyPct)}
+              onChangeText={(t) => { const v = parseInt(t); if (!isNaN(v) && v >= 0) updateGrid('urgencyPct', v); }}
+            />
+            <Text style={{ color: C.gold, fontFamily: SERIF, fontSize: 15, fontWeight: '700' }}>%</Text>
+          </View>
+        </View>
+      </View>
+      <Text style={s.footnote}>
+        Ces tarifs s'appliquent aux formules sans prix fixe. Le week-end et l'urgence s'ajoutent en pourcentage.
+      </Text>
+
+      <Section note="vos types de coupe avec tarif indicatif">Mes prestations</Section>
       {services.map((sv) => (
         <View key={sv.id} style={[s.card, s.row, { gap: 12 }]}>
           <View style={s.grow}>
@@ -2851,7 +2880,7 @@ function FormulasScreen({ formulas, setFormulas, services, setServices, toast })
               <Chip key={d} mini label={d + ' min'} on={svDur === d} onPress={() => setSvDur(d)} />
             ))}
           </View>
-          <Field label="PRIX (€)" placeholder="35" keyboardType="numeric"
+          <Field label="PRIX INDICATIF (€)" placeholder="35" keyboardType="numeric"
             value={svPrice} onChangeText={setSvPrice} />
           <Btn label="CRÉER LA PRESTATION" onPress={createService} />
           <Btn ghost label="ANNULER" onPress={() => setAddingServ(false)} />
@@ -2860,7 +2889,7 @@ function FormulasScreen({ formulas, setFormulas, services, setServices, toast })
         <Btn ghost icon="plus" label="NOUVELLE PRESTATION" onPress={() => setAddingServ(true)} />
       )}
 
-      <Section note="types de rendez-vous avec tarif propre">Mes formules</Section>
+      <Section note="types de rendez-vous proposés aux clients">Mes formules</Section>
       {formulas.map((f) => (
         <View key={f.id} style={[s.card, !f.active && { opacity: 0.55 }]}>
           <View style={[s.row, { gap: 12, alignItems: 'flex-start' }]}>
@@ -2871,22 +2900,17 @@ function FormulasScreen({ formulas, setFormulas, services, setServices, toast })
                 {f.dur} min · {WINDOWS[f.window]}{f.recur ? ' · hebdo' : ''}
               </Text>
             </View>
-            <PriceField cents={f.price ?? 0} onChange={(v) =>
-              setFormulas((fs) => fs.map((x) => x.id === f.id ? { ...x, price: v } : x))
-            } />
+            {f.price != null ? (
+              <PriceField cents={f.price} onChange={(v) =>
+                setFormulas((fs) => fs.map((x) => x.id === f.id ? { ...x, price: v } : x))
+              } />
+            ) : (
+              <View style={{ paddingHorizontal: 8, paddingVertical: 4, backgroundColor: 'rgba(200,169,106,0.12)',
+                borderWidth: 1, borderColor: C.lineGold, borderRadius: 8 }}>
+                <Text style={{ color: C.gold, fontSize: 10, fontWeight: '700', letterSpacing: 0.5 }}>GRILLE</Text>
+              </View>
+            )}
             <Toggle on={f.active} onPress={() => toggleActive(f.id)} />
-          </View>
-          <Text style={[s.fieldLabel, { marginTop: 12, marginBottom: 6 }]}>MAJORATIONS</Text>
-          <View style={[s.wrap, { gap: 6 }]}>
-            {SUR_LABELS.map(({ key, label, sub }) => (
-              <TouchableOpacity key={key}
-                style={[s.surChip, f[key] && s.surChipOn]}
-                onPress={() => toggleSur(f.id, key)}
-                activeOpacity={0.75}>
-                <Text style={[s.surChipTxt, f[key] && { color: C.ink }]}>{label}</Text>
-                <Text style={[s.surChipSub, f[key] && { color: C.ink }]}>{sub}</Text>
-              </TouchableOpacity>
-            ))}
           </View>
         </View>
       ))}
@@ -2895,13 +2919,8 @@ function FormulasScreen({ formulas, setFormulas, services, setServices, toast })
         <View style={[s.card, { borderColor: C.lineGold }]}>
           <Text style={[s.bname, { marginBottom: 12 }]}>Nouvelle formule</Text>
           <Text style={s.fieldLabel}>NOM</Text>
-          <TextInput
-            style={s.input}
-            placeholder="Ex. Rendez-vous domicile, Express midi…"
-            placeholderTextColor="#5A5852"
-            value={name}
-            onChangeText={setName}
-          />
+          <TextInput style={s.input} placeholder="Ex. Express, Domicile, Soirée VIP…"
+            placeholderTextColor="#5A5852" value={name} onChangeText={setName} />
           <Text style={s.fieldLabel}>DURÉE</Text>
           <View style={s.wrap}>
             {DUR_CHOICES.map((d) => (
@@ -2914,34 +2933,19 @@ function FormulasScreen({ formulas, setFormulas, services, setServices, toast })
               <Chip key={k} mini label={l} on={windowSel === k} onPress={() => setWindowSel(k)} />
             ))}
           </View>
-          <Text style={s.fieldLabel}>PRIX DE BASE (€)</Text>
-          <View style={[s.row, { marginBottom: 12, gap: 8 }]}>
-            <TextInput
-              style={[s.input, { flex: 1, marginBottom: 0 }]}
-              keyboardType="numeric"
-              placeholder="Ex. 35"
-              placeholderTextColor="#5A5852"
-              value={priceTxt}
-              onChangeText={setPriceTxt}
-            />
-            <Text style={{ color: C.gold, fontFamily: SERIF, fontSize: 17, fontWeight: '700', alignSelf: 'center' }}>€</Text>
+          <Text style={s.fieldLabel}>TARIF</Text>
+          <View style={[s.wrap, { marginBottom: 10 }]}>
+            <Chip mini label="Grille tarifaire" on={useGrid} onPress={() => setUseGrid(true)} />
+            <Chip mini label="Prix fixe" on={!useGrid} onPress={() => setUseGrid(false)} />
           </View>
-          <Text style={s.fieldLabel}>MAJORATIONS OPTIONNELLES</Text>
-          <View style={[s.wrap, { gap: 6, marginBottom: 12 }]}>
-            {SUR_LABELS.map(({ key, label, sub }) => {
-              const stateMap = { surE, surN, surW, surU };
-              const setMap = { surE: setSurE, surN: setSurN, surW: setSurW, surU: setSurU };
-              return (
-                <TouchableOpacity key={key}
-                  style={[s.surChip, stateMap[key] && s.surChipOn]}
-                  onPress={() => setMap[key](!stateMap[key])}
-                  activeOpacity={0.75}>
-                  <Text style={[s.surChipTxt, stateMap[key] && { color: C.ink }]}>{label}</Text>
-                  <Text style={[s.surChipSub, stateMap[key] && { color: C.ink }]}>{sub}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+          {!useGrid && (
+            <View style={[s.row, { marginBottom: 12, gap: 8 }]}>
+              <TextInput style={[s.input, { flex: 1, marginBottom: 0 }]}
+                keyboardType="numeric" placeholder="Ex. 45"
+                placeholderTextColor="#5A5852" value={priceTxt} onChangeText={setPriceTxt} />
+              <Text style={{ color: C.gold, fontFamily: SERIF, fontSize: 17, fontWeight: '700', alignSelf: 'center' }}>€</Text>
+            </View>
+          )}
           <Text style={s.fieldLabel}>RÉCURRENCE</Text>
           <View style={[s.wrap, { marginBottom: 12 }]}>
             <Chip mini label="Ponctuelle" on={!recur} onPress={() => setRecur(false)} />
@@ -2954,7 +2958,7 @@ function FormulasScreen({ formulas, setFormulas, services, setServices, toast })
         <Btn ghost icon="plus" label="NOUVELLE FORMULE" onPress={() => setCreating(true)} />
       )}
       <Text style={s.footnote}>
-        Prix fixe par formule. Les majorations cochées s'ajoutent automatiquement selon l'horaire.
+        Une formule avec prix fixe ne tient pas compte de la grille tarifaire.
       </Text>
     </ScrollView>
   );
@@ -3916,6 +3920,7 @@ function Main() {
   const [agenda, setAgenda] = useState(initAgenda);
   const [daycfg, setDaycfg] = useState({}); // durée des créneaux par jour (Enzo)
   const [formulas, setFormulas] = useState(initFormulas);
+  const [pricingGrid, setPricingGrid] = useState(DEFAULT_PRICING_GRID);
   const [services, setServices] = useState(() => [...SERVICES]);
   const [booking, setBooking] = useState({ barber: 'any', formula: null, service: null, done: null });
   const [clientDay, setClientDay] = useState(0);
@@ -4048,7 +4053,7 @@ function Main() {
       );
     } else if (tab === 'explore') content = <ExploreScreen barbers={barbersLive} user={user} openBarber={setBarberDetail} favoriteBarber={favoriteBarber} onProCTA={logout} toast={toast} />;
     else if (tab === 'book') content = (
-      <BookScreen agenda={agenda} formulas={formulas} services={services} booking={booking} setBooking={setBooking}
+      <BookScreen agenda={agenda} formulas={formulas} services={services} booking={booking} setBooking={setBooking} pricingGrid={pricingGrid}
         dayIdx={clientDay} setDayIdx={setClientDay} onConfirm={confirmBooking}
         barbers={barbersLive} favoriteBarber={favoriteBarber} />
     );
@@ -4063,7 +4068,7 @@ function Main() {
         dayIdx={barberDay} setDayIdx={setBarberDay} toast={toast} />
     );
     else if (tab === 'formulas') content = (
-      <FormulasScreen formulas={formulas} setFormulas={setFormulas} services={services} setServices={setServices} toast={toast} />
+      <FormulasScreen formulas={formulas} setFormulas={setFormulas} services={services} setServices={setServices} pricingGrid={pricingGrid} setPricingGrid={setPricingGrid} toast={toast} />
     );
     else if (tab === 'planning') content = (
       <PlanningScreen agenda={agenda} setAgenda={setAgenda} dayIdx={barberDay} setDayIdx={setBarberDay} delay={enzoDelay} setHistory={setHistory} toast={toast} />
@@ -4362,13 +4367,13 @@ const s = StyleSheet.create({
   back: { color: C.muted, fontSize: 12, letterSpacing: 2 },
 
   photo: {
-    width: 104, height: 126, borderRadius: 14, marginRight: 9,
+    width: 150, height: 190, borderRadius: 16, marginRight: 10,
     borderWidth: 1, borderColor: C.line, alignItems: 'center', justifyContent: 'center',
     overflow: 'hidden',
   },
   photoLabel: { position: 'absolute', bottom: 7, color: '#D8D5CE', fontSize: 9, letterSpacing: 1.5 },
   photoTitleInput: {
-    width: 104, marginTop: 6, paddingVertical: 5, paddingHorizontal: 8,
+    width: 150, marginTop: 6, paddingVertical: 5, paddingHorizontal: 8,
     backgroundColor: C.surface2, borderWidth: 1, borderColor: C.line, borderRadius: 8,
     color: C.text, fontSize: 10.5, textAlign: 'center',
   },
@@ -4500,7 +4505,7 @@ const s = StyleSheet.create({
     zIndex: 10,
   },
   photoAdd: {
-    width: 104, height: 126, borderRadius: 14,
+    width: 150, height: 190, borderRadius: 16,
     borderWidth: 1, borderColor: C.lineGold,
     alignItems: 'center', justifyContent: 'center',
   },
