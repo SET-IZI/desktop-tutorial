@@ -1396,6 +1396,37 @@ function BarberDetailScreen({ barber, services, products, favoriteBarber, onTogg
                 ))}
               </ScrollView>
 
+              {(barber.depositPct > 0 || barber.noticeHours > 0 || barber.planningNote) && (
+                <>
+                  <Section>Conditions de réservation</Section>
+                  <View style={[s.card, { gap: 10 }]}>
+                    {barber.depositPct > 0 && (
+                      <View style={s.row}>
+                        <Feather name="credit-card" size={14} color={C.gold} />
+                        <Text style={[s.softText, s.grow]}>Acompte de {barber.depositPct} % requis à la réservation</Text>
+                      </View>
+                    )}
+                    {barber.noticeHours > 0 && (
+                      <View style={s.row}>
+                        <Feather name="clock" size={14} color={C.gold} />
+                        <Text style={[s.softText, s.grow]}>Réservation au moins {barber.noticeHours} h à l'avance</Text>
+                      </View>
+                    )}
+                    {barber.cancelHours > 0 && (
+                      <View style={s.row}>
+                        <Feather name="x-circle" size={14} color={C.gold} />
+                        <Text style={[s.softText, s.grow]}>Annulation gratuite jusqu'à {barber.cancelHours} h avant le RDV</Text>
+                      </View>
+                    )}
+                    {barber.planningNote ? (
+                      <View style={s.row}>
+                        <Feather name="info" size={14} color={C.gold} />
+                        <Text style={[s.softText, s.grow]}>{barber.planningNote}</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                </>
+              )}
               <Section>Lieu de coupe</Section>
               <View style={[s.place, { backgroundColor: barber.coverColor || TEX[(barber.tex + 1) % 4] }]}>
                 <Feather name={barber.venue === 'domicile' ? 'home' : barber.venue === 'studio' ? 'star' : 'scissors'} size={26} color="rgba(200,169,106,0.45)" />
@@ -2967,6 +2998,10 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, clients, setC
   const [igLink, setIgLink] = useState(enzo.instagram || '');
   const [ttLink, setTtLink] = useState(enzo.tiktok || '');
   const [fbLink, setFbLink] = useState(enzo.facebook || '');
+  const [depositPct, setDepositPct] = useState(String(enzo.depositPct ?? 0));
+  const [noticeHours, setNoticeHours] = useState(String(enzo.noticeHours ?? 2));
+  const [cancelHours, setCancelHours] = useState(String(enzo.cancelHours ?? 24));
+  const [planningNote, setPlanningNote] = useState(enzo.planningNote || '');
   const [blockingClient, setBlockingClient] = useState(null); // { id, firstName, lastName } | null
   const [ptSearch, setPtSearch] = useState('');
   const [addingTier, setAddingTier] = useState(false);
@@ -3274,6 +3309,48 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, clients, setC
         </View>
       </View>
       <Btn ghost label="ENREGISTRER LES CHIFFRES" onPress={saveStats} />
+
+      {/* ── Règles de planning ── */}
+      <Section note="s'appliquent à toutes les réservations">Règles du planning</Section>
+      <View style={s.card}>
+        <View style={[s.row, { marginBottom: 14, gap: 12 }]}>
+          <View style={{ flex: 1 }}>
+            <Text style={[s.statL, { marginBottom: 6 }]}>ACOMPTE (%)</Text>
+            <TextInput style={[s.input, { marginBottom: 0 }]}
+              value={depositPct} onChangeText={setDepositPct}
+              keyboardType="numeric" placeholderTextColor="#5A5852" placeholder="0" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[s.statL, { marginBottom: 6 }]}>DÉLAI MIN. (h)</Text>
+            <TextInput style={[s.input, { marginBottom: 0 }]}
+              value={noticeHours} onChangeText={setNoticeHours}
+              keyboardType="numeric" placeholderTextColor="#5A5852" placeholder="2" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[s.statL, { marginBottom: 6 }]}>ANNUL. GRATU. (h)</Text>
+            <TextInput style={[s.input, { marginBottom: 0 }]}
+              value={cancelHours} onChangeText={setCancelHours}
+              keyboardType="numeric" placeholderTextColor="#5A5852" placeholder="24" />
+          </View>
+        </View>
+        <Text style={[s.statL, { marginBottom: 6 }]}>NOTE VISIBLE PAR LES CLIENTS (facultatif)</Text>
+        <TextInput style={[s.input, { height: 70, textAlignVertical: 'top', paddingTop: 10 }]}
+          multiline value={planningNote} onChangeText={setPlanningNote}
+          placeholderTextColor="#5A5852"
+          placeholder="Ex. Pas de coupe le lundi. Majoration +10 le dimanche. RDV uniquement via barbr." />
+        <Btn ghost label="ENREGISTRER LES RÈGLES" onPress={() => {
+          const dep = parseInt(depositPct, 10);
+          const not = parseInt(noticeHours, 10);
+          const can = parseInt(cancelHours, 10);
+          updateEnzo(() => ({
+            depositPct: isNaN(dep) ? 0 : Math.min(dep, 100),
+            noticeHours: isNaN(not) ? 2 : not,
+            cancelHours: isNaN(can) ? 24 : can,
+            planningNote: planningNote.trim() || null,
+          }));
+          toast('Règles de planning enregistrées.');
+        }} />
+      </View>
 
       {/* ── Fidélité ── */}
       <Section note="gérez les règles et les points de vos clients">Fidélité</Section>
