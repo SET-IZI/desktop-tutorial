@@ -3429,7 +3429,7 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, clients, setC
             unread: true,
             title: t,
             msg: `${barberName} : ${b}`,
-            time: 'À l'instant',
+            time: "À l'instant",
           };
           if (setNotifs) setNotifs((ns) => [newNotif, ...ns]);
           setMsgTitle('');
