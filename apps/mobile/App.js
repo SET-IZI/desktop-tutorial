@@ -2979,7 +2979,7 @@ const BLOCK_REASONS = [
   'Autre',
 ];
 
-function FicheScreen({ barbers, setBarbers, products, setProducts, clients, setClients, onPreview, toast }) {
+function FicheScreen({ barbers, setBarbers, products, setProducts, clients, setClients, setNotifs, onPreview, toast }) {
   const enzo = barbers.find((b) => b.id === 'enzo');
 
   const [bio, setBio] = useState(enzo.bio);
@@ -3002,6 +3002,8 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, clients, setC
   const [noticeHours, setNoticeHours] = useState(String(enzo.noticeHours ?? 2));
   const [cancelHours, setCancelHours] = useState(String(enzo.cancelHours ?? 24));
   const [planningNote, setPlanningNote] = useState(enzo.planningNote || '');
+  const [msgTitle, setMsgTitle] = useState('');
+  const [msgBody, setMsgBody] = useState('');
   const [blockingClient, setBlockingClient] = useState(null); // { id, firstName, lastName } | null
   const [ptSearch, setPtSearch] = useState('');
   const [addingTier, setAddingTier] = useState(false);
@@ -3349,6 +3351,42 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, clients, setC
             planningNote: planningNote.trim() || null,
           }));
           toast('Règles de planning enregistrées.');
+        }} />
+      </View>
+
+      {/* ── Message groupé ── */}
+      <Section note="envoyez une notification à tous vos clients">Message groupé</Section>
+      <View style={s.card}>
+        <TextInput style={[s.input, { marginBottom: 10 }]}
+          value={msgTitle} onChangeText={setMsgTitle}
+          placeholder="Objet · ex. Nouveaux créneaux disponibles"
+          placeholderTextColor="#5A5852" />
+        <TextInput style={[s.input, { height: 90, textAlignVertical: 'top', paddingTop: 10 }]}
+          multiline value={msgBody} onChangeText={setMsgBody}
+          placeholder="Votre message personnalisé pour tous vos clients..."
+          placeholderTextColor="#5A5852" />
+        <Text style={[s.footnoteLeft, { marginTop: 10, marginBottom: 12 }]}>
+          {`Sera reçu par ${clients.filter((c) => !c.blocked).length} client${clients.filter((c) => !c.blocked).length > 1 ? 's' : ''} (clients non bloqués)`}
+        </Text>
+        <Btn label="ENVOYER À TOUS LES CLIENTS" onPress={() => {
+          const t = msgTitle.trim();
+          const b = msgBody.trim();
+          if (!t || !b) { toast('Renseignez un objet et un message.'); return; }
+          const barberName = enzo.name ? enzo.name.split(' ')[0] : 'Votre barber';
+          const newNotif = {
+            id: 'msg_' + Date.now(),
+            icon: 'message-square',
+            color: '#C8A96A',
+            unread: true,
+            title: t,
+            msg: `${barberName} : ${b}`,
+            time: 'À l'instant',
+          };
+          if (setNotifs) setNotifs((ns) => [newNotif, ...ns]);
+          setMsgTitle('');
+          setMsgBody('');
+          const n = clients.filter((c) => !c.blocked).length;
+          toast(`Message envoyé à ${n} client${n > 1 ? 's' : ''}.`);
         }} />
       </View>
 
@@ -3817,7 +3855,7 @@ function Main() {
     );
     else if (tab === 'fiche') content = (
       <FicheScreen barbers={barbers} setBarbers={setBarbers} products={products} setProducts={setProducts}
-        clients={clients} setClients={setClients}
+        clients={clients} setClients={setClients} setNotifs={setNotifs}
         onPreview={() => setBarberPreview(true)} toast={toast} />
     );
     else content = <ActivityScreen agenda={agenda} />;
