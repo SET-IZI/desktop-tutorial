@@ -10,6 +10,7 @@ import {
   Animated,
   Dimensions,
   Image,
+  Linking,
   Platform,
   ScrollView,
   StatusBar,
@@ -1211,6 +1212,9 @@ function ExploreScreen({ barbers, user, openBarber, favoriteBarber, onProCTA, to
                       <Feather name="map-pin" size={10} color={C.gold} />
                       <Text style={s.btags}>{b.salon} · {String(b.dist).replace('.', ',')} km</Text>
                     </View>
+                    {b.address ? (
+                      <Text style={[s.btags, { marginTop: 1, color: C.muted }]} numberOfLines={1}>{b.address}</Text>
+                    ) : null}
                     <View style={[s.row, { gap: 12, marginTop: 6 }]}>
                       <Badge status={b.delay} />
                       <Text style={s.rate}>★ {b.rating}</Text>
@@ -1345,10 +1349,14 @@ function BarberDetailScreen({ barber, services, products, favoriteBarber, onTogg
             <Text style={s.rate}>★ {barber.rating}</Text>
             <Badge status={barber.delay} />
           </View>
-          <View style={[s.row, { gap: 6, marginTop: 7 }]}>
+          <TouchableOpacity
+            style={[s.row, { gap: 6, marginTop: 7 }]}
+            onPress={() => Linking.openURL(`https://maps.apple.com/?q=${encodeURIComponent(barber.address)}`)}
+            hitSlop={6} activeOpacity={0.7}>
             <Feather name="map-pin" size={11} color={C.gold} />
-            <Text style={s.btags}>{barber.address} · {String(barber.dist).replace('.', ',')} km</Text>
-          </View>
+            <Text style={[s.btags, { textDecorationLine: 'underline', color: C.gold }]}>{barber.address}</Text>
+            <Text style={s.btags}>· {String(barber.dist).replace('.', ',')} km</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Onglets */}
