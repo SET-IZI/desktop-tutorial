@@ -176,23 +176,27 @@ function initFormulas() {
   return [
     {
       id: 'f1', name: 'Classique', icon: 'scissors', dur: 30, window: 'all',
-      fixed: null, recur: false, active: true,
-      desc: 'Prestation au choix, tarif dynamique selon l’horaire.',
+      price: 2500, surE: true, surN: true, surW: true, surU: true,
+      recur: false, active: true,
+      desc: 'Prestation standard — majorations soirée, nuit et week-end actives.',
     },
     {
       id: 'f2', name: 'Nocturne', icon: 'moon', dur: 45, window: 'night',
-      fixed: null, recur: false, active: true,
-      desc: 'Créneaux du soir uniquement — tarifs soirée et nuit appliqués.',
+      price: 3500, surE: false, surN: false, surW: false, surU: false,
+      recur: false, active: true,
+      desc: 'Séance nocturne — créneaux après 20 h, tarif tout compris.',
     },
     {
       id: 'f3', name: 'Transformation', icon: 'star', dur: 120, window: 'day',
-      fixed: 9000, recur: false, active: true,
+      price: 9000, surE: false, surN: false, surW: false, surU: false,
+      recur: false, active: true,
       desc: 'Refonte complète du style — 2 h, photos avant/après offertes.',
     },
     {
       id: 'f4', name: 'Hebdomadaire', icon: 'refresh-cw', dur: 30, window: 'all',
-      fixed: null, recur: true, active: false,
-      desc: 'Même créneau chaque semaine — fidélité récompensée : −15 %.',
+      price: 2100, surE: false, surN: false, surW: false, surU: false,
+      recur: true, active: false,
+      desc: 'Même créneau chaque semaine — fidélité récompensée.',
     },
   ];
 }
@@ -341,30 +345,18 @@ function initAgenda() {
   return agenda;
 }
 
-/* ───────── Tarification dynamique (PRD §4) ───────── */
-function computePrice(base, slotDate, now) {
-  let price = base;
+/* Tarification par formule — prix fixe + majorations optionnelles */
+function quoteFor(formula, _service, slotDate, now) {
+  let price = formula.price ?? 0;
   const rules = [];
   const h = slotDate.getHours();
-  if (h >= 22) { price = base + 2500; rules.push('Tarif nuit · après 22h'); }
-  else if (h >= 20) { price = base + 1000; rules.push('Tarif soirée · après 20h'); }
   const d = slotDate.getDay();
-  if (d === 0 || d === 6) { price = Math.round(price * 1.15); rules.push('Week-end +15 %'); }
-  if ((slotDate - now) / 60000 < 120 && slotDate > now) { price = Math.round(price * 1.2); rules.push('Urgence +20 %'); }
+  if (formula.surN && h >= 22) { price += 2500; rules.push('Majoration nuit après 22h'); }
+  else if (formula.surE && h >= 20) { price += 1000; rules.push('Majoration soirée après 20h'); }
+  if (formula.surW && (d === 0 || d === 6)) { price = Math.round(price * 1.15); rules.push('Week-end +15 %'); }
+  if (formula.surU && (slotDate - now) / 60000 < 120 && slotDate > now) { price = Math.round(price * 1.2); rules.push('Urgence +20 %'); }
+  if (formula.recur) { price = Math.round(price * 0.85); rules.push('Hebdo -15 %'); }
   return { price, rules };
-}
-function quoteFor(formula, service, slotDate, now) {
-  if (formula.fixed != null) {
-    return { price: formula.fixed, rules: [`Formule ${formula.name}`] };
-  }
-  const q = computePrice(service.price, slotDate, now);
-  if (formula.recur) {
-    q.price = Math.round(q.price * 0.85);
-    q.rules = [...q.rules, 'Formule hebdomadaire −15 %'];
-  } else if (formula.id !== 'f1') {
-    q.rules = [`Formule ${formula.name}`, ...q.rules];
-  }
-  return q;
 }
 const fmt = (c) =>
   (c / 100).toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + ' €';
@@ -1055,8 +1047,10 @@ const FADE_TAGS = ['Fade', 'Burst Fade', 'Taper'];
 function BigCard({ b, onPress }) {
   return (
     <TouchableOpacity style={s.bigCard} onPress={onPress} activeOpacity={0.85}>
-      <View style={[s.bigArt, { backgroundColor: TEX[b.tex] }]}>
-        <Text style={s.bigIni}>{b.ini}</Text>
+      <View style={[s.bigArt, { backgroundColor: b.coverColor || TEX[b.tex] }]}>
+        {b.coverImage
+          ? <Image source={{ uri: b.coverImage }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+          : <Text style={s.bigIni}>{b.ini}</Text>}
         <View style={s.bigVenue}>
           <Text style={s.bigVenueText}>{VENUES[b.venue]}</Text>
         </View>
@@ -1693,9 +1687,8 @@ function BookScreen({ agenda, formulas, services, booking, setBooking, dayIdx, s
       ? formulas.filter((f) => f.active && (f.id === 'f1' || f.id === 'f2'))
       : initFormulas().filter((f) => f.active);
   const formula = available.find((f) => f.id === booking.formula) || null;
-  const needService = formula && formula.fixed == null;
   const service = services.find((x) => x.id === booking.service);
-  const ready = formula && (!needService || service);
+  const ready = !!formula;
   const slots = ready ? openSlotsFor(agenda, dayIdx, booking.barber, formula.window) : [];
   const now = new Date();
 
@@ -1731,7 +1724,7 @@ function BookScreen({ agenda, formulas, services, booking, setBooking, dayIdx, s
               <View style={s.row}>
                 <Text style={[s.optText, s.grow]}>{f.name}</Text>
                 <Text style={s.formulaMeta}>
-                  {f.dur} min · {WINDOWS[f.window]}{f.fixed != null ? ` · ${fmt(f.fixed)}` : ''}{f.recur ? ' · −15 %' : ''}
+                  {f.dur} min · {WINDOWS[f.window]}{f.price != null ? ` · ${fmt(f.price)}` : ''}{f.recur ? ' · −15 %' : ''}
                 </Text>
               </View>
               <Text style={[s.btags, { marginTop: 3 }]}>{f.desc}</Text>
@@ -1739,18 +1732,6 @@ function BookScreen({ agenda, formulas, services, booking, setBooking, dayIdx, s
           </TouchableOpacity>
         );
       })}
-
-      {needService && (
-        <>
-          <Section>La prestation</Section>
-          <View style={s.wrap}>
-            {services.map((sv) => (
-              <Chip key={sv.id} label={sv.name} price={fmt(sv.price)} on={booking.service === sv.id}
-                onPress={() => setBooking({ ...booking, service: sv.id })} />
-            ))}
-          </View>
-        </>
-      )}
 
       {ready && (
         <>
@@ -1792,9 +1773,11 @@ function BookScreen({ agenda, formulas, services, booking, setBooking, dayIdx, s
                   </TouchableOpacity>
                 );
               })}
-              <Text style={s.footnote}>
-                Les prix évoluent selon l’horaire — soirée après 20 h, nuit après 22 h, week-end, urgence.
-              </Text>
+              {(formula.surE || formula.surN || formula.surW || formula.surU) && (
+                <Text style={s.footnote}>
+                  Les majorations actives sur cette formule s'appliquent selon l'horaire.
+                </Text>
+              )}
             </>
           )}
         </>
@@ -2533,82 +2516,107 @@ function SlotsScreen({ agenda, setAgenda, daycfg, setDaycfg, clients, setClients
         </>
       ) : (
         <>
-          <Lead>
-        Votre agenda, vos règles : choisissez une date sur le calendrier — jusqu’à deux mois à l’avance —
-        puis ouvrez, fermez ou posez des pauses. Touchez une case : fermé → ouvert → pause.
-      </Lead>
-      <Calendar sel={dayIdx} onSel={setDayIdx} markFor={(key) => {
-        const vals = Object.values(agenda.enzo[key] || {});
-        if (vals.some((v) => v.status === 'booked')) return 'booked';
-        if (vals.some((v) => v.status === 'open')) return 'open';
-        return null;
-      }} />
-      <Text style={[s.btags, { marginTop: 10 }]}>{DAYS[dayIdx].label}</Text>
-      <Text style={s.fieldLabel}>APPLIQUER SUR</Text>
-      <View style={[s.wrap, { marginBottom: 4 }]}>
-        {[1, 2, 3, 5, 7].map((n) => (
-          <Chip key={n} mini
-            label={n === 1 ? 'Ce jour' : n + ' jours'}
-            on={multiDay === n}
-            onPress={() => setMultiDay(n)} />
-        ))}
-      </View>
+          {/* ── En-tête du jour ── */}
+          <View style={[s.card, { borderColor: C.lineGold, marginBottom: 4 }]}>
+            <Text style={[s.bname, { fontSize: 15, marginBottom: 4 }]}>{DAYS[dayIdx].label}</Text>
+            <View style={[s.row, { gap: 14 }]}>
+              <View style={s.row}><View style={[s.dot, { backgroundColor: C.gold }]} /><Text style={s.legend}>{nOpen} ouvert{nOpen > 1 ? 's' : ''}</Text></View>
+              <View style={s.row}><View style={[s.dot, { backgroundColor: C.orange }]} /><Text style={s.legend}>{nPause} pause{nPause > 1 ? 's' : ''}</Text></View>
+              <View style={s.row}><View style={[s.dot, { backgroundColor: C.green }]} /><Text style={s.legend}>{nBooked} réservé{nBooked > 1 ? 's' : ''}</Text></View>
+            </View>
+          </View>
 
-      <Text style={s.fieldLabel}>DURÉE PAR CRÉNEAU — SELON VOTRE RYTHME</Text>
-      <View style={s.wrap}>
-        {STEP_CHOICES.map((v) => (
-          <Chip key={v} mini label={`${v} min`} on={step === v} onPress={() => changeStep(v)} />
-        ))}
-      </View>
+          {/* ── Réglages du jour ── */}
+          <Section>Réglages</Section>
+          <View style={s.card}>
+            <Text style={s.fieldLabel}>DURÉE D'UN CRÉNEAU</Text>
+            <View style={[s.wrap, { marginBottom: 12 }]}>
+              {STEP_CHOICES.map((v) => (
+                <Chip key={v} mini label={`${v} min`} on={step === v} onPress={() => changeStep(v)} />
+              ))}
+            </View>
+            <Text style={s.fieldLabel}>APPLIQUER LES ACTIONS SUR</Text>
+            <View style={s.wrap}>
+              {[1, 2, 3, 5, 7].map((n) => (
+                <Chip key={n} mini
+                  label={n === 1 ? 'Ce jour' : n + ' jours'}
+                  on={multiDay === n}
+                  onPress={() => setMultiDay(n)} />
+              ))}
+            </View>
+          </View>
 
-      <View style={[s.row, { marginTop: 16, marginBottom: 12, gap: 13, flexWrap: 'wrap' }]}>
-        <View style={s.row}><View style={[s.dot, { backgroundColor: '#3A3A40' }]} /><Text style={s.legend}>Fermé</Text></View>
-        <View style={s.row}><View style={[s.dot, { backgroundColor: C.gold }]} /><Text style={s.legend}>Ouvert</Text></View>
-        <View style={s.row}><View style={[s.dot, { backgroundColor: C.orange }]} /><Text style={s.legend}>Pause</Text></View>
-        <View style={s.row}><View style={[s.dot, { backgroundColor: C.green }]} /><Text style={s.legend}>Réservé</Text></View>
-      </View>
-      <Text style={[s.btags, { marginBottom: 12 }]}>
-        {nOpen} ouvert{nOpen > 1 ? 's' : ''} · {nPause} pause{nPause > 1 ? 's' : ''} · {nBooked} réservé{nBooked > 1 ? 's' : ''}
-      </Text>
+          {/* ── Plages horaires (action principale) ── */}
+          <Section note="appuyez pour ouvrir ces horaires">Ouvrir une plage</Section>
+          <View style={[s.wrap, { gap: 8 }]}>
+            {SCHEDULE_PRESETS.map((p) => (
+              <TouchableOpacity key={p.label}
+                style={[s.card, { marginBottom: 0, paddingVertical: 12, paddingHorizontal: 16,
+                  borderColor: C.lineGold, flexDirection: 'row', alignItems: 'center', gap: 10 }]}
+                onPress={() => bulk('Ouvert ' + p.label, (h) => h >= p.start && h < p.end, 'open')}
+                activeOpacity={0.8}>
+                <Feather name="clock" size={14} color={C.gold} />
+                <Text style={[s.bname, { fontSize: 13.5 }]}>{p.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
 
-      <View style={s.slotGrid}>
-        {allTimes.map((time) => {
-          const sl = slots[time];
-          const st = sl ? sl.status : 'closed';
-          return (
-            <TouchableOpacity
-              key={time}
-              style={[
-                s.slotCell,
-                st === 'open' && s.slotOpen,
-                st === 'pause' && s.slotPause,
-                st === 'booked' && s.slotBooked,
-              ]}
-              onPress={() => cycle(time)}
-              onLongPress={() => st === 'open' && openBookModal(time)}
-              activeOpacity={0.75}
-            >
-              <Text style={[s.slotCellTime, st === 'closed' && { color: '#5A5852' }, st === 'booked' && { color: C.ink }]}>
-                {time}
-              </Text>
-              {st === 'booked' ? (
-                <Text style={s.slotCellWho} numberOfLines={1}>{sl.who}</Text>
-              ) : (
-                <Text style={[
-                  s.slotCellState,
-                  st === 'open' && { color: C.gold },
-                  st === 'pause' && { color: C.orange },
-                ]}>
-                  {st === 'open' ? 'ouvert' : st === 'pause' ? 'pause' : 'fermé'}
-                </Text>
-              )}
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-      <Text style={[s.footnote, { marginTop: 4 }]}>
-        Appui long sur un créneau ouvert pour réserver directement pour un client.
-      </Text>
+          {/* ── Actions rapides ── */}
+          <Section>Actions rapides</Section>
+          <View style={[s.wrap, { gap: 8 }]}>
+            {[
+              ['sun', 'Tout ouvrir (9h–22h)', () => bulk('Tout ouvert.', (h) => h >= 9 && h < 22, 'open'), false],
+              ['moon', 'Soirée (20h–22h)', () => bulk('Soirée ouverte.', (h) => h >= 20, 'open'), false],
+              ['coffee', 'Pause déjeuner (12h–14h)', () => bulk('Pause déjeuner.', (h) => h >= 12 && h < 14, 'pause'), false],
+              ['x-circle', 'Tout fermer', () => bulk('Créneaux fermés.', () => true, null), true],
+            ].map(([icon, label, action, danger]) => (
+              <TouchableOpacity key={label}
+                style={[s.card, { marginBottom: 0, paddingVertical: 11, paddingHorizontal: 14,
+                  borderColor: danger ? 'rgba(200,80,80,0.3)' : C.line,
+                  flexDirection: 'row', alignItems: 'center', gap: 10 }]}
+                onPress={action} activeOpacity={0.8}>
+                <Feather name={icon} size={14} color={danger ? '#e05' : C.muted} />
+                <Text style={[s.softText, danger && { color: '#e05' }]}>{label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* ── Grille des créneaux ── */}
+          <Section note="touchez pour ouvrir · fermé · pause">Créneaux du jour</Section>
+          <View style={[s.row, { gap: 12, marginBottom: 10, flexWrap: 'wrap' }]}>
+            <View style={s.row}><View style={[s.dot, { backgroundColor: '#3A3A40' }]} /><Text style={s.legend}>Fermé</Text></View>
+            <View style={s.row}><View style={[s.dot, { backgroundColor: C.gold }]} /><Text style={s.legend}>Ouvert</Text></View>
+            <View style={s.row}><View style={[s.dot, { backgroundColor: C.orange }]} /><Text style={s.legend}>Pause</Text></View>
+            <View style={s.row}><View style={[s.dot, { backgroundColor: C.green }]} /><Text style={s.legend}>Réservé</Text></View>
+          </View>
+
+          <View style={s.slotGrid}>
+            {allTimes.map((time) => {
+              const sl = slots[time];
+              const st = sl ? sl.status : 'closed';
+              return (
+                <TouchableOpacity key={time}
+                  style={[s.slotCell, st === 'open' && s.slotOpen, st === 'pause' && s.slotPause, st === 'booked' && s.slotBooked]}
+                  onPress={() => cycle(time)}
+                  onLongPress={() => st === 'open' && openBookModal(time)}
+                  activeOpacity={0.75}>
+                  <Text style={[s.slotCellTime, st === 'closed' && { color: '#5A5852' }, st === 'booked' && { color: C.ink }]}>
+                    {time}
+                  </Text>
+                  {st === 'booked' ? (
+                    <Text style={s.slotCellWho} numberOfLines={1}>{sl.who}</Text>
+                  ) : (
+                    <Text style={[s.slotCellState, st === 'open' && { color: C.gold }, st === 'pause' && { color: C.orange }]}>
+                      {st === 'open' ? 'ouvert' : st === 'pause' ? 'pause' : 'fermé'}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          <Text style={[s.footnote, { marginTop: 6 }]}>
+            Appui long sur un créneau ouvert pour réserver manuellement un client.
+          </Text>
         </>
       )}
 
@@ -2741,17 +2749,27 @@ function PriceField({ cents, onChange }) {
 }
 
 function FormulasScreen({ formulas, setFormulas, services, setServices, toast }) {
-  const [creating, setCreating] = useState(false);
-  const [name, setName] = useState('');
-  const [dur, setDur] = useState(45);
-  const [windowSel, setWindowSel] = useState('all');
-  const [priceMode, setPriceMode] = useState('dyn');
-  const [priceTxt, setPriceTxt] = useState('');
-  const [recur, setRecur] = useState(false);
-  const [addingServ, setAddingServ] = useState(false);
-  const [svName, setSvName] = useState('');
-  const [svDur, setSvDur] = useState(30);
-  const [svPrice, setSvPrice] = useState('');
+  const [creating, setCreating] = React.useState(false);
+  const [name, setName] = React.useState('');
+  const [dur, setDur] = React.useState(45);
+  const [windowSel, setWindowSel] = React.useState('all');
+  const [priceTxt, setPriceTxt] = React.useState('');
+  const [surE, setSurE] = React.useState(false);
+  const [surN, setSurN] = React.useState(false);
+  const [surW, setSurW] = React.useState(false);
+  const [surU, setSurU] = React.useState(false);
+  const [recur, setRecur] = React.useState(false);
+  const [addingServ, setAddingServ] = React.useState(false);
+  const [svName, setSvName] = React.useState('');
+  const [svDur, setSvDur] = React.useState(30);
+  const [svPrice, setSvPrice] = React.useState('');
+
+  const SUR_LABELS = [
+    { key: 'surE', label: 'Soirée +10 €', sub: 'après 20h' },
+    { key: 'surN', label: 'Nuit +25 €', sub: 'après 22h' },
+    { key: 'surW', label: 'Week-end +15 %', sub: 'sam. & dim.' },
+    { key: 'surU', label: 'Urgence +20 %', sub: 'résa < 2h' },
+  ];
 
   const createService = () => {
     const label = svName.trim();
@@ -2760,59 +2778,42 @@ function FormulasScreen({ formulas, setFormulas, services, setServices, toast })
     if (isNaN(v) || v <= 0) { toast('Indiquez un prix valide.'); return; }
     setServices((ss) => [...ss, { id: 'sv' + Date.now(), name: label, dur: svDur, price: Math.round(v * 100) }]);
     setAddingServ(false); setSvName(''); setSvPrice(''); setSvDur(30);
-    toast(`Prestation « ${label} » créée — vos clients peuvent la réserver.`);
+    toast('Prestation créée.');
   };
 
   const removeService = (sv) => {
     setServices((ss) => ss.filter((x) => x.id !== sv.id));
-    toast(`Prestation « ${sv.name} » supprimée.`);
+    toast('Prestation supprimée.');
   };
 
   const toggleActive = (id) => {
     setFormulas((fs) => fs.map((f) => {
       if (f.id !== id) return f;
-      toast(f.active ? `Formule « ${f.name} » désactivée.` : `Formule « ${f.name} » visible par vos clients.`);
+      toast(f.active ? 'Formule désactivée.' : 'Formule visible par vos clients.');
       return { ...f, active: !f.active };
     }));
   };
 
+  const toggleSur = (fid, key) => {
+    setFormulas((fs) => fs.map((f) => f.id !== fid ? f : { ...f, [key]: !f[key] }));
+  };
+
   const create = () => {
     const label = name.trim();
-    if (!label) {
-      toast('Donnez un nom à votre formule.');
-      return;
-    }
-    let fixed = null;
-    if (priceMode === 'fixed') {
-      const v = parseFloat(priceTxt.replace(',', '.'));
-      if (isNaN(v) || v <= 0) {
-        toast('Indiquez un prix valide pour votre formule.');
-        return;
-      }
-      fixed = Math.round(v * 100);
-    }
-    setFormulas((fs) => [
-      ...fs,
-      {
-        id: 'f' + (fs.length + 1) + Date.now(),
-        name: label,
-        icon: recur ? 'refresh-cw' : ICON_FOR_WINDOW[windowSel],
-        dur,
-        window: windowSel,
-        fixed,
-        recur,
-        active: true,
-        desc: `${dur} min · ${WINDOWS[windowSel]}${recur ? ' · chaque semaine' : ''}${fixed == null ? ' · tarif dynamique' : ''}`,
-      },
-    ]);
+    if (!label) { toast('Donnez un nom à votre formule.'); return; }
+    const v = parseFloat(priceTxt.replace(',', '.'));
+    if (isNaN(v) || v <= 0) { toast('Indiquez un prix valide.'); return; }
+    const price = Math.round(v * 100);
+    setFormulas((fs) => [...fs, {
+      id: 'f' + (fs.length + 1) + Date.now(), name: label,
+      icon: recur ? 'refresh-cw' : ICON_FOR_WINDOW[windowSel],
+      dur, window: windowSel, price, surE, surN, surW, surU, recur, active: true,
+      desc: label + ' · ' + dur + ' min',
+    }]);
     setCreating(false);
-    setName('');
-    setDur(45);
-    setWindowSel('all');
-    setPriceMode('dyn');
-    setPriceTxt('');
-    setRecur(false);
-    toast(`Formule « ${label} » créée — vos clients peuvent la réserver.`);
+    setName(''); setDur(45); setWindowSel('all'); setPriceTxt('');
+    setSurE(false); setSurN(false); setSurW(false); setSurU(false); setRecur(false);
+    toast('Formule créée.');
   };
 
   return (
@@ -2820,10 +2821,10 @@ function FormulasScreen({ formulas, setFormulas, services, setServices, toast })
       <Kicker>ESPACE BARBER · ENZO MOREAU</Kicker>
       <Title em="formules">Mes </Title>
       <Lead>
-        Créez vos types de rendez-vous — nocturne, transformation, hebdomadaire… Vos clients réservent dans le cadre que vous fixez.
+        Définissez vos tarifs et vos types de rendez-vous. Chaque formule a son propre prix — les majorations sont optionnelles.
       </Lead>
 
-      <Section note="créez vos types de coupe, au prix que vous voulez">Mes tarifs</Section>
+      <Section note="vos prestations et leur tarif de base">Mes prestations</Section>
       {services.map((sv) => (
         <View key={sv.id} style={[s.card, s.row, { gap: 12 }]}>
           <View style={s.grow}>
@@ -2842,12 +2843,12 @@ function FormulasScreen({ formulas, setFormulas, services, setServices, toast })
       {addingServ ? (
         <View style={[s.card, { borderColor: C.lineGold }]}>
           <Text style={[s.bname, { marginBottom: 10 }]}>Nouvelle prestation</Text>
-          <Field label="NOM" placeholder="Ex. Dégradé américain, Locks, Défrisage…"
+          <Field label="NOM" placeholder="Dégradé américain, Locks…"
             value={svName} onChangeText={setSvName} />
           <Text style={s.fieldLabel}>DURÉE</Text>
           <View style={[s.wrap, { marginBottom: 4 }]}>
             {[20, 25, ...DUR_CHOICES].map((d) => (
-              <Chip key={d} mini label={`${d} min`} on={svDur === d} onPress={() => setSvDur(d)} />
+              <Chip key={d} mini label={d + ' min'} on={svDur === d} onPress={() => setSvDur(d)} />
             ))}
           </View>
           <Field label="PRIX (€)" placeholder="35" keyboardType="numeric"
@@ -2859,21 +2860,33 @@ function FormulasScreen({ formulas, setFormulas, services, setServices, toast })
         <Btn ghost icon="plus" label="NOUVELLE PRESTATION" onPress={() => setAddingServ(true)} />
       )}
 
-      <Section>Mes formules</Section>
+      <Section note="types de rendez-vous avec tarif propre">Mes formules</Section>
       {formulas.map((f) => (
         <View key={f.id} style={[s.card, !f.active && { opacity: 0.55 }]}>
-          <View style={s.row}>
-            <Feather name={f.icon} size={17} color={C.gold} />
+          <View style={[s.row, { gap: 12, alignItems: 'flex-start' }]}>
+            <Feather name={f.icon} size={17} color={C.gold} style={{ marginTop: 2 }} />
             <View style={s.grow}>
-              <View style={s.row}>
-                <Text style={[s.bname, s.grow, { fontSize: 14.5 }]}>{f.name}</Text>
-                <Text style={s.formulaMeta}>
-                  {f.dur} min · {WINDOWS[f.window]}{f.fixed != null ? ` · ${fmt(f.fixed)}` : ''}{f.recur ? ' · hebdo' : ''}
-                </Text>
-              </View>
-              <Text style={[s.btags, { marginTop: 3 }]}>{f.desc}</Text>
+              <Text style={[s.bname, { fontSize: 14.5 }]}>{f.name}</Text>
+              <Text style={[s.btags, { marginTop: 2 }]}>
+                {f.dur} min · {WINDOWS[f.window]}{f.recur ? ' · hebdo' : ''}
+              </Text>
             </View>
+            <PriceField cents={f.price ?? 0} onChange={(v) =>
+              setFormulas((fs) => fs.map((x) => x.id === f.id ? { ...x, price: v } : x))
+            } />
             <Toggle on={f.active} onPress={() => toggleActive(f.id)} />
+          </View>
+          <Text style={[s.fieldLabel, { marginTop: 12, marginBottom: 6 }]}>MAJORATIONS</Text>
+          <View style={[s.wrap, { gap: 6 }]}>
+            {SUR_LABELS.map(({ key, label, sub }) => (
+              <TouchableOpacity key={key}
+                style={[s.surChip, f[key] && s.surChipOn]}
+                onPress={() => toggleSur(f.id, key)}
+                activeOpacity={0.75}>
+                <Text style={[s.surChipTxt, f[key] && { color: C.ink }]}>{label}</Text>
+                <Text style={[s.surChipSub, f[key] && { color: C.ink }]}>{sub}</Text>
+              </TouchableOpacity>
+            ))}
           </View>
         </View>
       ))}
@@ -2892,7 +2905,7 @@ function FormulasScreen({ formulas, setFormulas, services, setServices, toast })
           <Text style={s.fieldLabel}>DURÉE</Text>
           <View style={s.wrap}>
             {DUR_CHOICES.map((d) => (
-              <Chip key={d} mini label={`${d} min`} on={dur === d} onPress={() => setDur(d)} />
+              <Chip key={d} mini label={d + ' min'} on={dur === d} onPress={() => setDur(d)} />
             ))}
           </View>
           <Text style={s.fieldLabel}>FENÊTRE HORAIRE</Text>
@@ -2901,28 +2914,38 @@ function FormulasScreen({ formulas, setFormulas, services, setServices, toast })
               <Chip key={k} mini label={l} on={windowSel === k} onPress={() => setWindowSel(k)} />
             ))}
           </View>
-          <Text style={s.fieldLabel}>TARIF</Text>
-          <View style={s.wrap}>
-            <Chip mini label="Tarif dynamique" on={priceMode === 'dyn'} onPress={() => setPriceMode('dyn')} />
-            <Chip mini label="Prix fixe" on={priceMode === 'fixed'} onPress={() => setPriceMode('fixed')} />
+          <Text style={s.fieldLabel}>PRIX DE BASE (€)</Text>
+          <View style={[s.row, { marginBottom: 12, gap: 8 }]}>
+            <TextInput
+              style={[s.input, { flex: 1, marginBottom: 0 }]}
+              keyboardType="numeric"
+              placeholder="Ex. 35"
+              placeholderTextColor="#5A5852"
+              value={priceTxt}
+              onChangeText={setPriceTxt}
+            />
+            <Text style={{ color: C.gold, fontFamily: SERIF, fontSize: 17, fontWeight: '700', alignSelf: 'center' }}>€</Text>
           </View>
-          {priceMode === 'fixed' && (
-            <View style={[s.row, { marginTop: 10 }]}>
-              <TextInput
-                style={[s.input, { flex: 1 }]}
-                keyboardType="numeric"
-                placeholder="Votre prix, ex. 50"
-                placeholderTextColor="#5A5852"
-                value={priceTxt}
-                onChangeText={setPriceTxt}
-              />
-              <Text style={{ color: C.gold, fontFamily: SERIF, fontSize: 17, fontWeight: '700' }}>€</Text>
-            </View>
-          )}
+          <Text style={s.fieldLabel}>MAJORATIONS OPTIONNELLES</Text>
+          <View style={[s.wrap, { gap: 6, marginBottom: 12 }]}>
+            {SUR_LABELS.map(({ key, label, sub }) => {
+              const stateMap = { surE, surN, surW, surU };
+              const setMap = { surE: setSurE, surN: setSurN, surW: setSurW, surU: setSurU };
+              return (
+                <TouchableOpacity key={key}
+                  style={[s.surChip, stateMap[key] && s.surChipOn]}
+                  onPress={() => setMap[key](!stateMap[key])}
+                  activeOpacity={0.75}>
+                  <Text style={[s.surChipTxt, stateMap[key] && { color: C.ink }]}>{label}</Text>
+                  <Text style={[s.surChipSub, stateMap[key] && { color: C.ink }]}>{sub}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
           <Text style={s.fieldLabel}>RÉCURRENCE</Text>
-          <View style={s.wrap}>
-            <Chip mini label="Ponctuel" on={!recur} onPress={() => setRecur(false)} />
-            <Chip mini label="Hebdomadaire (−15 %)" on={recur} onPress={() => setRecur(true)} />
+          <View style={[s.wrap, { marginBottom: 12 }]}>
+            <Chip mini label="Ponctuelle" on={!recur} onPress={() => setRecur(false)} />
+            <Chip mini label="Hebdomadaire (-15 %)" on={recur} onPress={() => setRecur(true)} />
           </View>
           <Btn label="CRÉER LA FORMULE" onPress={create} />
           <Btn ghost label="ANNULER" onPress={() => setCreating(false)} />
@@ -2931,7 +2954,7 @@ function FormulasScreen({ formulas, setFormulas, services, setServices, toast })
         <Btn ghost icon="plus" label="NOUVELLE FORMULE" onPress={() => setCreating(true)} />
       )}
       <Text style={s.footnote}>
-        Une formule désactivée disparaît immédiatement du parcours de réservation client.
+        Prix fixe par formule. Les majorations cochées s'ajoutent automatiquement selon l'horaire.
       </Text>
     </ScrollView>
   );
@@ -3961,10 +3984,7 @@ function Main() {
 
   const confirmBooking = (formula, service, slot, quote) => {
     const day = DAYS[clientDay];
-    const servLabel = formula.fixed != null
-      ? formula.name
-      : formula.id === 'f1' ? service.name : `${formula.name} · ${service.name}`;
-    setAgenda((a) => ({
+    const servLabel = formula.name;    setAgenda((a) => ({
       ...a,
       [slot.barber.id]: {
         ...a[slot.barber.id],
@@ -4210,9 +4230,9 @@ const s = StyleSheet.create({
   locInput: { flex: 1, color: C.text, fontSize: 12.5, padding: 0 },
 
   /* Cartes carrousel (Explorer) */
-  bigCard: { width: Math.floor(Math.min(SCREEN_W, 500) * 0.68), marginRight: 12 },
+  bigCard: { width: Math.floor(Math.min(SCREEN_W, 500) * 0.74), marginRight: 12 },
   bigArt: {
-    height: 230, borderRadius: 20, borderWidth: 1, borderColor: C.line,
+    height: 270, borderRadius: 20, borderWidth: 1, borderColor: C.line,
     alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
   },
   bigIni: { fontFamily: SERIF, fontSize: 52, fontWeight: '600', color: 'rgba(230,207,160,0.5)', marginTop: -44 },
@@ -4222,8 +4242,8 @@ const s = StyleSheet.create({
   },
   bigVenueText: { color: C.gold2, fontSize: 9, letterSpacing: 0.8 },
   bigShade: {
-    position: 'absolute', left: 0, right: 0, bottom: 0, height: 90,
-    backgroundColor: 'rgba(8,8,9,0.62)',
+    position: 'absolute', left: 0, right: 0, bottom: 0, height: 110,
+    backgroundColor: 'rgba(8,8,9,0.65)',
   },
   bigInfo: { position: 'absolute', left: 12, right: 12, bottom: 11 },
 
@@ -4442,6 +4462,15 @@ const s = StyleSheet.create({
     minWidth: 90,
   },
   priceInput: { color: C.text, fontSize: 14, padding: 0, minWidth: 50, textAlign: 'right' },
+  surChip: {
+    paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+    alignItems: 'center', minWidth: 80,
+  },
+  surChipOn: { backgroundColor: C.gold, borderColor: C.gold },
+  surChipTxt: { color: C.muted, fontSize: 11, fontWeight: '600' },
+  surChipSub: { color: C.gray, fontSize: 9, marginTop: 1 },
+
 
   /* Authentification & abonnement */
   authError: { color: C.red, fontSize: 12, marginTop: 12, lineHeight: 17 },
