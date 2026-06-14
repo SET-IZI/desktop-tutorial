@@ -555,48 +555,101 @@ const Toggle = ({ on, onPress }) => (
 
 /* ───────── Panel notifications (PRD §10) ───────── */
 function NotifPanel({ notifs, setNotifs, onClose }) {
+  const [filter, setFilter] = React.useState('all');
   const unreadCount = notifs.filter((n) => n.unread).length;
   const markAll = () => setNotifs((ns) => ns.map((n) => ({ ...n, unread: false })));
   const markOne = (id) => setNotifs((ns) => ns.map((n) => n.id === id ? { ...n, unread: false } : n));
+  const remove = (id) => setNotifs((ns) => ns.filter((n) => n.id !== id));
+  const clearAll = () => { setNotifs([]); };
+
+  const CATS = [
+    { k: 'all', label: 'Tout' },
+    { k: 'resa', label: 'Réservations' },
+    { k: 'alert', label: 'Alertes' },
+    { k: 'promo', label: 'Promos' },
+  ];
+  const catFor = (n) => {
+    if (['check-circle', 'calendar', 'clock'].includes(n.icon)) return 'resa';
+    if (['alert-circle', 'alert-triangle'].includes(n.icon)) return 'alert';
+    return 'promo';
+  };
+  const visible = filter === 'all' ? notifs : notifs.filter((n) => catFor(n) === filter);
 
   return (
     <View style={s.modalOverlay}>
       <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
       <View style={s.notifPanel}>
-        <View style={[s.row, { marginBottom: 18 }]}>
-          <Text style={[s.secText, s.grow]}>Notifications</Text>
-          {unreadCount > 0 && (
-            <TouchableOpacity onPress={markAll} hitSlop={8}>
-              <Text style={s.authLink}>Tout marquer lu</Text>
-            </TouchableOpacity>
-          )}
+        <View style={{ alignSelf: 'center', width: 40, height: 4, borderRadius: 2,
+          backgroundColor: 'rgba(255,255,255,0.15)', marginBottom: 20 }} />
+
+        <View style={[s.row, { marginBottom: 14, alignItems: 'center' }]}>
+          <View style={s.grow}>
+            <Text style={s.secText}>Notifications</Text>
+            {unreadCount > 0 && (
+              <Text style={[s.btags, { marginTop: 2 }]}>{unreadCount} non lue{unreadCount > 1 ? 's' : ''}</Text>
+            )}
+          </View>
+          <View style={[s.row, { gap: 16 }]}>
+            {unreadCount > 0 && (
+              <TouchableOpacity onPress={markAll} hitSlop={10}>
+                <Text style={[s.authLink, { fontSize: 12 }]}>Tout lire</Text>
+              </TouchableOpacity>
+            )}
+            {notifs.length > 0 && (
+              <TouchableOpacity onPress={clearAll} hitSlop={10}>
+                <Text style={[s.footnoteLeft, { color: C.muted, fontSize: 12 }]}>Effacer tout</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
-        <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 420 }}>
-          {notifs.map((n) => (
-            <TouchableOpacity key={n.id} style={[s.notifRow, n.unread && s.notifRowUnread]}
-              onPress={() => markOne(n.id)} activeOpacity={0.8}>
-              <View style={[s.notifIcon, { backgroundColor: `${n.color}22`, borderColor: `${n.color}44` }]}>
-                <Feather name={n.icon} size={16} color={n.color} />
+
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
+          <View style={[s.row, { gap: 7 }]}>
+            {CATS.map((c) => (
+              <TouchableOpacity key={c.k}
+                style={[s.chip, { paddingVertical: 5, paddingHorizontal: 12 },
+                  filter === c.k && { backgroundColor: C.gold, borderColor: C.gold }]}
+                onPress={() => setFilter(c.k)}>
+                <Text style={[s.chipText, filter === c.k && { color: '#000' }]}>{c.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </ScrollView>
+
+        <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 380 }}>
+          {visible.length === 0 ? (
+            <View style={{ alignItems: 'center', paddingVertical: 36 }}>
+              <Feather name="bell-off" size={26} color={C.muted} style={{ marginBottom: 10 }} />
+              <Text style={s.footnote}>Aucune notification</Text>
+            </View>
+          ) : (
+            visible.map((n) => (
+              <View key={n.id} style={[s.notifRow, n.unread && s.notifRowUnread]}>
+                <TouchableOpacity style={[s.row, { flex: 1, gap: 12 }]}
+                  onPress={() => markOne(n.id)} activeOpacity={0.8}>
+                  <View style={[s.notifIcon, { backgroundColor: n.color + '22', borderColor: n.color + '44' }]}>
+                    <Feather name={n.icon} size={16} color={n.color} />
+                  </View>
+                  <View style={s.grow}>
+                    <View style={[s.row, { marginBottom: 3 }]}>
+                      <Text style={[s.bname, { fontSize: 13, flex: 1 }]} numberOfLines={1}>{n.title}</Text>
+                      {n.unread && <View style={s.notifDot} />}
+                    </View>
+                    <Text style={[s.softText, { fontSize: 12, lineHeight: 17 }]} numberOfLines={2}>{n.msg}</Text>
+                    <Text style={[s.statL, { marginTop: 5, fontSize: 10 }]}>{n.time}</Text>
+                  </View>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => remove(n.id)} hitSlop={12} style={{ paddingLeft: 8, paddingTop: 4 }}>
+                  <Feather name="x" size={14} color={C.muted} />
+                </TouchableOpacity>
               </View>
-              <View style={s.grow}>
-                <View style={[s.row, { gap: 6, marginBottom: 3 }]}>
-                  <Text style={[s.bname, { fontSize: 13, flex: 1 }]} numberOfLines={1}>{n.title}</Text>
-                  {n.unread && <View style={s.notifDot} />}
-                </View>
-                <Text style={[s.softText, { lineHeight: 17 }]} numberOfLines={3}>{n.msg}</Text>
-                <Text style={[s.statL, { marginTop: 5 }]}>{n.time}</Text>
-              </View>
-            </TouchableOpacity>
-          ))}
-          {notifs.length === 0 && (
-            <Text style={s.footnote}>Aucune notification pour l’instant.</Text>
+            ))
           )}
         </ScrollView>
       </View>
     </View>
   );
 }
-
 /* ───────── Écran d’entrée ───────── */
 /* Logo barbr — fichier officiel (assets/logo.png, ratio ≈ 3,19:1) */
 const Logo = ({ size = 22 }) => (
