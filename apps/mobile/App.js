@@ -3186,7 +3186,7 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, clients, setC
           <View style={s.card}>
             <View style={[s.row, { marginBottom: 12 }]}>
               <Text style={[s.bname, { fontSize: 13, flex: 1 }]}>Points par client</Text>
-              <Text style={s.muted}>{clients.length} client{clients.length > 1 ? 's' : ''}</Text>
+              <Text style={s.btags}>{clients.length} client{clients.length > 1 ? 's' : ''}</Text>
             </View>
             <View style={[s.search, { marginBottom: 12 }]}>
               <Feather name="search" size={14} color={C.muted} />
