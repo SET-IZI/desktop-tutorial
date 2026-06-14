@@ -1606,6 +1606,127 @@ function openSlotsFor(agenda, dayIdx, barberId, window, fromH) {
   return out.sort((a, b) => a.time.localeCompare(b.time));
 }
 
+function BookBarberPicker({ bList, favoriteBarber, booking, setBooking }) {
+  const [bkQuery, setBkQuery] = React.useState('');
+  const [bkVenue, setBkVenue] = React.useState(null);
+  const [bkTag, setBkTag] = React.useState(null);
+
+  const q = bkQuery.trim().toLowerCase();
+  const sorted = [...bList].sort((a, b) => a.dist - b.dist);
+  const fav = sorted.find((b) => b.id === favoriteBarber) || null;
+  const isFiltering = q !== '' || bkVenue != null || bkTag != null;
+
+  const filtered = sorted.filter((b) => {
+    const hay = (b.name + ' ' + b.salon + ' ' + b.city + ' ' + b.tags.join(' ')).toLowerCase();
+    const matchQ = !q || hay.includes(q);
+    const matchV = !bkVenue || b.venue === bkVenue;
+    const matchT = !bkTag || b.tags.includes(bkTag);
+    return matchQ && matchV && matchT;
+  });
+
+  const VENUE_CHIPS = [['salon', 'En salon'], ['studio', 'Studio'], ['domicile', 'Domicile']];
+  const TAG_CHIPS = ['Fade', 'Burst Fade', 'Barbe', 'Transformation', 'Locks', 'Coloration'];
+
+  return (
+    <ScrollView style={s.screen} contentContainerStyle={s.screenPad} keyboardShouldPersistTaps="handled">
+      <Kicker>RENDEZ-VOUS</Kicker>
+      <Title em="qui">Avec </Title>
+
+      <View style={s.search}>
+        <Feather name="search" size={16} color={C.muted} />
+        <TextInput
+          style={s.searchInput}
+          placeholder="Barber, ville, style..."
+          placeholderTextColor="#5A5852"
+          value={bkQuery}
+          onChangeText={setBkQuery}
+        />
+        {bkQuery !== '' && (
+          <TouchableOpacity onPress={() => setBkQuery('')} hitSlop={8}>
+            <Feather name="x" size={15} color={C.muted} />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
+        <View style={[s.wrap, { flexWrap: 'nowrap', gap: 6 }]}>
+          {VENUE_CHIPS.map(([v, label]) => (
+            <Chip key={v} mini label={label} on={bkVenue === v}
+              onPress={() => setBkVenue(bkVenue === v ? null : v)} />
+          ))}
+          {TAG_CHIPS.map((t) => (
+            <Chip key={t} mini label={t} on={bkTag === t}
+              onPress={() => setBkTag(bkTag === t ? null : t)} />
+          ))}
+        </View>
+      </ScrollView>
+
+      {!isFiltering && fav && (
+        <>
+          <Section>Mon barber</Section>
+          <TouchableOpacity style={[s.card, { borderColor: C.lineGold }]}
+            onPress={() => setBooking({ ...booking, barber: fav.id, formula: null })} activeOpacity={0.85}>
+            <View style={s.row}>
+              <Ava b={fav} />
+              <View style={s.grow}>
+                <Text style={s.bname}>{fav.name}</Text>
+                <View style={[s.row, { gap: 5, marginTop: 2 }]}>
+                  <Feather name="map-pin" size={10} color={C.gold} />
+                  <Text style={s.btags}>{fav.salon} {String(fav.dist).replace('.', ',')} km</Text>
+                </View>
+                <View style={[s.row, { gap: 12, marginTop: 5 }]}>
+                  <Badge status={fav.delay} />
+                  <Text style={s.rate}>★ {fav.rating}</Text>
+                </View>
+              </View>
+              <View style={[s.tag, { alignSelf: 'flex-start', backgroundColor: 'rgba(200,169,106,0.15)', borderColor: C.gold }]}>
+                <Text style={[s.tagText, { color: C.gold }]}>MON BARBER</Text>
+              </View>
+            </View>
+            <View style={[s.wrap, { marginTop: 10, gap: 6 }]}>
+              {fav.tags.map((t) => <Tag key={t} label={t} />)}
+            </View>
+          </TouchableOpacity>
+        </>
+      )}
+
+      <Section note={isFiltering ? (filtered.length + ' artiste' + (filtered.length !== 1 ? 's' : '')) : 'du plus proche au plus loin'}>
+        {isFiltering ? 'Résultats' : 'Tous les artistes'}
+      </Section>
+
+      {filtered.length === 0 ? (
+        <Text style={s.footnote}>Aucun artiste ne correspond. Essayez un autre filtre.</Text>
+      ) : (
+        filtered.map((b) => (
+          <TouchableOpacity key={b.id}
+            style={[s.card, !isFiltering && b.id === favoriteBarber && { borderColor: C.lineGold }]}
+            onPress={() => setBooking({ ...booking, barber: b.id, formula: null })} activeOpacity={0.85}>
+            <View style={s.row}>
+              <Ava b={b} />
+              <View style={s.grow}>
+                <Text style={s.bname}>{b.name}</Text>
+                <View style={[s.row, { gap: 5, marginTop: 2 }]}>
+                  <Feather name="map-pin" size={10} color={C.gold} />
+                  <Text style={s.btags}>{b.salon} {String(b.dist).replace('.', ',')} km {b.city}</Text>
+                </View>
+                <View style={[s.row, { gap: 12, marginTop: 5 }]}>
+                  <Badge status={b.delay} />
+                  <Text style={s.rate}>★ {b.rating}</Text>
+                </View>
+              </View>
+              <Feather name="chevron-right" size={18} color={b.id === favoriteBarber ? C.gold : C.muted} />
+            </View>
+            <View style={[s.wrap, { marginTop: 10, gap: 6 }]}>
+              {b.tags.map((t) => <Tag key={t} label={t} />)}
+            </View>
+          </TouchableOpacity>
+        ))
+      )}
+    </ScrollView>
+  );
+}
+
+
 function BookScreen({ agenda, formulas, services, booking, setBooking, dayIdx, setDayIdx, onConfirm, barbers: allBarbers, favoriteBarber }) {
   if (booking.done) {
     const d = booking.done;
@@ -1645,56 +1766,11 @@ function BookScreen({ agenda, formulas, services, booking, setBooking, dayIdx, s
 
   const bList = allBarbers || BARBERS;
 
-  // Étape 1 : sélection du barber
+  // Etape 1 : selection du barber
   if (booking.barber === 'any') {
-    const fav = bList.find((b) => b.id === favoriteBarber) || null;
-    const others = bList.filter((b) => b.id !== favoriteBarber);
-    return (
-      <ScrollView style={s.screen} contentContainerStyle={s.screenPad}>
-        <Kicker>RENDEZ-VOUS</Kicker>
-        <Title em="qui">Avec </Title>
-        <Lead>Choisissez votre artiste pour voir ses créneaux disponibles.</Lead>
-        {fav && (
-          <>
-            <Section>Mon barber</Section>
-            <TouchableOpacity style={[s.card, { borderColor: C.lineGold }]}
-              onPress={() => setBooking({ ...booking, barber: fav.id, formula: null })} activeOpacity={0.85}>
-              <View style={s.row}>
-                <Ava b={fav} />
-                <View style={s.grow}>
-                  <Text style={s.bname}>{fav.name}</Text>
-                  <Text style={s.btags}>{fav.salon} · {String(fav.dist).replace('.', ',')} km</Text>
-                  <View style={[s.row, { gap: 10, marginTop: 5 }]}>
-                    <Badge status={fav.delay} />
-                    <Text style={s.rate}>★ {fav.rating}</Text>
-                  </View>
-                </View>
-                <Feather name="chevron-right" size={18} color={C.gold} />
-              </View>
-            </TouchableOpacity>
-          </>
-        )}
-        <Section>Tous les artistes</Section>
-        {others.map((b) => (
-          <TouchableOpacity key={b.id} style={s.card}
-            onPress={() => setBooking({ ...booking, barber: b.id, formula: null })} activeOpacity={0.85}>
-            <View style={s.row}>
-              <Ava b={b} />
-              <View style={s.grow}>
-                <Text style={s.bname}>{b.name}</Text>
-                <Text style={s.btags}>{b.salon} · {String(b.dist).replace('.', ',')} km</Text>
-                <View style={[s.row, { gap: 10, marginTop: 5 }]}>
-                  <Badge status={b.delay} />
-                  <Text style={s.rate}>★ {b.rating}</Text>
-                </View>
-              </View>
-              <Feather name="chevron-right" size={18} color={C.muted} />
-            </View>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-    );
+    return <BookBarberPicker bList={bList} favoriteBarber={favoriteBarber} booking={booking} setBooking={setBooking} />;
   }
+
 
   // Formules proposées : celles du barber choisi (toutes actives), génériques sinon
   const available = booking.barber === 'enzo'
