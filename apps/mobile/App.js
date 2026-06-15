@@ -4073,7 +4073,6 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, clients, setC
       </View>
     )}
     </>
-    </>
   );
 }
 
