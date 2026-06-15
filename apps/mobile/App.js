@@ -3361,6 +3361,7 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, clients, setC
   const [msgBody, setMsgBody] = useState('');
   const [blockingClient, setBlockingClient] = useState(null); // { id, firstName, lastName } | null
   const [ptSearch, setPtSearch] = useState('');
+  const [ficheTab, setFicheTab] = React.useState(null);
   const [addingTier, setAddingTier] = useState(false);
   const [tierPts, setTierPts] = useState('');
   const [tierLabel, setTierLabel] = useState('');
@@ -3459,15 +3460,50 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, clients, setC
 
   const curCover = enzo.coverColor || TEX[enzo.tex];
 
+  const FICHE_SECTIONS = [
+    { key: 'profil', icon: 'edit-3', title: 'Profil', desc: 'Fiche, photos, spécialités, réseaux' },
+    { key: 'planning', icon: 'calendar', title: 'Planning', desc: 'Règles, dépôt, délais' },
+    { key: 'clients', icon: 'users', title: 'Clients', desc: 'Fidélité, messages, blocages' },
+    { key: 'boutique', icon: 'shopping-bag', title: 'Boutique', desc: 'Produits et mode de vente' },
+  ];
+
   return (
     <>
-    <ScrollView style={s.screen} contentContainerStyle={s.screenPad} keyboardShouldPersistTaps="handled">
-      <Kicker>ESPACE BARBER · ENZO MOREAU</Kicker>
-      <Title em="fiche">Ma </Title>
-      <Lead>Modifiez votre fiche — les clients voient les changements en temps réel.</Lead>
+    {ficheTab === null ? (
+      <ScrollView style={s.screen} contentContainerStyle={s.screenPad}>
+        <Kicker>ESPACE BARBER</Kicker>
+        <Title>Paramètres</Title>
+        <Lead>Tout régler depuis un seul endroit.</Lead>
+        {FICHE_SECTIONS.map((sec) => (
+          <TouchableOpacity key={sec.key} style={s.card}
+            onPress={() => setFicheTab(sec.key)} activeOpacity={0.85}>
+            <View style={s.row}>
+              <View style={{ width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: C.lineGold, backgroundColor: 'rgba(200,169,106,0.08)', marginRight: 14, alignItems: 'center', justifyContent: 'center' }}>
+                <Feather name={sec.icon} size={18} color={C.gold} />
+              </View>
+              <View style={s.grow}>
+                <Text style={s.bname}>{sec.title}</Text>
+                <Text style={s.btags}>{sec.desc}</Text>
+              </View>
+              <Feather name="chevron-right" size={18} color={C.muted} />
+            </View>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    ) : (
+      <ScrollView style={s.screen} contentContainerStyle={s.screenPad} keyboardShouldPersistTaps="handled">
+        <TouchableOpacity onPress={() => setFicheTab(null)}
+          style={[s.row, { gap: 6, marginBottom: 18 }]} activeOpacity={0.7}>
+          <Feather name="chevron-left" size={16} color={C.gold} />
+          <Text style={[s.authLink, { fontSize: 13 }]}>Paramètres</Text>
+        </TouchableOpacity>
 
-      <Btn icon="eye" label="APERÇU — VUE CLIENT" onPress={onPreview} />
-
+        {ficheTab === 'profil' && (
+          <>
+            <Kicker>ESPACE BARBER · ENZO MOREAU</Kicker>
+            <Title em="fiche">Ma </Title>
+            <Lead>Modifiez votre fiche — les clients voient les changements en temps réel.</Lead>
+            <Btn icon="eye" label="APERÇU — VUE CLIENT" onPress={onPreview} />
       {/* ── Photo de couverture ── */}
       <Section>Photo de couverture</Section>
       {/* mini-hero preview */}
@@ -3666,7 +3702,14 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, clients, setC
         </View>
       </View>
       <Btn ghost label="ENREGISTRER LES CHIFFRES" onPress={saveStats} />
+          </>
+        )}
 
+        {ficheTab === 'planning' && (
+          <>
+            <Kicker>PLANNING</Kicker>
+            <Title>Règles</Title>
+            <Lead>Ces règles s’appliquent à toutes les réservations.</Lead>
       {/* ── Règles de planning ── */}
       <Section note="s'appliquent à toutes les réservations">Règles du planning</Section>
       <View style={s.card}>
@@ -3708,7 +3751,14 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, clients, setC
           toast('Règles de planning enregistrées.');
         }} />
       </View>
+          </>
+        )}
 
+        {ficheTab === 'clients' && (
+          <>
+            <Kicker>CLIENTS</Kicker>
+            <Title>Clients</Title>
+            <Lead>Gérez la fidélité, les messages et les blocages.</Lead>
       {/* ── Message groupé ── */}
       <Section note="envoyez une notification à tous vos clients">Message groupé</Section>
       <View style={s.card}>
@@ -3877,7 +3927,14 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, clients, setC
           </View>
         </>
       )}
+          </>
+        )}
 
+        {ficheTab === 'boutique' && (
+          <>
+            <Kicker>BOUTIQUE</Kicker>
+            <Title>Boutique</Title>
+            <Lead>Gérez vos produits et votre mode de vente.</Lead>
       {/* ── Boutique ── */}
       <Section note="désactivez-la si vous ne vendez pas de produits">Boutique — mes produits</Section>
       <View style={[s.card, s.row, { gap: 10 }]}>
@@ -3974,7 +4031,12 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, clients, setC
       )}
 
       <Text style={s.footnote}>Modifications visibles immédiatement côté client.</Text>
-    </ScrollView>
+          </>
+        )}
+
+        <Text style={s.footnote}>Modifications visibles immédiatement côté client.</Text>
+      </ScrollView>
+    )}
 
     {/* ── Modale blocage client ── */}
     {blockingClient && (
@@ -4010,6 +4072,7 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, clients, setC
         </View>
       </View>
     )}
+    </>
     </>
   );
 }
