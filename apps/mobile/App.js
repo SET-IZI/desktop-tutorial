@@ -1720,7 +1720,7 @@ function BookBarberPicker({ bList, favoriteBarber, booking, setBooking }) {
 }
 
 
-function BookScreen({ agenda, formulas, services, booking, setBooking, dayIdx, setDayIdx, onConfirm, barbers: allBarbers, favoriteBarber }) {
+function BookScreen({ agenda, formulas, services, booking, setBooking, dayIdx, setDayIdx, onConfirm, barbers: allBarbers, favoriteBarber, domicileEnabled }) {
   if (booking.done) {
     const d = booking.done;
     return (
@@ -1732,6 +1732,12 @@ function BookScreen({ agenda, formulas, services, booking, setBooking, dayIdx, s
           <Text style={[s.bname, { fontSize: 17 }]}>{d.serv}</Text>
           <Text style={[s.btags, { marginVertical: 6 }]}>{d.day} à {d.time} · avec {d.barber}</Text>
           {d.rules.length > 0 && <Text style={s.ruleText}>{d.rules.join('  +  ')}</Text>}
+          {d.address && (
+            <View style={[s.row, { marginTop: 8, gap: 6 }]}>
+              <Feather name="map-pin" size={13} color={C.gold} />
+              <Text style={[s.btags, { flex: 1 }]}>{d.address}</Text>
+            </View>
+          )}
           <Text style={[s.price, { fontSize: 24, marginTop: 8 }]}>{fmt(d.price)}</Text>
         </View>
         {d.recur && (
@@ -1752,16 +1758,53 @@ function BookScreen({ agenda, formulas, services, booking, setBooking, dayIdx, s
           </View>
         ))}
         <Btn ghost label="NOUVELLE RÉSERVATION"
-          onPress={() => setBooking({ barber: 'any', formula: null, service: null, done: null })} />
+          onPress={() => setBooking({ barber: 'any', formula: null, service: null, done: null, pendingSlot: null, address: '' })} />
       </ScrollView>
     );
   }
 
   const bList = allBarbers || BARBERS;
+  const selectedBarber = bList.find((b) => b.id === booking.barber);
+  const isHomecall = selectedBarber?.venue === 'domicile' || !!domicileEnabled;
 
   // Etape 1 : selection du barber
   if (booking.barber === 'any') {
     return <BookBarberPicker bList={bList} favoriteBarber={favoriteBarber} booking={booking} setBooking={setBooking} />;
+  }
+
+  if (booking.pendingSlot) {
+    const ps = booking.pendingSlot;
+    return (
+      <ScrollView style={s.screen} contentContainerStyle={s.screenPad} keyboardShouldPersistTaps="handled">
+        <Kicker>DOMICILE</Kicker>
+        <Title>Votre adresse</Title>
+        <Lead>Le barber se rend chez vous. Indiquez votre adresse pour qu'il puisse se préparer.</Lead>
+        <View style={[s.card, { borderColor: C.lineGold }]}>
+          <Text style={[s.bname, { fontSize: 17 }]}>{ps.formula.name}</Text>
+          <Text style={[s.btags, { marginVertical: 6 }]}>{DAYS[dayIdx].label} · {ps.slot.time} · {ps.slot.barber.name}</Text>
+          {ps.quote.rules.length > 0 && <Text style={s.ruleText}>{ps.quote.rules.join('  +  ')}</Text>}
+          <Text style={[s.price, { fontSize: 22, marginTop: 6 }]}>{fmt(ps.quote.price)}</Text>
+        </View>
+        <Section>Adresse d'intervention</Section>
+        <View style={[s.card, { paddingVertical: 12 }]}>
+          <Feather name="map-pin" size={14} color={C.gold} style={{ marginBottom: 8 }} />
+          <TextInput
+            style={[s.softText, { minHeight: 60, textAlignVertical: 'top', color: C.text, fontSize: 14 }]}
+            placeholder="Ex : 5 rue des Lilas, 59000 Lille"
+            placeholderTextColor={C.muted}
+            value={booking.address}
+            onChangeText={(v) => setBooking({ ...booking, address: v })}
+            multiline
+          />
+        </View>
+        <Btn label="CONFIRMER LE RDV"
+          onPress={() => onConfirm(ps.formula, ps.service, ps.slot, ps.quote, booking.address)} />
+        <TouchableOpacity style={{ marginTop: 14, alignItems: 'center' }}
+          onPress={() => setBooking({ ...booking, pendingSlot: null })} activeOpacity={0.7}>
+          <Text style={s.authLink}>Retour aux créneaux</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    );
   }
 
 
@@ -1848,7 +1891,7 @@ function BookScreen({ agenda, formulas, services, booking, setBooking, dayIdx, s
                 const q = quoteFor(formula, service, sl.date, now);
                 return (
                   <TouchableOpacity key={sl.barber.id + sl.time} style={[s.card, s.row]}
-                    onPress={() => onConfirm(formula, service, sl, q)} activeOpacity={0.8}>
+                    onPress={() => { if (isHomecall) { setBooking({ ...booking, pendingSlot: { formula, service, slot: sl, quote: q } }); } else { onConfirm(formula, service, sl, q); } }} activeOpacity={0.8}>
                     <Text style={s.slotTime}>{sl.time}</Text>
                     <View style={s.grow}>
                       <Text style={s.softText}>{sl.barber.name}</Text>
@@ -2308,7 +2351,7 @@ const INIT_CLIENTS = [
   { id: 'c5', firstName: 'Noah', lastName: 'Petit', phone: '07 98 76 54 32', notes: 'Coupe enfant', loyaltyPts: 0, blocked: false },
 ];
 
-function SlotsScreen({ agenda, setAgenda, daycfg, setDaycfg, endHour, setEndHour, clients, setClients, services, dayIdx, setDayIdx, toast }) {
+function SlotsScreen({ agenda, setAgenda, daycfg, setDaycfg, endHour, setEndHour, domicileEnabled, setDomicileEnabled, clients, setClients, services, dayIdx, setDayIdx, toast }) {
   const day = DAYS[dayIdx];
   const step = daycfg[day.key] || 30;
   const slots = agenda.enzo[day.key] || {};
@@ -2334,7 +2377,7 @@ function SlotsScreen({ agenda, setAgenda, daycfg, setDaycfg, endHour, setEndHour
     if (!sl || sl.status !== 'booked') return;
     Alert.alert(
       `Annuler le RDV de ${sl.who} ?`,
-      `${sl.serv} · ${time} · ${fmt(sl.price)}`,
+      `${sl.serv} · ${time} · ${fmt(sl.price)}${sl.address ? '\n' + sl.address : ''}`,
       [
         { text: 'Garder', style: 'cancel' },
         {
@@ -2637,6 +2680,11 @@ function SlotsScreen({ agenda, setAgenda, daycfg, setDaycfg, endHour, setEndHour
                   on={(endHour ?? 23) === h} onPress={() => setEndHour(h)} />
               ))}
             </View>
+            <View style={[s.row, { marginTop: 14 }]}>
+              <Text style={[s.fieldLabel, { flex: 1, marginTop: 0 }]}>MODE DOMICILE</Text>
+              <Chip mini label={domicileEnabled ? 'Actif' : 'Inactif'} on={domicileEnabled}
+                onPress={() => setDomicileEnabled(!domicileEnabled)} />
+            </View>
           </View>
 
           {/* ── Plages horaires (action principale) ── */}
@@ -2675,6 +2723,12 @@ function SlotsScreen({ agenda, setAgenda, daycfg, setDaycfg, endHour, setEndHour
           </View>
 
           {/* ── Grille des créneaux ── */}
+          {domicileEnabled && (
+            <View style={[s.card, { borderColor: C.lineGold, flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 4 }]}>
+              <Feather name="home" size={14} color={C.gold} style={{ marginTop: 2 }} />
+              <Text style={[s.softText, { flex: 1, lineHeight: 18 }]}>Mode domicile actif — les clients saisiront leur adresse lors de la prise de RDV.</Text>
+            </View>
+          )}
           <Section note="touchez pour ouvrir · fermé · pause">Créneaux du jour</Section>
           <View style={[s.row, { gap: 12, marginBottom: 10, flexWrap: 'wrap' }]}>
             <View style={s.row}><View style={[s.dot, { backgroundColor: '#3A3A40' }]} /><Text style={s.legend}>Fermé</Text></View>
@@ -3995,10 +4049,11 @@ function Main() {
   const [barberDetail, setBarberDetail] = useState(null);
   const [agenda, setAgenda] = useState(initAgenda);
   const [daycfg, setDaycfg] = useState({});
-  const [endHour, setEndHour] = useState(23); // durée des créneaux par jour (Enzo)
+  const [endHour, setEndHour] = useState(23);
+  const [domicileEnabled, setDomicileEnabled] = useState(false); // durée des créneaux par jour (Enzo)
   const [formulas, setFormulas] = useState(initFormulas);
   const [services, setServices] = useState(() => [...SERVICES]);
-  const [booking, setBooking] = useState({ barber: 'any', formula: null, service: null, done: null });
+  const [booking, setBooking] = useState({ barber: 'any', formula: null, service: null, done: null, pendingSlot: null, address: '' });
   const [clientDay, setClientDay] = useState(0);
   const [barberDay, setBarberDay] = useState(0);
   const [cat, setCat] = useState('ALL');
@@ -4063,7 +4118,7 @@ function Main() {
     setBarberDetail(null);
   };
 
-  const confirmBooking = (formula, service, slot, quote) => {
+  const confirmBooking = (formula, service, slot, quote, address) => {
     const day = DAYS[clientDay];
     const servLabel = formula.name;    setAgenda((a) => ({
       ...a,
@@ -4071,7 +4126,7 @@ function Main() {
         ...a[slot.barber.id],
         [day.key]: {
           ...a[slot.barber.id][day.key],
-          [slot.time]: { status: 'booked', who: user ? `${user.firstName} ${user.lastName[0]}.` : 'Client', serv: servLabel, price: quote.price, done: false },
+          [slot.time]: { status: 'booked', who: user ? `${user.firstName} ${user.lastName[0]}.` : 'Client', serv: servLabel, price: quote.price, done: false, address: address || null },
         },
       },
     }));
@@ -4080,7 +4135,7 @@ function Main() {
       ...booking,
       done: {
         serv: servLabel, time: slot.time, day: day.label, barber: slot.barber.name,
-        price: quote.price, rules: quote.rules, recur: formula.recur, loyalty: hasLoyalty,
+        price: quote.price, rules: quote.rules, recur: formula.recur, loyalty: hasLoyalty, address: address || null,
       },
     });
     if (hasLoyalty) {
@@ -4131,14 +4186,14 @@ function Main() {
     else if (tab === 'book') content = (
       <BookScreen agenda={agenda} formulas={formulas} services={services} booking={booking} setBooking={setBooking}
         dayIdx={clientDay} setDayIdx={setClientDay} onConfirm={confirmBooking}
-        barbers={barbersLive} favoriteBarber={favoriteBarber} />
+        barbers={barbersLive} favoriteBarber={favoriteBarber} domicileEnabled={domicileEnabled} />
     );
     else if (tab === 'cuts') content = <CutsScreen history={history} setHistory={setHistory} setBarbers={setBarbers} user={user} toast={toast} />;
     else if (tab === 'shop' && shopOn) content = <ShopScreen products={products} cat={cat} setCat={setCat} cart={cart} addCart={addCart} shopMode={barbers.find((b) => b.id === 'enzo')?.shopMode || 'vitrine'} toast={toast} />;
     else content = <MeScreen user={user} points={points} setPoints={setPoints} barbers={barbers} upcoming={upcoming} favoriteBarber={favoriteBarber} onLogout={logout} toast={toast} />;
   } else if (role === 'barber') {
     if (tab === 'slots') content = (
-      <SlotsScreen agenda={agenda} setAgenda={setAgenda} daycfg={daycfg} setDaycfg={setDaycfg} endHour={endHour} setEndHour={setEndHour}
+      <SlotsScreen agenda={agenda} setAgenda={setAgenda} daycfg={daycfg} setDaycfg={setDaycfg} endHour={endHour} setEndHour={setEndHour} domicileEnabled={domicileEnabled} setDomicileEnabled={setDomicileEnabled}
         clients={clients} setClients={setClients}
         services={services}
         dayIdx={barberDay} setDayIdx={setBarberDay} toast={toast} />
