@@ -1,11 +1,4 @@
-// barbr — applic
-          <View style={s.row}>
-            <Text style={[s.fieldLabel, { flex: 1, marginTop: 0 }]}>FIN DE JOURNÉE</Text>
-            {[22, 23, 24, 25].map((h) => (
-              <Chip key={h} mini label={h >= 24 ? String(h - 24).padStart(2,'0') + 'h' : h + 'h'}
-                on={(endHour ?? 23) === h} onPress={() => setEndHour(h)} />
-            ))}
-          </View>ation mobile (démo autonome, sans serveur)
+// barbr — application mobile (démo autonome, sans serveur)
 // Deux interfaces reliées par un agenda partagé :
 //  · Client : recherche par position & style, réservation dans les créneaux ouverts
 //  · Barber : ouverture des créneaux, formules de rendez-vous, planning, statut, activité
@@ -2635,6 +2628,13 @@ function SlotsScreen({ agenda, setAgenda, daycfg, setDaycfg, endHour, setEndHour
                   label={n === 1 ? 'Ce jour' : n + ' jours'}
                   on={multiDay === n}
                   onPress={() => setMultiDay(n)} />
+              ))}
+            </View>
+            <View style={[s.row, { marginTop: 14 }]}>
+              <Text style={[s.fieldLabel, { flex: 1, marginTop: 0 }]}>FIN DE JOURNÉE</Text>
+              {[22, 23, 24, 25].map((h) => (
+                <Chip key={h} mini label={h >= 24 ? String(h - 24).padStart(2,'0') + 'h' : h + 'h'}
+                  on={(endHour ?? 23) === h} onPress={() => setEndHour(h)} />
               ))}
             </View>
           </View>
