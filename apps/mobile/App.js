@@ -636,13 +636,18 @@ function NotifPanel({ notifs, setNotifs, onClose }) {
   );
 }
 /* ───────── Écran d’entrée ───────── */
-/* Logo barbr — fichier officiel (assets/logo.png, ratio ≈ 3,19:1) */
+/* Logo barbr — wordmark autonome (aucun asset requis) */
 const Logo = ({ size = 22 }) => (
-  <Image
-    source={require('./assets/logo.png')}
-    style={{ height: size * 1.35, width: size * 1.35 * 3.19 }}
-    resizeMode="contain"
-  />
+  <Text
+    style={{
+      fontFamily: SERIF,
+      fontSize: size * 1.15,
+      fontWeight: '600',
+      color: C.text,
+      letterSpacing: size * 0.04,
+    }}>
+    barb<Text style={{ color: C.gold }}>r</Text>
+  </Text>
 );
 
 /* ───────── Écran d'ouverture animé ───────── */
