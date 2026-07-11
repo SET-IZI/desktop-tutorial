@@ -1725,7 +1725,7 @@ function BookBarberPicker({ bList, favoriteBarber, booking, setBooking }) {
 }
 
 
-function BookScreen({ agenda, formulas, services, booking, setBooking, dayIdx, setDayIdx, onConfirm, barbers: allBarbers, favoriteBarber, homeFee }) {
+function BookScreen({ agenda, formulas, services, booking, setBooking, dayIdx, setDayIdx, onConfirm, barbers: allBarbers, favoriteBarber, homeFee, waitlist, onWaitlist, toast }) {
   if (booking.done) {
     const d = booking.done;
     return (
@@ -1762,6 +1762,7 @@ function BookScreen({ agenda, formulas, services, booking, setBooking, dayIdx, s
             <Text style={[s.softText, s.grow]}>{txt}</Text>
           </View>
         ))}
+        <Btn ghost icon="calendar" label="AJOUTER AU CALENDRIER" onPress={() => toast && toast('RDV ajouté à votre calendrier.')} />
         <Btn ghost label="NOUVELLE RÉSERVATION"
           onPress={() => setBooking({ barber: 'any', formula: null, service: null, done: null, pendingSlot: null, address: '' })} />
       </ScrollView>
@@ -1824,6 +1825,7 @@ function BookScreen({ agenda, formulas, services, booking, setBooking, dayIdx, s
   const ready = !!formula;
   const slots = ready ? openSlotsFor(agenda, dayIdx, booking.barber, formula.window, formula.fromH) : [];
   const now = new Date();
+  const waitlisted = (waitlist || []).some((e) => e.dayKey === DAYS[dayIdx].key);
 
   return (
     <ScrollView style={s.screen} contentContainerStyle={s.screenPad}>
@@ -1884,12 +1886,17 @@ function BookScreen({ agenda, formulas, services, booking, setBooking, dayIdx, s
             Le créneau
           </Section>
           {slots.length === 0 ? (
+            <>
             <Text style={s.footnote}>
               Aucun créneau ouvert ce jour pour cette formule.{'\n'}
               {formula.window === 'night'
                 ? 'La formule Nocturne ne propose que les créneaux après 20 h.'
                 : 'Essayez un autre jour ou un autre artiste.'}
             </Text>
+            <Btn ghost icon="bell"
+              label={waitlisted ? 'INSCRIT — VOUS SEREZ NOTIFIÉ' : 'ME NOTIFIER SI UN CRÉNEAU SE LIBÈRE'}
+              onPress={() => { if (!waitlisted && onWaitlist) onWaitlist(dayIdx, formula); }} />
+            </>
           ) : (
             <>
               {slots.map((sl) => {
@@ -1928,7 +1935,7 @@ function BookScreen({ agenda, formulas, services, booking, setBooking, dayIdx, s
   );
 }
 
-function CutsScreen({ history, setHistory, setBarbers, user, toast }) {
+function CutsScreen({ history, setHistory, setBarbers, user, onRebook, toast }) {
   const [pendingRate, setPendingRate] = useState(null); // { id, n }
   const [comment, setComment] = useState('');
   const [viewer, setViewer] = useState(null);
@@ -2010,6 +2017,7 @@ function CutsScreen({ history, setHistory, setBarbers, user, toast }) {
             <Chip mini label="Télécharger" onPress={() => savePhotos(h.photos, toast)} />
             <Chip mini label="Partager" onPress={() => toast('Lien de partage copié.')} />
             <Chip mini label="Montrer" onPress={() => toast('À montrer à votre prochain barber.')} />
+            {h.barberId && onRebook ? <Chip mini label="Reprendre RDV" onPress={() => onRebook(h.barberId)} /> : null}
           </View>
         </View>
       ))}
@@ -2062,7 +2070,7 @@ function ShopScreen({ products, cat, setCat, cart, addCart, shopMode, toast }) {
   );
 }
 
-function MeScreen({ user, points, setPoints, barbers, upcoming, favoriteBarber, onLogout, toast }) {
+function MeScreen({ user, points, setPoints, barbers, upcoming, waitlist, onCancelRdv, onMoveRdv, canCancel, onRemoveWaitlist, favoriteBarber, onLogout, toast }) {
   const [confirmRedeem, setConfirmRedeem] = React.useState(null);
   const [notifSms, setNotifSms] = React.useState(true);
   const [notifEmail, setNotifEmail] = React.useState(true);
@@ -2071,6 +2079,8 @@ function MeScreen({ user, points, setPoints, barbers, upcoming, favoriteBarber, 
   const [editingPhone, setEditingPhone] = React.useState(false);
   const [voucher, setVoucher] = React.useState(null);
   const [legalOpenMe, setLegalOpenMe] = React.useState(null);
+  const [refInput, setRefInput] = React.useState('');
+  const [refUsed, setRefUsed] = React.useState(false);
   const loyaltyBarbers = barbers.filter((b) => b.loyalty);
 
   const doRedeem = (b, t) => {
@@ -2206,18 +2216,72 @@ function MeScreen({ user, points, setPoints, barbers, upcoming, favoriteBarber, 
         </Text>
       ) : (
         upcoming.map((u, i) => (
-          <View key={i} style={[s.card, s.row]}>
-            <Feather name={u.recur ? 'refresh-cw' : 'calendar'} size={18} color={C.gold} />
-            <View style={s.grow}>
-              <Text style={[s.bname, { fontSize: 13.5 }]}>{u.serv} · {u.day} {u.time}</Text>
-              <Text style={[s.btags, { marginTop: 2 }]}>
-                avec {u.barber}{u.recur ? ' · chaque semaine' : ''}
-              </Text>
+          <View key={u.id || i} style={s.card}>
+            <View style={s.row}>
+              <Feather name={u.recur ? 'refresh-cw' : 'calendar'} size={18} color={C.gold} />
+              <View style={s.grow}>
+                <Text style={[s.bname, { fontSize: 13.5 }]}>{u.serv} · {u.day} {u.time}</Text>
+                <Text style={[s.btags, { marginTop: 2 }]}>
+                  avec {u.barber}{u.recur ? ' · chaque semaine' : ''}
+                </Text>
+              </View>
+              <Text style={[s.price, { fontSize: 15 }]}>{fmt(u.price)}</Text>
             </View>
-            <Text style={[s.price, { fontSize: 15 }]}>{fmt(u.price)}</Text>
+            <View style={[s.wrap, { marginTop: 10, gap: 6 }]}>
+              <Chip mini label="Déplacer" onPress={() => onMoveRdv && onMoveRdv(u)} />
+              <Chip mini label="Annuler" onPress={() => {
+                if (canCancel && !canCancel(u)) { toast('Trop tard pour annuler — contactez votre barber.'); return; }
+                onCancelRdv && onCancelRdv(u);
+              }} />
+              <Chip mini label="Calendrier" onPress={() => toast('RDV ajouté à votre calendrier.')} />
+            </View>
           </View>
         ))
       )}
+      {waitlist && waitlist.length > 0 && (
+        <>
+          <Section note="vous serez notifié si un créneau se libère">Liste d'attente</Section>
+          {waitlist.map((w) => (
+            <View key={w.id} style={[s.card, s.row]}>
+              <Feather name="bell" size={16} color={C.gold} />
+              <View style={s.grow}>
+                <Text style={[s.bname, { fontSize: 13 }]}>{w.dayLabel}</Text>
+                <Text style={s.btags}>{w.formulaName}</Text>
+              </View>
+              <TouchableOpacity onPress={() => onRemoveWaitlist && onRemoveWaitlist(w.id)} hitSlop={8}>
+                <Feather name="x" size={16} color={C.muted} />
+              </TouchableOpacity>
+            </View>
+          ))}
+        </>
+      )}
+      <Section note="10 pts offerts à vous et votre filleul">Parrainage</Section>
+      <View style={s.card}>
+        <Text style={s.fieldLabel}>VOTRE CODE</Text>
+        <View style={[s.row, { marginTop: 6 }]}>
+          <Text style={[s.bname, { fontSize: 16, letterSpacing: 2, flex: 1 }]}>BARBR-{(user?.firstName || 'CLIENT').toUpperCase()}</Text>
+          <Chip mini label="Copier" onPress={() => toast('Code copié — partagez-le !')} />
+        </View>
+        {!refUsed ? (
+          <>
+            <Text style={[s.fieldLabel, { marginTop: 12 }]}>CODE D'UN AMI</Text>
+            <View style={[s.row, { gap: 8, marginTop: 6 }]}>
+              <TextInput style={[s.input, { flex: 1, marginBottom: 0 }]} value={refInput} onChangeText={setRefInput}
+                placeholder="BARBR-..." placeholderTextColor="#5A5852" autoCapitalize="characters" />
+              <Chip mini label="Valider" onPress={() => {
+                if (!refInput.trim().toUpperCase().startsWith('BARBR-')) { toast('Code invalide.'); return; }
+                const target = favoriteBarber || 'enzo';
+                setPoints((p) => ({ ...p, [target]: (p[target] || 0) + 10 }));
+                setRefUsed(true); setRefInput('');
+                toast('+10 points fidélité — merci du parrainage !');
+              }} />
+            </View>
+          </>
+        ) : (
+          <Text style={[s.footnoteLeft, { marginTop: 10, color: C.green }]}>Code parrain utilisé — +10 pts crédités.</Text>
+        )}
+      </View>
+
       <Section>Rappels & notifications</Section>
       <View style={s.card}>
         {[
@@ -2365,7 +2429,7 @@ const INIT_CLIENTS = [
   { id: 'c5', firstName: 'Noah', lastName: 'Petit', phone: '07 98 76 54 32', notes: 'Coupe enfant', loyaltyPts: 0, blocked: false },
 ];
 
-function SlotsScreen({ agenda, setAgenda, daycfg, setDaycfg, endHour, setEndHour, homeFee, setHomeFee, clients, setClients, services, dayIdx, setDayIdx, toast }) {
+function SlotsScreen({ agenda, setAgenda, daycfg, setDaycfg, endHour, setEndHour, homeFee, setHomeFee, clients, setClients, services, dayIdx, setDayIdx, onFreeSlot, toast }) {
   const day = DAYS[dayIdx];
   const step = daycfg[day.key] || 30;
   const slots = agenda.enzo[day.key] || {};
@@ -2398,6 +2462,7 @@ function SlotsScreen({ agenda, setAgenda, daycfg, setDaycfg, endHour, setEndHour
           text: 'Annuler le rendez-vous', style: 'destructive',
           onPress: () => {
             update((d) => { d[time] = { status: 'open' }; });
+            if (onFreeSlot) onFreeSlot(day.key, time);
             toast(`RDV ${time} annulé — créneau remis en ouvert.`);
           },
         },
@@ -2561,6 +2626,46 @@ function SlotsScreen({ agenda, setAgenda, daycfg, setDaycfg, endHour, setEndHour
     });
     const suffix = multiDay > 1 ? ' (' + multiDay + ' jours)' : '';
     toast(label + suffix);
+  };
+
+  // ── Vacances : ferme tout à partir du jour sélectionné, garde les RDV ──
+  const vacation = (n) => {
+    let kept = 0;
+    for (let i = 0; i < n; i++) {
+      const dIdx = dayIdx + i;
+      if (dIdx >= DAYS.length) break;
+      Object.values(agenda.enzo[DAYS[dIdx].key] || {}).forEach((sl) => {
+        if (sl.status === 'booked') kept++;
+      });
+    }
+    setAgenda((a) => {
+      const newEnzo = { ...a.enzo };
+      for (let i = 0; i < n; i++) {
+        const dIdx = dayIdx + i;
+        if (dIdx >= DAYS.length) break;
+        const dKey = DAYS[dIdx].key;
+        const copy = {};
+        Object.entries(newEnzo[dKey] || {}).forEach(([t, sl]) => {
+          if (sl.status === 'booked') copy[t] = sl;
+        });
+        newEnzo[dKey] = copy;
+      }
+      return { ...a, enzo: newEnzo };
+    });
+    toast(kept > 0
+      ? `Vacances — ${n} jours fermés. ${kept} RDV conservé(s) : gérez-les depuis le Planning.`
+      : `Vacances — ${n} jours fermés à partir de ${day.label}.`);
+  };
+
+  const askVacation = (n) => {
+    Alert.alert(
+      `Fermer ${n} jours ?`,
+      `Tous les créneaux ouverts à partir de ${day.label} seront fermés pendant ${n} jours. Les RDV déjà pris sont conservés.`,
+      [
+        { text: 'Garder', style: 'cancel' },
+        { text: 'Fermer', style: 'destructive', onPress: () => vacation(n) },
+      ]
+    );
   };
 
   return (
@@ -2745,6 +2850,20 @@ function SlotsScreen({ agenda, setAgenda, daycfg, setDaycfg, endHour, setEndHour
                 onPress={action} activeOpacity={0.8}>
                 <Feather name={icon} size={14} color={danger ? '#e05' : C.muted} />
                 <Text style={[s.softText, danger && { color: '#e05' }]}>{label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* ── Vacances ── */}
+          <Section note="ferme tout à partir du jour sélectionné — les RDV existants sont conservés">Vacances</Section>
+          <View style={[s.wrap, { gap: 8 }]}>
+            {[7, 14, 30].map((n) => (
+              <TouchableOpacity key={n}
+                style={[s.card, { marginBottom: 0, paddingVertical: 12, paddingHorizontal: 16,
+                  flexDirection: 'row', alignItems: 'center', gap: 10 }]}
+                onPress={() => askVacation(n)} activeOpacity={0.8}>
+                <Feather name="sun" size={14} color={C.orange} />
+                <Text style={[s.bname, { fontSize: 13.5 }]}>{n} jours</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -3121,7 +3240,7 @@ function FormulasScreen({ formulas, setFormulas, services, setServices, toast })
   );
 }
 
-function PlanningScreen({ agenda, setAgenda, dayIdx, setDayIdx, delay, setHistory, toast }) {
+function PlanningScreen({ agenda, setAgenda, dayIdx, setDayIdx, delay, setHistory, setClients, onFreeSlot, toast }) {
   const day = DAYS[dayIdx];
   const slots = agenda.enzo[day.key] || {};
   const rdv = Object.entries(slots)
@@ -3142,7 +3261,22 @@ function PlanningScreen({ agenda, setAgenda, dayIdx, setDayIdx, delay, setHistor
         [day.key]: { ...a.enzo[day.key], [time]: { status: 'open' } },
       },
     }));
+    if (onFreeSlot) onFreeSlot(day.key, time);
     toast(`Réservation de ${who} annulée — créneau ${time} réouvert.`);
+  };
+
+  const noShow = (r) => {
+    setAgenda((a) => ({
+      ...a,
+      enzo: {
+        ...a.enzo,
+        [day.key]: { ...a.enzo[day.key], [r.time]: { ...a.enzo[day.key][r.time], done: true, noshow: true } },
+      },
+    }));
+    if (setClients) setClients((cs) => cs.map((c) =>
+      r.who === `${c.firstName} ${c.lastName[0]}.` || r.who === `${c.firstName} ${c.lastName}`
+        ? { ...c, noShows: (c.noShows || 0) + 1 } : c));
+    toast(`${r.who} marqué absent — ${r.time} comptabilisé en no-show.`);
   };
 
   const addFinPhoto = async (fromCamera) => {
@@ -3216,12 +3350,15 @@ function PlanningScreen({ agenda, setAgenda, dayIdx, setDayIdx, delay, setHistor
                 <Text style={[s.btags, { marginTop: 2 }]}>{r.serv}</Text>
               </View>
               {r.done ? (
-                <Feather name="check" size={17} color={C.green} />
+                <Feather name={r.noshow ? 'user-x' : 'check'} size={17} color={r.noshow ? C.orange : C.green} />
               ) : (
                 <View style={[s.row, { gap: 12 }]}>
                   <Text style={[s.price, { fontSize: 15 }]}>{fmt(r.price)}</Text>
                   <TouchableOpacity onPress={() => { setFinModal(r); setFinPhotos([]); }} hitSlop={10}>
                     <Feather name="check-circle" size={20} color={C.green} />
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => noShow(r)} hitSlop={10}>
+                    <Feather name="user-x" size={20} color={C.orange} />
                   </TouchableOpacity>
                   <TouchableOpacity onPress={() => cancel(r.time, r.who)} hitSlop={10}>
                     <Feather name="x-circle" size={20} color={C.red} />
@@ -3232,7 +3369,7 @@ function PlanningScreen({ agenda, setAgenda, dayIdx, setDayIdx, delay, setHistor
           ))
         )}
         <Text style={s.footnote}>
-          ✓ pour terminer une coupe (avec ou sans photos du résultat) — ✕ pour annuler la réservation.
+          ✓ pour terminer une coupe — silhouette barrée pour marquer le client absent (no-show) — ✕ pour annuler.
         </Text>
       </ScrollView>
 
@@ -3317,6 +3454,15 @@ function ActivityScreen({ agenda }) {
   const open = todaySlots.filter((v) => v.status === 'open').length;
   const ca = booked.filter((r) => r.done).reduce((sum, r) => sum + r.price, 0);
   const fill = booked.length + open > 0 ? Math.round((booked.length / (booked.length + open)) * 100) : 0;
+  const sumDays = (n) => {
+    let t = 0;
+    for (let i = 0; i < n && i < DAYS.length; i++) {
+      Object.values(agenda.enzo[DAYS[i].key] || {}).forEach((v) => {
+        if (v.status === 'booked' && !v.noshow) t += v.price || 0;
+      });
+    }
+    return t;
+  };
   const top = [['Burst Fade', 38], ['Coupe + Barbe', 27], ['Transformation', 21], ['Barbe seule', 14]];
   return (
     <ScrollView style={s.screen} contentContainerStyle={s.screenPad}>
@@ -3325,7 +3471,7 @@ function ActivityScreen({ agenda }) {
       <Lead>Vos chiffres, en un coup d’œil.</Lead>
       <View style={s.kpis}>
         {[
-          [fmt(ca), 'CA DU JOUR'], ['1 240 €', 'CA SEMAINE'], ['4 980 €', 'CA MOIS'],
+          [fmt(ca), 'CA DU JOUR'], [fmt(sumDays(7)), 'PRÉVU 7 JOURS'], [fmt(sumDays(30)), 'PRÉVU 30 JOURS'],
           [fill + ' %', 'REMPLISSAGE'], [String(booked.length), 'RDV AUJOURD’HUI'], ['★ 4,9', 'NOTE MOYENNE'],
         ].map(([v, l]) => (
           <View key={l} style={s.kpi}>
@@ -3389,6 +3535,7 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, clients, setC
   const [blockingClient, setBlockingClient] = useState(null); // { id, firstName, lastName } | null
   const [ptSearch, setPtSearch] = useState('');
   const [ficheTab, setFicheTab] = React.useState(null);
+  const [noteEdit, setNoteEdit] = React.useState(null); // { id, text }
   const [addingTier, setAddingTier] = useState(false);
   const [tierPts, setTierPts] = useState('');
   const [tierLabel, setTierLabel] = useState('');
@@ -3912,7 +4059,8 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, clients, setC
               const pts = cl.loyaltyPts || 0;
               const nxt = (enzo.loyaltyTiers || []).filter((t) => t.pts > pts).sort((a, b) => a.pts - b.pts)[0];
               return (
-                <View key={cl.id} style={[s.row, { paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: C.line, gap: 10, opacity: cl.blocked ? 0.55 : 1 }]}>
+                <View key={cl.id} style={{ borderBottomWidth: 1, borderBottomColor: C.line }}>
+                <View style={[s.row, { paddingVertical: 10, gap: 10, opacity: cl.blocked ? 0.55 : 1 }]}>
                   <View style={s.grow}>
                     <View style={[s.row, { gap: 6 }]}>
                       {cl.blocked && <Feather name="slash" size={12} color={C.red || '#E05252'} />}
@@ -3922,6 +4070,8 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, clients, setC
                       ? <Text style={[s.btags, { color: C.red || '#E05252' }]}>BLOQUÉ{cl.blockReason ? ' · ' + cl.blockReason : ''}</Text>
                       : <Text style={s.btags}>{pts} pts{nxt ? ` · encore ${nxt.pts - pts} pts pour « ${nxt.label} »` : ''}</Text>
                     }
+                    {!cl.blocked && cl.notes ? <Text style={[s.btags, { fontStyle: 'italic', marginTop: 1 }]} numberOfLines={1}>{cl.notes}</Text> : null}
+                    {(cl.noShows || 0) > 0 && <Text style={[s.btags, { color: C.orange, marginTop: 1 }]}>{cl.noShows} absence{cl.noShows > 1 ? 's' : ''}</Text>}
                   </View>
                   {!cl.blocked ? (
                     <>
@@ -3936,6 +4086,10 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, clients, setC
                       </TouchableOpacity>
                     </>
                   ) : null}
+                  <TouchableOpacity style={s.stockBtn} hitSlop={8}
+                    onPress={() => setNoteEdit(noteEdit?.id === cl.id ? null : { id: cl.id, text: cl.notes || '' })}>
+                    <Feather name="edit-2" size={12} color={C.gold} />
+                  </TouchableOpacity>
                   <TouchableOpacity hitSlop={8}
                     style={[s.stockBtn, { borderColor: cl.blocked ? C.gold : (C.red || '#E05252'), paddingHorizontal: 8 }]}
                     onPress={() => {
@@ -3948,6 +4102,19 @@ function FicheScreen({ barbers, setBarbers, products, setProducts, clients, setC
                     }}>
                     <Feather name={cl.blocked ? 'unlock' : 'slash'} size={12} color={cl.blocked ? C.gold : (C.red || '#E05252')} />
                   </TouchableOpacity>
+                </View>
+                {noteEdit?.id === cl.id && (
+                  <View style={[s.row, { gap: 8, paddingBottom: 10 }]}>
+                    <TextInput style={[s.input, { flex: 1, marginBottom: 0 }]} value={noteEdit.text}
+                      onChangeText={(v) => setNoteEdit({ id: cl.id, text: v })}
+                      placeholder="Note privée (sabot, style, préférences...)" placeholderTextColor="#5A5852" />
+                    <Chip mini label="OK" onPress={() => {
+                      setClients((cs) => cs.map((x) => x.id === cl.id ? { ...x, notes: noteEdit.text.trim() } : x));
+                      setNoteEdit(null);
+                      toast('Note enregistrée.');
+                    }} />
+                  </View>
+                )}
                 </View>
               );
             })}
@@ -4150,6 +4317,7 @@ function Main() {
   const [points, setPoints] = useState({ enzo: 86 }); // points fidélité par barber
   const [favoriteBarber, setFavoriteBarber] = useState(null); // id du barber principal
   const [upcoming, setUpcoming] = useState([]);
+  const [waitlist, setWaitlist] = useState([]); // { id, dayKey, dayLabel, formulaName }
   const [enzoDelay, setEnzoDelay] = useState('ON_TIME');
   const [toastMsg, setToastMsg] = useState(null);
   const toastAnim = useRef(new Animated.Value(0)).current;
@@ -4231,10 +4399,61 @@ function Main() {
       setPoints((p) => ({ ...p, [slot.barber.id]: (p[slot.barber.id] || 0) + Math.floor(quote.price / 100) }));
     }
     setUpcoming((u) => [...u, {
-      serv: servLabel, time: slot.time, day: day.label, barber: slot.barber.name,
+      id: 'u' + Date.now(), serv: servLabel, time: slot.time, day: day.label, barber: slot.barber.name,
+      barberId: slot.barber.id, dayKey: day.key,
       price: quote.price, recur: formula.recur,
     }]);
     toast(`Réservation confirmée — ${day.label} ${slot.time} avec ${slot.barber.name.split(' ')[0]} · ${fmt(quote.price)}`);
+  };
+
+  // ── Liste d'attente : notifie le client quand un créneau se libère ──
+  const notifyWaitlist = (dayKey, time, barberName) => {
+    if (!waitlist.some((e) => e.dayKey === dayKey)) return;
+    const dLabel = DAYS[DAY_INDEX[dayKey]]?.label || '';
+    setNotifs((ns) => [{
+      id: 'wl' + Date.now(), icon: 'bell', color: '#C8A96A', unread: true,
+      title: "Un créneau s'est libéré",
+      msg: `${barberName} — ${dLabel} à ${time}. Réservez vite depuis l'onglet Réserver !`,
+      time: "À l'instant",
+    }, ...ns]);
+    setWaitlist((w) => w.filter((e) => e.dayKey !== dayKey));
+  };
+
+  const joinWaitlist = (dIdx, formula) => {
+    const d = DAYS[dIdx];
+    if (waitlist.some((e) => e.dayKey === d.key)) {
+      toast("Vous êtes déjà sur la liste d'attente pour ce jour.");
+      return;
+    }
+    setWaitlist((w) => [...w, { id: 'w' + Date.now(), dayKey: d.key, dayLabel: d.label, formulaName: formula.name }]);
+    toast(`Liste d'attente — ${d.label} : vous serez notifié si un créneau se libère.`);
+  };
+
+  // ── Annulation / déplacement d'un RDV par le client ──
+  const canCancel = (u) => {
+    const dIdx = DAY_INDEX[u.dayKey];
+    if (dIdx == null) return false;
+    const slotDate = timeToDate(DAYS[dIdx], u.time);
+    const hours = barbers.find((b) => b.id === u.barberId)?.cancelHours ?? 24;
+    return slotDate - new Date() > hours * 3600000;
+  };
+
+  const cancelUpcoming = (u, silent) => {
+    setAgenda((a) => {
+      const dayA = a[u.barberId]?.[u.dayKey];
+      if (!dayA || !dayA[u.time] || dayA[u.time].status !== 'booked') return a;
+      return { ...a, [u.barberId]: { ...a[u.barberId], [u.dayKey]: { ...dayA, [u.time]: { status: 'open' } } } };
+    });
+    setUpcoming((us) => us.filter((x) => x.id !== u.id));
+    notifyWaitlist(u.dayKey, u.time, u.barber);
+    if (!silent) toast(`RDV du ${u.day} à ${u.time} annulé — créneau libéré.`);
+  };
+
+  const moveUpcoming = (u) => {
+    cancelUpcoming(u, true);
+    setBooking({ barber: u.barberId, formula: null, service: null, done: null, pendingSlot: null, address: '' });
+    setTab('book');
+    toast('Ancien créneau libéré — choisissez le nouveau.');
   };
 
   const addCart = (p) => {
@@ -4275,15 +4494,16 @@ function Main() {
     else if (tab === 'book') content = (
       <BookScreen agenda={agenda} formulas={formulas} services={services} booking={booking} setBooking={setBooking}
         dayIdx={clientDay} setDayIdx={setClientDay} onConfirm={confirmBooking}
-        barbers={barbersLive} favoriteBarber={favoriteBarber} homeFee={homeFee} />
+        barbers={barbersLive} favoriteBarber={favoriteBarber} homeFee={homeFee}
+        waitlist={waitlist} onWaitlist={joinWaitlist} toast={toast} />
     );
-    else if (tab === 'cuts') content = <CutsScreen history={history} setHistory={setHistory} setBarbers={setBarbers} user={user} toast={toast} />;
+    else if (tab === 'cuts') content = <CutsScreen history={history} setHistory={setHistory} setBarbers={setBarbers} user={user} onRebook={(bid) => { setBooking({ barber: bid, formula: null, service: null, done: null, pendingSlot: null, address: '' }); setTab('book'); toast('Choisissez votre nouveau créneau.'); }} toast={toast} />;
     else if (tab === 'shop' && shopOn) content = <ShopScreen products={products} cat={cat} setCat={setCat} cart={cart} addCart={addCart} shopMode={barbers.find((b) => b.id === 'enzo')?.shopMode || 'vitrine'} toast={toast} />;
-    else content = <MeScreen user={user} points={points} setPoints={setPoints} barbers={barbers} upcoming={upcoming} favoriteBarber={favoriteBarber} onLogout={logout} toast={toast} />;
+    else content = <MeScreen user={user} points={points} setPoints={setPoints} barbers={barbers} upcoming={upcoming} waitlist={waitlist} onCancelRdv={cancelUpcoming} onMoveRdv={moveUpcoming} canCancel={canCancel} onRemoveWaitlist={(id) => setWaitlist((w) => w.filter((e) => e.id !== id))} favoriteBarber={favoriteBarber} onLogout={logout} toast={toast} />;
   } else if (role === 'barber') {
     if (tab === 'slots') content = (
       <SlotsScreen agenda={agenda} setAgenda={setAgenda} daycfg={daycfg} setDaycfg={setDaycfg} endHour={endHour} setEndHour={setEndHour} homeFee={homeFee} setHomeFee={setHomeFee}
-        clients={clients} setClients={setClients}
+        clients={clients} setClients={setClients} onFreeSlot={(dk, t) => notifyWaitlist(dk, t, 'Enzo Moreau')}
         services={services}
         dayIdx={barberDay} setDayIdx={setBarberDay} toast={toast} />
     );
@@ -4291,7 +4511,7 @@ function Main() {
       <FormulasScreen formulas={formulas} setFormulas={setFormulas} services={services} setServices={setServices} toast={toast} />
     );
     else if (tab === 'planning') content = (
-      <PlanningScreen agenda={agenda} setAgenda={setAgenda} dayIdx={barberDay} setDayIdx={setBarberDay} delay={enzoDelay} setHistory={setHistory} toast={toast} />
+      <PlanningScreen agenda={agenda} setAgenda={setAgenda} dayIdx={barberDay} setDayIdx={setBarberDay} delay={enzoDelay} setHistory={setHistory} setClients={setClients} onFreeSlot={(dk, t) => notifyWaitlist(dk, t, 'Enzo Moreau')} toast={toast} />
     );
     else if (tab === 'status') content = (
       <StatusScreen agenda={agenda} delay={enzoDelay} setDelay={setEnzoDelay} toast={toast} />
