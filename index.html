@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FESTIV' EVENTS — L'expert technique de vos événements professionnels</title>
+<meta name="description" content="FESTIV' EVENTS : sonorisation, éclairage, vidéo et mobilier événementiel. Location et prestations pour séminaires, conférences, conventions et soirées d'entreprise à Lys-lez-Lannoy.">
+<style>
+  :root{
+    --bg:#080808;
+    --bg-2:#0f0f11;
+    --panel:#121216;
+    --gold:#e8b45c;
+    --gold-soft:#f4d38a;
+    --orange:#e8622a;
+    --orange-2:#ff7a3c;
+    --text:#f4f2ee;
+    --muted:#a9a6a0;
+    --line:rgba(232,180,92,.22);
+    --font: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    font-family:var(--font);
+    background:var(--bg);
+    color:var(--text);
+    overflow-x:hidden;
+    line-height:1.6;
+  }
+  a{color:inherit;text-decoration:none}
+  .wrap{max-width:1200px;margin:0 auto;padding:0 24px}
+  .accent{color:var(--gold)}
+  .orange{color:var(--orange-2)}
+
+  /* ---------- NAV ---------- */
+  header{
+    position:fixed;top:0;left:0;right:0;z-index:50;
+    display:flex;align-items:center;justify-content:space-between;
+    padding:18px 32px;
+    transition:background .4s ease, padding .4s ease, box-shadow .4s ease;
+  }
+  header.scrolled{
+    background:rgba(8,8,8,.82);
+    backdrop-filter:blur(12px);
+    padding:12px 32px;
+    box-shadow:0 6px 30px rgba(0,0,0,.5);
+  }
+  .brand{font-weight:800;letter-spacing:2px;font-size:20px}
+  .brand .apos{color:var(--gold)}
+  .brand .ev{color:var(--orange-2)}
+  nav ul{display:flex;gap:28px;list-style:none;font-size:14px;letter-spacing:1px}
+  nav a{color:var(--muted);transition:color .25s;position:relative}
+  nav a::after{content:"";position:absolute;left:0;bottom:-6px;width:0;height:2px;background:linear-gradient(90deg,var(--gold),var(--orange));transition:width .3s}
+  nav a:hover{color:var(--text)}
+  nav a:hover::after{width:100%}
+  .nav-cta{
+    padding:9px 20px;border:1px solid var(--gold);border-radius:40px;
+    color:var(--gold);font-size:13px;letter-spacing:1px;transition:.3s;
+  }
+  .nav-cta:hover{background:var(--gold);color:#111;box-shadow:0 0 24px rgba(232,180,92,.5)}
+  .burger{display:none;flex-direction:column;gap:5px;cursor:pointer}
+  .burger span{width:26px;height:2px;background:var(--text);transition:.3s}
+
+  /* ---------- HERO ---------- */
+  .hero{
+    position:relative;min-height:100vh;display:flex;align-items:center;
+    background:radial-gradient(1200px 700px at 75% 20%, #16233f 0%, #0a0e17 45%, #060606 80%);
+    overflow:hidden;
+  }
+  .hero-stage{position:absolute;inset:0;overflow:hidden}
+  /* moving light beams */
+  .beam{
+    position:absolute;top:-30%;width:70px;height:150%;
+    background:linear-gradient(to bottom, rgba(120,170,255,0) 0%, rgba(120,170,255,.20) 45%, rgba(120,170,255,0) 100%);
+    filter:blur(6px);transform-origin:top center;mix-blend-mode:screen;
+    animation:sweep 7s ease-in-out infinite;
+  }
+  .beam.b1{left:58%;animation-delay:0s;background:linear-gradient(to bottom,rgba(255,150,80,0),rgba(255,150,80,.18),rgba(255,150,80,0))}
+  .beam.b2{left:66%;animation-delay:1.2s}
+  .beam.b3{left:74%;animation-delay:2.4s;background:linear-gradient(to bottom,rgba(232,180,92,0),rgba(232,180,92,.2),rgba(232,180,92,0))}
+  .beam.b4{left:82%;animation-delay:.6s}
+  .beam.b5{left:90%;animation-delay:1.8s;background:linear-gradient(to bottom,rgba(255,150,80,0),rgba(255,150,80,.16),rgba(255,150,80,0))}
+  @keyframes sweep{
+    0%,100%{transform:rotate(-16deg);opacity:.35}
+    50%{transform:rotate(16deg);opacity:.9}
+  }
+  /* floating particles */
+  .particles{position:absolute;inset:0}
+  .particles i{
+    position:absolute;bottom:-10px;width:4px;height:4px;border-radius:50%;
+    background:var(--gold);opacity:.5;box-shadow:0 0 8px var(--gold);
+    animation:rise linear infinite;
+  }
+  @keyframes rise{
+    0%{transform:translateY(0) scale(1);opacity:0}
+    10%{opacity:.7}
+    100%{transform:translateY(-100vh) scale(.3);opacity:0}
+  }
+  .hero-glow{
+    position:absolute;right:-5%;top:15%;width:520px;height:520px;border-radius:50%;
+    background:radial-gradient(circle, rgba(232,98,42,.35), transparent 65%);
+    filter:blur(30px);animation:pulse 6s ease-in-out infinite;
+  }
+  @keyframes pulse{0%,100%{transform:scale(1);opacity:.6}50%{transform:scale(1.15);opacity:1}}
+
+  .hero-content{position:relative;z-index:5;padding-top:80px}
+  .hero .kicker{
+    display:inline-block;letter-spacing:4px;font-size:13px;color:var(--gold);
+    border:1px solid var(--line);padding:8px 16px;border-radius:40px;margin-bottom:26px;
+    opacity:0;animation:fadeUp .8s .1s forwards;
+  }
+  .logo-big{font-size:clamp(48px,9vw,120px);font-weight:900;line-height:.92;letter-spacing:3px}
+  .logo-big .l1{display:block;background:linear-gradient(90deg,var(--gold-soft),var(--orange));-webkit-background-clip:text;background-clip:text;color:transparent;opacity:0;animation:fadeUp .8s .2s forwards}
+  .logo-big .l2{display:block;color:var(--orange-2);opacity:0;animation:fadeUp .8s .35s forwards}
+  .logo-big .bar{display:inline-block;width:70px;height:6px;background:var(--gold);margin:14px 0 6px;border-radius:4px;transform:scaleX(0);transform-origin:left;animation:grow .7s .5s forwards}
+  @keyframes grow{to{transform:scaleX(1)}}
+  .hero h2{
+    font-size:clamp(20px,2.6vw,30px);font-weight:400;color:var(--text);
+    margin:26px 0 10px;max-width:640px;opacity:0;animation:fadeUp .8s .55s forwards;
+  }
+  .hero h2 b{font-weight:800}
+  .hero .slogan{
+    display:flex;gap:20px;flex-wrap:wrap;margin:22px 0 34px;
+    font-weight:800;letter-spacing:3px;color:var(--gold-soft);font-size:15px;
+    opacity:0;animation:fadeUp .8s .7s forwards;
+  }
+  .hero .slogan span{position:relative;padding-left:22px}
+  .hero .slogan span::before{content:"";position:absolute;left:0;top:50%;width:10px;height:10px;transform:translateY(-50%) rotate(45deg);background:var(--orange)}
+  .hero-actions{display:flex;gap:16px;flex-wrap:wrap;opacity:0;animation:fadeUp .8s .85s forwards}
+  .btn{
+    padding:15px 34px;border-radius:40px;font-weight:700;letter-spacing:1px;font-size:15px;
+    transition:.3s;cursor:pointer;display:inline-flex;align-items:center;gap:10px;
+  }
+  .btn-primary{background:linear-gradient(90deg,var(--orange),var(--gold));color:#100c07;border:none}
+  .btn-primary:hover{transform:translateY(-3px);box-shadow:0 12px 34px rgba(232,98,42,.45)}
+  .btn-ghost{border:1px solid var(--line);color:var(--text)}
+  .btn-ghost:hover{border-color:var(--gold);color:var(--gold);transform:translateY(-3px)}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
+
+  .scroll-ind{position:absolute;bottom:26px;left:50%;transform:translateX(-50%);z-index:5;color:var(--muted);font-size:12px;letter-spacing:2px;text-align:center;animation:bob 2s ease-in-out infinite}
+  .scroll-ind div{width:22px;height:36px;border:2px solid var(--muted);border-radius:14px;margin:8px auto 0;position:relative}
+  .scroll-ind div::after{content:"";position:absolute;left:50%;top:7px;transform:translateX(-50%);width:4px;height:8px;background:var(--gold);border-radius:3px;animation:drop 1.6s infinite}
+  @keyframes drop{0%{opacity:0;top:7px}30%{opacity:1}60%{opacity:1;top:18px}100%{opacity:0;top:18px}}
+  @keyframes bob{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(8px)}}
+
+  /* ---------- VALUES ---------- */
+  section{padding:100px 0;position:relative}
+  .section-head{text-align:center;margin-bottom:60px}
+  .section-head .eyebrow{color:var(--orange-2);letter-spacing:4px;font-size:13px;font-weight:700}
+  .section-head h3{font-size:clamp(28px,4vw,44px);font-weight:800;margin-top:12px}
+  .section-head .rule{width:60px;height:3px;background:linear-gradient(90deg,var(--gold),var(--orange));margin:18px auto 0;border-radius:3px}
+
+  .values{display:grid;grid-template-columns:repeat(3,1fr);gap:26px}
+  .value{
+    background:linear-gradient(160deg,var(--panel),#0c0c0e);
+    border:1px solid rgba(255,255,255,.05);border-radius:18px;padding:38px 30px;text-align:center;
+    position:relative;overflow:hidden;transition:transform .4s, border-color .4s;
+  }
+  .value::before{content:"";position:absolute;inset:0;background:radial-gradient(300px 120px at 50% 0,rgba(232,180,92,.12),transparent);opacity:0;transition:.4s}
+  .value:hover{transform:translateY(-8px);border-color:var(--line)}
+  .value:hover::before{opacity:1}
+  .value .ico{width:64px;height:64px;margin:0 auto 20px;border-radius:50%;display:grid;place-items:center;border:1px solid var(--line);color:var(--gold);font-size:26px;transition:.4s}
+  .value:hover .ico{background:linear-gradient(135deg,var(--orange),var(--gold));color:#111;box-shadow:0 0 28px rgba(232,98,42,.4)}
+  .value h4{font-size:20px;letter-spacing:1px;margin-bottom:8px}
+  .value p{color:var(--muted);font-size:15px}
+
+  /* ---------- SERVICES ---------- */
+  #services{background:linear-gradient(180deg,#060606,#0c0d12 50%,#060606)}
+  .services{display:grid;grid-template-columns:repeat(4,1fr);gap:22px}
+  .service{
+    background:var(--panel);border:1px solid rgba(255,255,255,.05);border-radius:16px;
+    padding:34px 26px;transition:.4s;position:relative;overflow:hidden;
+  }
+  .service .num{position:absolute;right:16px;top:8px;font-size:70px;font-weight:900;color:rgba(255,255,255,.03)}
+  .service .sico{font-size:34px;margin-bottom:18px;filter:drop-shadow(0 0 10px rgba(232,180,92,.3))}
+  .service h4{font-size:18px;letter-spacing:1px;margin-bottom:12px;line-height:1.25}
+  .service p{color:var(--muted);font-size:14.5px}
+  .service::after{content:"";position:absolute;left:0;bottom:0;width:100%;height:3px;background:linear-gradient(90deg,var(--orange),var(--gold));transform:scaleX(0);transform-origin:left;transition:transform .4s}
+  .service:hover{transform:translateY(-8px);border-color:var(--line);background:#15151b}
+  .service:hover::after{transform:scaleX(1)}
+
+  /* ---------- EVENTS BANNER ---------- */
+  #events{background:radial-gradient(900px 400px at 50% 0,#132038,#070707 70%);text-align:center}
+  .event-tags{display:flex;flex-wrap:wrap;justify-content:center;gap:14px 10px;margin:0 auto 34px;max-width:900px}
+  .event-tags span{
+    padding:12px 24px;border:1px solid var(--line);border-radius:40px;letter-spacing:2px;
+    font-size:14px;color:var(--gold-soft);transition:.3s;
+  }
+  .event-tags span:hover{background:linear-gradient(90deg,var(--orange),var(--gold));color:#111;transform:scale(1.06)}
+  .big-slogan{font-size:clamp(22px,3.4vw,40px);font-weight:800;line-height:1.3;max-width:900px;margin:0 auto}
+  .big-slogan .hl{background:linear-gradient(90deg,var(--gold-soft),var(--orange));-webkit-background-clip:text;background-clip:text;color:transparent}
+
+  /* ---------- STATS ---------- */
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:26px;max-width:900px;margin:60px auto 0}
+  .stat{text-align:center;padding:26px;border:1px solid rgba(255,255,255,.06);border-radius:16px;background:var(--panel)}
+  .stat .n{font-size:44px;font-weight:900;background:linear-gradient(90deg,var(--gold),var(--orange));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .stat .l{color:var(--muted);letter-spacing:2px;font-size:13px;margin-top:6px;text-transform:uppercase}
+
+  /* ---------- CONTACT ---------- */
+  #contact{background:linear-gradient(180deg,#060606,#0b0b0d)}
+  .contact-grid{display:grid;grid-template-columns:1.1fr 1fr;gap:50px;align-items:center}
+  .contact-info h3{font-size:clamp(26px,3.4vw,40px);font-weight:800;line-height:1.2;margin-bottom:14px}
+  .contact-info .sub{color:var(--muted);margin-bottom:30px}
+  .contact-info ul{list-style:none;display:flex;flex-direction:column;gap:18px}
+  .contact-info li{display:flex;align-items:center;gap:16px}
+  .contact-info .ci{width:48px;height:48px;flex:none;border-radius:12px;display:grid;place-items:center;border:1px solid var(--line);color:var(--gold);font-size:20px;transition:.3s}
+  .contact-info li:hover .ci{background:linear-gradient(135deg,var(--orange),var(--gold));color:#111}
+  .contact-info .k{font-size:12px;letter-spacing:2px;color:var(--muted);text-transform:uppercase}
+  .contact-info .v{font-size:17px;font-weight:600}
+
+  .contact-card{
+    background:linear-gradient(160deg,#15151b,#0b0b0e);border:1px solid var(--line);
+    border-radius:20px;padding:38px;box-shadow:0 30px 60px rgba(0,0,0,.4);
+  }
+  .contact-card h4{font-size:22px;margin-bottom:6px}
+  .contact-card p{color:var(--muted);font-size:14px;margin-bottom:22px}
+  .field{margin-bottom:16px}
+  .field label{display:block;font-size:12px;letter-spacing:1px;color:var(--muted);margin-bottom:6px;text-transform:uppercase}
+  .field input,.field textarea{
+    width:100%;padding:13px 15px;background:#0a0a0c;border:1px solid rgba(255,255,255,.08);
+    border-radius:10px;color:var(--text);font-family:inherit;font-size:15px;transition:.3s;
+  }
+  .field input:focus,.field textarea:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px rgba(232,180,92,.12)}
+  .field textarea{resize:vertical;min-height:90px}
+
+  /* ---------- FOOTER ---------- */
+  footer{background:#050505;border-top:1px solid rgba(255,255,255,.06);padding:50px 0 30px}
+  .foot-grid{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:36px;margin-bottom:34px}
+  .foot-brand .brand{font-size:26px;margin-bottom:14px;display:inline-block}
+  .foot-brand p{color:var(--muted);font-size:14px;max-width:320px}
+  .foot-col h5{letter-spacing:2px;font-size:13px;color:var(--gold);margin-bottom:16px;text-transform:uppercase}
+  .foot-col a,.foot-col p{display:block;color:var(--muted);font-size:14px;margin-bottom:10px;transition:.25s}
+  .foot-col a:hover{color:var(--gold)}
+  .foot-bottom{border-top:1px solid rgba(255,255,255,.06);padding-top:22px;text-align:center;color:var(--muted);font-size:13px;letter-spacing:1px}
+  .tagbadge{display:inline-block;margin-top:8px;color:var(--gold-soft);letter-spacing:3px;font-size:12px;font-weight:700}
+
+  /* reveal */
+  .reveal{opacity:0;transform:translateY(40px);transition:opacity .7s ease, transform .7s ease}
+  .reveal.in{opacity:1;transform:none}
+  .reveal.d1{transition-delay:.1s}.reveal.d2{transition-delay:.2s}.reveal.d3{transition-delay:.3s}.reveal.d4{transition-delay:.4s}
+
+  /* ---------- RESPONSIVE ---------- */
+  @media(max-width:980px){
+    .values,.services{grid-template-columns:repeat(2,1fr)}
+    .contact-grid{grid-template-columns:1fr;gap:34px}
+    .foot-grid{grid-template-columns:1fr 1fr}
+    .stats{grid-template-columns:1fr}
+  }
+  @media(max-width:640px){
+    nav ul,.nav-cta{display:none}
+    .burger{display:flex}
+    .values,.services,.foot-grid{grid-template-columns:1fr}
+    header{padding:14px 20px}
+    .hero .slogan{gap:12px}
+  }
+  @media(prefers-reduced-motion:reduce){
+    *{animation:none!important;transition:none!important}
+    .reveal{opacity:1;transform:none}
+    .hero .kicker,.logo-big .l1,.logo-big .l2,.hero h2,.hero .slogan,.hero-actions{opacity:1}
+  }
+</style>
+</head>
+<body>
+
+<header id="top">
+  <a href="#top" class="brand">FESTIV<span class="apos">'</span> <span class="ev">EVENTS</span></a>
+  <nav>
+    <ul>
+      <li><a href="#values">Notre approche</a></li>
+      <li><a href="#services">Services</a></li>
+      <li><a href="#events">Événements</a></li>
+      <li><a href="#contact">Contact</a></li>
+    </ul>
+  </nav>
+  <a href="#contact" class="nav-cta">Demander un devis</a>
+  <div class="burger" id="burger"><span></span><span></span><span></span></div>
+</header>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-stage">
+    <span class="beam b1"></span><span class="beam b2"></span><span class="beam b3"></span>
+    <span class="beam b4"></span><span class="beam b5"></span>
+    <div class="hero-glow"></div>
+    <div class="particles" id="particles"></div>
+  </div>
+  <div class="wrap hero-content">
+    <span class="kicker">LOCATION ET PRESTATIONS ÉVÉNEMENTIELLES</span>
+    <div class="logo-big">
+      <span class="l1">FESTIV'</span>
+      <span class="bar"></span>
+      <span class="l2">EVENTS</span>
+    </div>
+    <h2>L'expert technique de <b>vos événements professionnels</b>.</h2>
+    <div class="slogan"><span>INNOVER</span><span>CONNECTER</span><span>RÉUSSIR</span></div>
+    <div class="hero-actions">
+      <a href="#services" class="btn btn-primary">Découvrir nos prestations →</a>
+      <a href="#contact" class="btn btn-ghost">Nous contacter</a>
+    </div>
+  </div>
+  <div class="scroll-ind">DÉFILER<div></div></div>
+</section>
+
+<!-- VALUES -->
+<section id="values">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div class="eyebrow">NOTRE APPROCHE</div>
+      <h3>Une équipe passionnée à votre service</h3>
+      <div class="rule"></div>
+    </div>
+    <div class="values">
+      <div class="value reveal d1">
+        <div class="ico">◎</div>
+        <h4>Exigez l'excellence</h4>
+        <p>Techniciens expérimentés et matériel haut de gamme pour une qualité irréprochable.</p>
+      </div>
+      <div class="value reveal d2">
+        <div class="ico">✦</div>
+        <h4>Créez l'impact</h4>
+        <p>Des mises en scène immersives qui marquent durablement vos invités.</p>
+      </div>
+      <div class="value reveal d3">
+        <div class="ico">▲</div>
+        <h4>Atteignez vos objectifs</h4>
+        <p>Un accompagnement personnalisé, du concept jusqu'au jour J.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SERVICES -->
+<section id="services">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div class="eyebrow">NOS PRESTATIONS</div>
+      <h3>Une solution clé en main</h3>
+      <div class="rule"></div>
+    </div>
+    <div class="services">
+      <div class="service reveal d1">
+        <span class="num">01</span>
+        <div class="sico">🔊</div>
+        <h4>Sonorisation</h4>
+        <p>Systèmes audio professionnels adaptés à tous vos espaces.</p>
+      </div>
+      <div class="service reveal d2">
+        <span class="num">02</span>
+        <div class="sico">💡</div>
+        <h4>Éclairage</h4>
+        <p>Mise en lumière scénique, ambiances et effets LED.</p>
+      </div>
+      <div class="service reveal d3">
+        <span class="num">03</span>
+        <div class="sico">🎬</div>
+        <h4>Vidéo &amp; Écrans</h4>
+        <p>Écrans LED, projection, régie vidéo et diffusion en direct.</p>
+      </div>
+      <div class="service reveal d4">
+        <span class="num">04</span>
+        <div class="sico">🪑</div>
+        <h4>Mobilier événementiel</h4>
+        <p>Mobilier design et modulable pour tous vos événements.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- EVENTS -->
+<section id="events">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div class="eyebrow">TYPES D'ÉVÉNEMENTS</div>
+      <h3>Nous sublimons chaque moment</h3>
+      <div class="rule"></div>
+    </div>
+    <div class="event-tags reveal d1">
+      <span>SÉMINAIRES</span><span>CONFÉRENCES</span><span>CONVENTIONS</span>
+      <span>LANCEMENTS DE PRODUITS</span><span>SOIRÉES D'ENTREPRISE</span>
+    </div>
+    <p class="big-slogan reveal d2">Une solution clé en main, <span class="hl">un résultat à la hauteur de vos ambitions.</span></p>
+    <div class="stats">
+      <div class="stat reveal d1"><div class="n">100%</div><div class="l">Sur-mesure</div></div>
+      <div class="stat reveal d2"><div class="n">4</div><div class="l">Pôles d'expertise</div></div>
+      <div class="stat reveal d3"><div class="n">A→Z</div><div class="l">Accompagnement</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- CONTACT -->
+<section id="contact">
+  <div class="wrap">
+    <div class="contact-grid">
+      <div class="contact-info reveal">
+        <h3>Parlons de votre <span class="orange">prochain événement</span></h3>
+        <p class="sub">Techniciens expérimentés · Matériel haut de gamme · Accompagnement personnalisé</p>
+        <ul>
+          <li>
+            <div class="ci">📍</div>
+            <div><div class="k">Adresse</div><div class="v">92B rue du Fresnoy, 59390 Lys-lez-Lannoy</div></div>
+          </li>
+          <li>
+            <div class="ci">📞</div>
+            <div><div class="k">Téléphone</div><div class="v"><a href="tel:+33624857188">06 24 85 71 88</a></div></div>
+          </li>
+          <li>
+            <div class="ci">✉️</div>
+            <div><div class="k">Email</div><div class="v"><a href="mailto:contact@festiv-events.fr">contact@festiv-events.fr</a></div></div>
+          </li>
+          <li>
+            <div class="ci">🌐</div>
+            <div><div class="k">Site web</div><div class="v"><a href="https://www.festiv-events.fr" target="_blank" rel="noopener">www.festiv-events.fr</a></div></div>
+          </li>
+        </ul>
+      </div>
+      <div class="contact-card reveal d2">
+        <h4>Demander un devis</h4>
+        <p>Décrivez votre projet, nous revenons vers vous rapidement.</p>
+        <form id="contactForm" novalidate>
+          <div class="field"><label for="name">Nom</label><input id="name" type="text" placeholder="Votre nom" required></div>
+          <div class="field"><label for="email">Email</label><input id="email" type="email" placeholder="vous@exemple.fr" required></div>
+          <div class="field"><label for="msg">Votre projet</label><textarea id="msg" placeholder="Type d'événement, date, besoins techniques…"></textarea></div>
+          <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center">Envoyer ma demande</button>
+          <p id="formNote" style="display:none;margin-top:14px;color:var(--gold);font-size:14px;text-align:center"></p>
+        </form>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="wrap">
+    <div class="foot-grid">
+      <div class="foot-brand">
+        <span class="brand">FESTIV<span class="apos">'</span> <span class="ev">EVENTS</span></span>
+        <p>L'expert technique de vos événements professionnels. Location et prestations événementielles dans les Hauts-de-France.</p>
+        <span class="tagbadge">INNOVER · CONNECTER · RÉUSSIR</span>
+      </div>
+      <div class="foot-col">
+        <h5>Prestations</h5>
+        <a href="#services">Sonorisation</a>
+        <a href="#services">Éclairage</a>
+        <a href="#services">Vidéo &amp; Écrans</a>
+        <a href="#services">Mobilier événementiel</a>
+      </div>
+      <div class="foot-col">
+        <h5>Contact</h5>
+        <p>92B rue du Fresnoy<br>59390 Lys-lez-Lannoy</p>
+        <a href="tel:+33624857188">06 24 85 71 88</a>
+        <a href="mailto:contact@festiv-events.fr">contact@festiv-events.fr</a>
+      </div>
+    </div>
+    <div class="foot-bottom">© <span id="year"></span> FESTIV' EVENTS — Tous droits réservés.</div>
+  </div>
+</footer>
+
+<script>
+  // year
+  document.getElementById('year').textContent = new Date().getFullYear();
+
+  // header scroll state
+  const header = document.querySelector('header');
+  window.addEventListener('scroll', () => {
+    header.classList.toggle('scrolled', window.scrollY > 40);
+  });
+
+  // burger (simple scroll to contact on mobile)
+  document.getElementById('burger').addEventListener('click', () => {
+    document.getElementById('contact').scrollIntoView({behavior:'smooth'});
+  });
+
+  // reveal on scroll
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => { if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target);} });
+  }, {threshold:.15});
+  document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+
+  // particles
+  const p = document.getElementById('particles');
+  if (p && !window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+    for(let i=0;i<28;i++){
+      const dot = document.createElement('i');
+      dot.style.left = Math.random()*100 + '%';
+      dot.style.animationDuration = (6 + Math.random()*8) + 's';
+      dot.style.animationDelay = (Math.random()*8) + 's';
+      const s = 2 + Math.random()*4;
+      dot.style.width = dot.style.height = s + 'px';
+      dot.style.opacity = .2 + Math.random()*.5;
+      if(Math.random()>.5){ dot.style.background='#ff7a3c'; dot.style.boxShadow='0 0 8px #ff7a3c'; }
+      p.appendChild(dot);
+    }
+  }
+
+  // form
+  document.getElementById('contactForm').addEventListener('submit', (ev) => {
+    ev.preventDefault();
+    const note = document.getElementById('formNote');
+    const name = document.getElementById('name').value.trim();
+    const email = document.getElementById('email').value.trim();
+    if(!name || !email){
+      note.style.display='block'; note.style.color='#ff7a3c';
+      note.textContent='Merci de renseigner votre nom et votre email.';
+      return;
+    }
+    note.style.display='block'; note.style.color='var(--gold)';
+    note.textContent='Merci ' + name + ' ! Votre demande a bien été prise en compte.';
+    ev.target.reset();
+  });
+</script>
+</body>
+</html>
