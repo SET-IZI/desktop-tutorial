@@ -34,6 +34,7 @@ nécessaire. Un nom de domaine personnalisé s'ajoute dans le champ *Custom doma
 | Téléphone, e-mail, adresse | `index.html` — section `#contact`, bouton du menu, bloc `LocalBusiness` en bas de page, et `assets/js/main.js` (adresse du formulaire) |
 | Lien Messenger | `index.html` — `https://m.me/hubevert`, à remplacer par l'URL exacte de la page Facebook |
 | Textes des prestations | `index.html` — section `#services` |
+| Photo d'accueil | `assets/elagage-corde.jpg` (format paysage, le sujet doit rester dans la moitié droite pour ne pas passer sous le titre) |
 | Photos | remplacer les fichiers de `assets/` en gardant les mêmes noms (environ 1400 px de côté, JPEG) |
 | Couleurs | `assets/css/styles.css` — variables `--green-*` en haut du fichier |
 
