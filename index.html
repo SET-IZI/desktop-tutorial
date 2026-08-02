@@ -108,15 +108,15 @@
   .value p{color:var(--muted);font-size:15px}
 
   #services{background:linear-gradient(180deg,#060606,#0c0d12 50%,#060606)}
-  .services{display:grid;grid-template-columns:repeat(4,1fr);gap:22px}
+  .services{display:grid;grid-template-columns:repeat(2,1fr);gap:28px}
   .service{background:var(--panel);border:1px solid rgba(255,255,255,.05);border-radius:16px;overflow:hidden;transition:transform .4s,border-color .4s;position:relative;display:flex;flex-direction:column}
-  .service .simg{position:relative;height:168px;background-size:cover;background-position:center;transition:transform .5s}
-  .service .simg::after{content:"";position:absolute;inset:0;background:linear-gradient(to top,var(--panel),rgba(18,18,22,.1) 55%,rgba(18,18,22,.35))}
+  .service .simg{position:relative;aspect-ratio:3/2;background-size:cover;background-position:center;transition:transform .5s}
+  .service .simg::after{content:"";position:absolute;inset:0;background:linear-gradient(to top,var(--panel),transparent 40%)}
   .service .badge{position:absolute;left:18px;bottom:-22px;z-index:2;width:50px;height:50px;border-radius:13px;display:grid;place-items:center;background:linear-gradient(135deg,var(--orange),var(--gold));color:#141414;box-shadow:0 8px 20px rgba(0,0,0,.45)}
   .service .badge svg{width:26px;height:26px}
-  .service .sbody{padding:36px 22px 28px}
-  .service h4{font-size:18px;letter-spacing:1px;margin-bottom:10px;line-height:1.25}
-  .service p{color:var(--muted);font-size:14.5px}
+  .service .sbody{padding:40px 30px 32px}
+  .service h4{font-size:23px;letter-spacing:1px;margin-bottom:12px;line-height:1.2}
+  .service p{color:var(--muted);font-size:16px}
   .service:hover{transform:translateY(-8px);border-color:var(--line)}
   .service:hover .simg{transform:scale(1.06)}
 
