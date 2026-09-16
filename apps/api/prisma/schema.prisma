@@ -1,0 +1,313 @@
+// BarberPro — schéma de données (PostgreSQL)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ───────────────────────── Utilisateurs ─────────────────────────
+
+enum Role {
+  CLIENT
+  BARBER
+  ADMIN
+}
+
+enum AuthProvider {
+  EMAIL
+  GOOGLE
+  APPLE
+  FACEBOOK
+}
+
+model User {
+  id           String       @id @default(cuid())
+  email        String       @unique
+  passwordHash String?
+  provider     AuthProvider @default(EMAIL)
+  firstName    String
+  lastName     String
+  phone        String?
+  birthDate    DateTime?
+  role         Role         @default(CLIENT)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  barberProfile  BarberProfile?
+  appointments   Appointment[]       @relation("ClientAppointments")
+  reviews        Review[]
+  orders         Order[]
+  loyalty        LoyaltyTransaction[]
+  deviceTokens   DeviceToken[]
+}
+
+// ───────────────────────── Barbiers ─────────────────────────
+
+enum DelayStatus {
+  ON_TIME
+  DELAY_5
+  DELAY_10
+  DELAY_15
+  DELAY_15_PLUS
+  ABSENT
+}
+
+model BarberProfile {
+  id              String      @id @default(cuid())
+  userId          String      @unique
+  user            User        @relation(fields: [userId], references: [id])
+  bio             String?
+  avatarUrl       String?
+  videoUrl        String?
+  yearsExperience Int         @default(0)
+  // Tags de compétences : Dégradé américain, Coupe afro, Barbe, Rasage traditionnel, Hair Design, Coloration…
+  skillTags       String[]
+  delayStatus     DelayStatus @default(ON_TIME)
+  delayUpdatedAt  DateTime    @default(now())
+  active          Boolean     @default(true)
+
+  galleryPhotos GalleryPhoto[]
+  appointments  Appointment[]
+  reviews       Review[]
+  workingHours  WorkingHours[]
+  blockedSlots  BlockedSlot[]
+  pricingRules  PricingRule[]
+}
+
+model GalleryPhoto {
+  id       String        @id @default(cuid())
+  barberId String
+  barber   BarberProfile @relation(fields: [barberId], references: [id])
+  url      String
+  caption  String?
+}
+
+model WorkingHours {
+  id        String        @id @default(cuid())
+  barberId  String
+  barber    BarberProfile @relation(fields: [barberId], references: [id])
+  weekday   Int // 0 = dimanche … 6 = samedi
+  startTime String // "09:00"
+  endTime   String // "19:00"
+}
+
+model BlockedSlot {
+  id       String        @id @default(cuid())
+  barberId String
+  barber   BarberProfile @relation(fields: [barberId], references: [id])
+  startsAt DateTime
+  endsAt   DateTime
+  reason   String?
+}
+
+// ───────────────────────── Prestations ─────────────────────────
+
+model Service {
+  id              String  @id @default(cuid())
+  name            String // Coupe Homme, Coupe + Barbe, Barbe seule, Coupe enfant, Hair Design, Premium Package…
+  description     String?
+  durationMinutes Int
+  basePriceCents  Int
+  active          Boolean @default(true)
+
+  appointments AppointmentService[]
+  pricingRules PricingRule[]
+}
+
+// ───────────────────────── Tarification dynamique ─────────────────────────
+
+enum PricingRuleType {
+  EVENING // après `startHour`, prix fixe de remplacement
+  NIGHT // après `startHour` (plus tardif), prix fixe de remplacement
+  WEEKEND // majoration en %
+  HOLIDAY // majoration en %
+  URGENCY // réservation < `urgencyWindowMinutes` avant le RDV, majoration en %
+  CUSTOM // prix personnalisé (barber et/ou prestation)
+}
+
+model PricingRule {
+  id        String          @id @default(cuid())
+  type      PricingRuleType
+  label     String
+  active    Boolean         @default(true)
+  // Ciblage optionnel : règle globale si null
+  serviceId String?
+  service   Service?        @relation(fields: [serviceId], references: [id])
+  barberId  String?
+  barber    BarberProfile?  @relation(fields: [barberId], references: [id])
+  // EVENING / NIGHT / CUSTOM : prix fixe de remplacement
+  fixedPriceCents Int?
+  startHour       Int? // ex. 20 pour "après 20h"
+  // WEEKEND / HOLIDAY / URGENCY : majoration en pourcentage (ex. 20 = +20 %)
+  surchargePercent      Int?
+  urgencyWindowMinutes  Int? // ex. 120 pour "moins de 2h avant"
+}
+
+model Holiday {
+  id    String   @id @default(cuid())
+  date  DateTime @unique
+  label String
+}
+
+// ───────────────────────── Réservations ─────────────────────────
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+model Appointment {
+  id        String            @id @default(cuid())
+  clientId  String
+  client    User              @relation("ClientAppointments", fields: [clientId], references: [id])
+  barberId  String
+  barber    BarberProfile     @relation(fields: [barberId], references: [id])
+  startsAt  DateTime
+  endsAt    DateTime
+  status    AppointmentStatus @default(PENDING)
+  // Prix calculé par le moteur de tarification au moment de la réservation
+  totalPriceCents   Int
+  appliedRuleLabels String[]
+  depositCents      Int      @default(0)
+  paidOnSite        Boolean  @default(false)
+  createdAt         DateTime @default(now())
+
+  services AppointmentService[]
+  photos   AppointmentPhoto[]
+  review   Review?
+}
+
+model AppointmentService {
+  appointmentId String
+  appointment   Appointment @relation(fields: [appointmentId], references: [id])
+  serviceId     String
+  service       Service     @relation(fields: [serviceId], references: [id])
+  priceCents    Int
+
+  @@id([appointmentId, serviceId])
+}
+
+// 1 à 10 photos prises par le barber, attachées à la prestation (galerie "Mes Coupes")
+model AppointmentPhoto {
+  id            String      @id @default(cuid())
+  appointmentId String
+  appointment   Appointment @relation(fields: [appointmentId], references: [id])
+  url           String
+  label         String? // Face, Profil gauche, Profil droit, Arrière…
+  createdAt     DateTime    @default(now())
+}
+
+// ───────────────────────── Avis ─────────────────────────
+
+model Review {
+  id            String        @id @default(cuid())
+  appointmentId String        @unique
+  appointment   Appointment   @relation(fields: [appointmentId], references: [id])
+  authorId      String
+  author        User          @relation(fields: [authorId], references: [id])
+  barberId      String
+  barber        BarberProfile @relation(fields: [barberId], references: [id])
+  rating        Int // 1..5
+  comment       String?
+  photoUrls     String[]
+  published     Boolean       @default(true)
+  createdAt     DateTime      @default(now())
+}
+
+// Paramètres admin de visibilité des avis (PRD §8)
+model ReviewSettings {
+  id          Int     @id @default(1)
+  showReviews Boolean @default(true)
+  showRating  Boolean @default(true)
+  showPhotos  Boolean @default(true)
+}
+
+// ───────────────────────── Boutique ─────────────────────────
+
+enum ProductCategory {
+  CIRE
+  POMMADE
+  HUILE_BARBE
+  SHAMPOING
+  ACCESSOIRE
+}
+
+model Product {
+  id          String          @id @default(cuid())
+  name        String
+  description String?
+  category    ProductCategory
+  priceCents  Int
+  stock       Int             @default(0)
+  photoUrls   String[]
+  videoUrl    String?
+  active      Boolean         @default(true)
+
+  orderItems OrderItem[]
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  FULFILLED
+  CANCELLED
+}
+
+model Order {
+  id         String      @id @default(cuid())
+  clientId   String
+  client     User        @relation(fields: [clientId], references: [id])
+  status     OrderStatus @default(PENDING)
+  totalCents Int
+  createdAt  DateTime    @default(now())
+
+  items OrderItem[]
+}
+
+model OrderItem {
+  orderId        String
+  order          Order   @relation(fields: [orderId], references: [id])
+  productId      String
+  product        Product @relation(fields: [productId], references: [id])
+  quantity       Int
+  unitPriceCents Int
+
+  @@id([orderId, productId])
+}
+
+// ───────────────────────── Fidélité ─────────────────────────
+
+enum LoyaltyReason {
+  EARN_APPOINTMENT // 1 € dépensé = 1 point
+  EARN_ORDER
+  REDEEM_DISCOUNT
+  REDEEM_PRODUCT
+  REDEEM_HAIRCUT
+}
+
+model LoyaltyTransaction {
+  id        String        @id @default(cuid())
+  userId    String
+  user      User          @relation(fields: [userId], references: [id])
+  points    Int // positif = gain, négatif = dépense
+  reason    LoyaltyReason
+  createdAt DateTime      @default(now())
+}
+
+// ───────────────────────── Notifications ─────────────────────────
+
+model DeviceToken {
+  id       String @id @default(cuid())
+  userId   String
+  user     User   @relation(fields: [userId], references: [id])
+  token    String @unique
+  platform String // ios | android
+}

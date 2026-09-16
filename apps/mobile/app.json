@@ -1,0 +1,22 @@
+{
+  "expo": {
+    "name": "barbr",
+    "slug": "barbr",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#000000"
+    },
+    "ios": {
+      "bundleIdentifier": "app.barbr.mobile",
+      "supportsTablet": false
+    },
+    "android": {
+      "package": "app.barbr.mobile"
+    }
+  }
+}

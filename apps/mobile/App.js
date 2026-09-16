@@ -1,0 +1,5251 @@
+// barbr — application mobile (démo autonome, sans serveur)
+// Deux interfaces reliées par un agenda partagé :
+//  · Client : recherche par position & style, réservation dans les créneaux ouverts
+//  · Barber : ouverture des créneaux, formules de rendez-vous, planning, statut, activité
+// Design premium : noir profond, or champagne, serif élégante.
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Animated,
+  Dimensions,
+  Image,
+  Linking,
+  Platform,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { Feather } from '@expo/vector-icons';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as ImagePicker from 'expo-image-picker';
+import * as Location from 'expo-location';
+import * as MediaLibrary from 'expo-media-library';
+
+/* ───────── Thème ───────── */
+const C = {
+  bg: '#0A0A0B',
+  surface: '#131316',
+  surface2: '#1B1B20',
+  line: 'rgba(255,255,255,0.08)',
+  lineGold: 'rgba(200,169,106,0.32)',
+  gold: '#C8A96A',
+  gold2: '#E6CFA0',
+  ink: '#0E0D0B',
+  text: '#F1EEE7',
+  muted: '#908D86',
+  soft: '#A5A29B',
+  green: '#7FB98F',
+  orange: '#D9A05B',
+  red: '#C97B6E',
+  gray: '#76736D',
+};
+const SERIF = Platform.select({ ios: 'Georgia', default: 'serif' });
+const SCREEN_W = Dimensions.get('window').width;
+const PAD = 20;
+const PCARD_W = Math.floor((Math.min(SCREEN_W, 500) - PAD * 2 - 11) / 2);
+const SLOT_W = Math.floor((Math.min(SCREEN_W, 500) - PAD * 2 - 16) / 3);
+const SMALL = SCREEN_W < 370;
+
+/* ───────── Données de démonstration ───────── */
+const TEX = ['#211D15', '#181B20', '#1F1715', '#161B17'];
+const COVER_COLORS = [
+  '#211D15', '#181B20', '#1F1715', '#161B17',
+  '#1A1520', '#151A18', '#0F1520', '#1A1810',
+  '#1C1014', '#0E1518',
+];
+
+const DELAY = {
+  ON_TIME: { dot: C.green, label: 'À l’heure' },
+  DELAY_5: { dot: C.orange, label: '5 min de retard' },
+  DELAY_10: { dot: C.orange, label: '10 min de retard' },
+  DELAY_15: { dot: C.red, label: '15 min de retard' },
+  DELAY_15_PLUS: { dot: C.red, label: 'Plus de 15 min' },
+  ABSENT: { dot: C.gray, label: 'Absent' },
+};
+
+// Styles de coupe recherchables
+const STYLES = [
+  'Fade', 'Burst Fade', 'Taper', 'Transformation', 'Dégradé américain',
+  'Coupe afro', 'Locks', 'Barbe', 'Rasage traditionnel', 'Hair Design', 'Coloration',
+];
+
+// Lieu d’exercice — affiché en badge sur les fiches
+const VENUES = { salon: 'En salon', studio: 'Studio privé', domicile: 'À domicile' };
+
+const BARBERS = [
+  {
+    id: 'enzo', name: 'Enzo Moreau', ini: 'EM', tex: 0, years: 8, rating: '4,9',
+    salon: 'barbr — Le Salon', city: 'Lille Centre', dist: 0.8,
+    venue: 'salon', address: '12 rue Nationale, 59000 Lille',
+    clients: '1 240', prestations: '3 680', ponct: 97, delay: 'ON_TIME',
+    shopEnabled: true, shopMode: 'vitrine', loyalty: true,
+    loyaltyRate: 1,
+    loyaltyTiers: [
+      { id: 't1', pts: 50, label: '5 € de réduction' },
+      { id: 't2', pts: 100, label: '10 € de réduction' },
+      { id: 't3', pts: 250, label: 'Coupe offerte' },
+      { id: 't4', pts: 500, label: 'Package Premium offert' },
+    ],
+    tags: ['Burst Fade', 'Fade', 'Dégradé américain', 'Barbe'],
+    bio: 'Spécialiste du burst fade et du dégradé américain depuis huit ans. Précision du trait, finitions au rasoir.',
+    story: 'Tout a commencé à 16 ans, une tondeuse à la main, dans le garage familial. Après un CAP coiffure et cinq ans dans les salons du Vieux-Lille, j’ai rejoint barbr pour y imposer ma signature : des dégradés au millimètre, jamais pressés, toujours finis au rasoir. Chaque client repart avec des conseils d’entretien personnalisés.',
+    photos: [
+      { id: 'ph1', label: 'Burst Fade', tex: 0 },
+      { id: 'ph2', label: 'Dégradé', tex: 1 },
+      { id: 'ph3', label: 'Barbe', tex: 2 },
+      { id: 'ph4', label: 'Finitions', tex: 3 },
+    ],
+    reviews: [
+      { who: 'Karim', note: 5, txt: 'Le meilleur burst fade de la ville. Je ne vais plus nulle part ailleurs.' },
+      { who: 'Lucas', note: 5, txt: 'Toujours à l’heure, toujours impeccable.' },
+      { who: 'Mehdi', note: 4, txt: 'Très beau travail sur la barbe, salon élégant.' },
+    ],
+  },
+  {
+    id: 'sofiane', name: 'Sofiane Kaci', ini: 'SK', tex: 1, years: 6, rating: '4,7',
+    salon: 'barbr — Le Salon', city: 'Lille Centre', dist: 0.8,
+    venue: 'salon', address: '12 rue Nationale, 59000 Lille',
+    clients: '860', prestations: '2 210', ponct: 91, delay: 'DELAY_10',
+    tags: ['Rasage traditionnel', 'Barbe', 'Coloration'],
+    bio: 'Maître du rasage à l’ancienne : serviette chaude, coupe-chou et soins. Un rituel plus qu’une prestation.',
+    story: 'Formé à Istanbul auprès des maîtres barbiers du Grand Bazar, je perpétue un rituel qui se perd : serviette chaude, blaireau, coupe-chou et soin final. Trente minutes hors du temps. La barbe est un art de patience — la mienne et la vôtre.',
+    reviews: [
+      { who: 'Antoine', note: 5, txt: 'Le rasage serviette chaude est une expérience à part.' },
+      { who: 'Yanis', note: 4, txt: 'Excellent, juste un peu d’attente parfois.' },
+    ],
+  },
+  {
+    id: 'marco', name: 'Marco Vitale', ini: 'MV', tex: 2, years: 5, rating: '4,8',
+    salon: 'Se déplace chez vous', city: 'Lille & alentours', dist: 1.5,
+    venue: 'domicile', address: 'Lille, La Madeleine, Lambersart',
+    clients: '540', prestations: '1 490', ponct: 95, delay: 'ON_TIME',
+    tags: ['Hair Design', 'Taper', 'Coupe enfant'],
+    bio: 'Hair design et motifs sur mesure, directement chez vous. Chaque coupe est traitée comme une pièce unique.',
+    story: 'J’ai choisi le domicile pour une raison simple : c’est chez vous que vous êtes le plus détendu. J’arrive avec tout mon matériel, une bâche, et trente minutes plus tard votre salon redevient un salon. Spécialiste des motifs et des coupes enfant — même les plus remuants.',
+    reviews: [{ who: 'Sacha', note: 5, txt: 'Le motif était exactement celui que j’imaginais. Et sans bouger de chez moi.' }],
+  },
+  {
+    id: 'ibra', name: 'Ibrahim Diallo', ini: 'ID', tex: 3, years: 7, rating: '4,9',
+    salon: 'Kings Cut', city: 'Wazemmes', dist: 2.1,
+    venue: 'studio', address: '4 rue des Sarrazins, 59000 Lille',
+    clients: '980', prestations: '2 870', ponct: 94, delay: 'ON_TIME',
+    tags: ['Coupe afro', 'Burst Fade', 'Locks', 'Transformation'],
+    bio: 'Référence coupe afro et locks. Les transformations complètes sont sa signature — avant/après garantis.',
+    story: 'Kings Cut, c’est mon studio privé : un fauteuil, un client à la fois, zéro attente. Dix ans à travailler le cheveu texturé m’ont appris une chose — il n’y a pas une coupe afro, il y en a mille. Les transformations sont mes préférées : on prend le temps, on photographie l’avant, et l’après parle tout seul.',
+    reviews: [{ who: 'Moussa', note: 5, txt: 'Transformation totale, je ne me reconnaissais plus. Incroyable.' }],
+  },
+  {
+    id: 'lucas', name: 'Lucas Brun', ini: 'LB', tex: 1, years: 4, rating: '4,6',
+    salon: 'Le Comptoir du Barbier', city: 'Roubaix', dist: 3.4,
+    venue: 'salon', address: '28 Grande Rue, 59100 Roubaix',
+    clients: '410', prestations: '1 120', ponct: 92, delay: 'ON_TIME',
+    tags: ['Taper', 'Fade', 'Barbe'],
+    bio: 'Taper et fade au cordeau, dans un comptoir à l’ancienne. Simple, net, précis.',
+    story: 'Le Comptoir, c’est carrelage d’époque, fauteuils en cuir et café offert. Pas de chichis : un taper net, un fade propre, une barbe dessinée. Je préfère faire trois choses parfaitement que dix à moitié.',
+    reviews: [{ who: 'Hugo', note: 5, txt: 'Mon taper n’a jamais été aussi propre.' }],
+  },
+  {
+    id: 'yanis', name: 'Yanis Cohen', ini: 'YC', tex: 2, years: 9, rating: '4,8',
+    salon: 'Studio Y', city: 'Villeneuve-d’Ascq', dist: 5.2,
+    venue: 'studio', address: '2 allée des Lilas, 59650 Villeneuve-d’Ascq',
+    clients: '1 150', prestations: '3 240', ponct: 96, delay: 'ON_TIME',
+    tags: ['Transformation', 'Coloration', 'Hair Design'],
+    bio: 'Studio dédié aux métamorphoses : coloration, hair design et transformations complètes sur rendez-vous long.',
+    story: 'Studio Y est pensé comme un atelier d’artiste : lumière contrôlée, miroirs sans concession, playlists choisies. On y vient pour changer — de couleur, de style, de tête. Apportez une photo d’inspiration, repartez avec mieux.',
+    reviews: [{ who: 'Théo', note: 5, txt: 'Coloration + design parfaits, le résultat dépasse la photo d’inspiration.' }],
+  },
+];
+
+const SERVICES = [
+  { id: 's1', name: 'Coupe Homme', dur: 30, price: 2500 },
+  { id: 's2', name: 'Coupe + Barbe', dur: 45, price: 3500 },
+  { id: 's3', name: 'Barbe seule', dur: 20, price: 1500 },
+  { id: 's4', name: 'Coupe enfant', dur: 25, price: 1800 },
+  { id: 's5', name: 'Hair Design', dur: 60, price: 4500 },
+  { id: 's6', name: 'Premium Package', dur: 90, price: 7000 },
+];
+
+/* Formules de rendez-vous — créées et activées par le barber */
+const WINDOWS = { all: 'Libre', day: 'Journée', evening: 'Soirée', night: 'Nuit' };
+
+function initFormulas() {
+  return [
+    { id: 'f1', name: 'Classique', icon: 'scissors', dur: 30, window: 'all',
+      price: 2500, surE: true, surN: true, surW: true, surU: true,
+      recur: false, active: true, desc: 'Prestation standard — majorations activables.' },
+    { id: 'f2', name: 'Nocturne', icon: 'moon', dur: 45, window: 'night',
+      price: 3500, fromH: 20, surE: false, surN: false, surW: false, surU: false,
+      recur: false, active: true, desc: 'Séance nocturne — tarif tout compris.' },
+    { id: 'f3', name: 'Transformation', icon: 'star', dur: 120, window: 'day',
+      price: 9000, surE: false, surN: false, surW: false, surU: false,
+      recur: false, active: true, desc: 'Refonte complète — 2 h, photos avant/après.' },
+    { id: 'f4', name: 'Hebdomadaire', icon: 'refresh-cw', dur: 30, window: 'all',
+      price: 2000, surE: false, surN: false, surW: false, surU: false,
+      recur: true, active: false, desc: 'Même créneau chaque semaine — fidélité -15 %.' },
+  ];
+}
+
+const CATS = [
+  ['ALL', 'Tout'], ['CIRE', 'Cires'], ['POMMADE', 'Pommades'],
+  ['HUILE', 'Huiles'], ['SHAMP', 'Shampoings'], ['ACC', 'Accessoires'],
+];
+const PRODUCTS = [
+  { id: 'p1', name: 'Cire coiffante mate', cat: 'CIRE', price: 1490, stock: 40, ic: 'box', tex: 0 },
+  { id: 'p2', name: 'Pommade brillante', cat: 'POMMADE', price: 1690, stock: 25, ic: 'droplet', tex: 1 },
+  { id: 'p3', name: 'Huile à barbe — cèdre', cat: 'HUILE', price: 1990, stock: 30, ic: 'droplet', tex: 2 },
+  { id: 'p4', name: 'Shampoing fortifiant', cat: 'SHAMP', price: 1290, stock: 50, ic: 'droplet', tex: 3 },
+  { id: 'p5', name: 'Peigne en bois', cat: 'ACC', price: 990, stock: 60, ic: 'align-justify', tex: 0 },
+  { id: 'p6', name: 'Tondeuse de finition', cat: 'ACC', price: 4990, stock: 8, ic: 'zap', tex: 1 },
+];
+
+const HISTORY = [
+  {
+    id: 'h1', date: '12 avril 2026', barber: 'Enzo Moreau', barberId: 'enzo',
+    servs: 'Coupe + Barbe', price: 3500, rating: 5,
+    photos: [
+      { id: 'hp1', label: 'Face', tex: 0 }, { id: 'hp2', label: 'Profil gauche', tex: 1 },
+      { id: 'hp3', label: 'Profil droit', tex: 2 }, { id: 'hp4', label: 'Arrière', tex: 3 },
+    ],
+  },
+  {
+    id: 'h2', date: '2 mars 2026', barber: 'Marco Vitale', barberId: 'marco',
+    servs: 'Hair Design', price: 4500, rating: null,
+    photos: [{ id: 'hp5', label: 'Face', tex: 2 }, { id: 'hp6', label: 'Arrière', tex: 1 }],
+  },
+];
+
+/* ───────── Notifications de démonstration (PRD §10) ───────── */
+const DEMO_NOTIFS = [
+  {
+    id: 'n1', icon: 'check-circle', color: '#7FB98F', unread: true,
+    title: 'Réservation confirmée',
+    msg: 'Enzo Moreau — Coupe + Barbe · Demain à 10h30. Salon barbr, 12 rue Nationale.',
+    time: 'À l’instant',
+  },
+  {
+    id: 'n2', icon: 'clock', color: '#C8A96A', unread: true,
+    title: 'Rappel J-1',
+    msg: 'Votre coupe chez Enzo Moreau est demain à 10h30. Pensez à confirmer votre présence.',
+    time: 'Il y a 2h',
+  },
+  {
+    id: 'n3', icon: 'alert-circle', color: '#D9A05B', unread: false,
+    title: 'Enzo Moreau est en retard',
+    msg: '10 min de retard sur votre RDV de 14h00. Nouvelle heure de passage estimée : 14h10.',
+    time: 'Hier, 13h52',
+  },
+  {
+    id: 'n4', icon: 'tag', color: '#C8A96A', unread: false,
+    title: 'Offre spéciale week-end',
+    msg: '-20 % sur la formule Transformation chez Ibrahim Diallo — ce samedi et dimanche.',
+    time: 'Il y a 3 jours',
+  },
+  {
+    id: 'n5', icon: 'bell', color: '#908D86', unread: false,
+    title: 'Nouveaux créneaux disponibles',
+    msg: 'Marco Vitale a ouvert de nouveaux créneaux cette semaine à partir de 17h. Réservez vite !',
+    time: 'Il y a 5 jours',
+  },
+];
+
+/* ───────── Jours & créneaux ───────── */
+const WD = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
+const MO = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+const MO_SHORT = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+const HORIZON = 60; // jours réservables / ouvrables à l’avance
+/* Grille horaire 9h → 23h, au pas choisi par le barber (15 à 60 min) */
+function timesFor(step, endH) {
+  const e = (endH ?? 23) * 60;
+  const out = [];
+  for (let t = 9 * 60; t + step <= e; t += step) {
+    const h = Math.floor(t / 60) % 24;
+    out.push(`${String(h).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`);
+  }
+  return out;
+}
+const TIMES = timesFor(30, 23); // grille par défaut
+function makeDays() {
+  const out = [];
+  for (let i = 0; i < HORIZON; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() + i);
+    d.setHours(0, 0, 0, 0);
+    const label = i === 0 ? 'Aujourd’hui' : i === 1 ? 'Demain'
+      : `${WD[d.getDay()]} ${d.getDate()} ${MO_SHORT[d.getMonth()]}`;
+    out.push({ key: d.toDateString(), label, date: d });
+  }
+  return out;
+}
+const DAYS = makeDays();
+const DAY_INDEX = {};
+DAYS.forEach((d, i) => { DAY_INDEX[d.key] = i; });
+const timeToDate = (day, time) => {
+  const [h, m] = time.split(':').map(Number);
+  const d = new Date(day.date);
+  d.setHours(h, m, 0, 0);
+  return d;
+};
+const inWindow = (time, window, fromH) => {
+  const h = Number(time.slice(0, 2));
+  if (window === 'day') return h < (fromH ?? 20);
+  if (window === 'evening') return h >= (fromH ?? 18);
+  if (window === 'night') return h >= (fromH ?? 20);
+  return true;
+};
+
+/* Agenda partagé : agenda[barberId][dayKey][time] =
+   { status:'open' } ou { status:'booked', who, serv, price, done } — absent = fermé. */
+function initAgenda() {
+  const agenda = {};
+  BARBERS.forEach((b, bi) => {
+    agenda[b.id] = {};
+    DAYS.forEach((day, di) => {
+      const slots = {};
+      TIMES.forEach((time, ti) => {
+        if (b.id === 'enzo') {
+          const h = Number(time.slice(0, 2));
+          const openToday = (h >= 9 && h < 12) || (h >= 14 && h < 18) || (h >= 20 && h <= 22);
+          const openOther = h >= 9 && h < 18 && (ti + di) % 4 !== 0;
+          if (di === 0 ? openToday : openOther) slots[time] = { status: 'open' };
+        } else if ((ti + bi * 2 + di) % 3 !== 0) {
+          slots[time] = { status: 'open' };
+          if ((ti * (di + 2) + bi) % 11 === 4) {
+            slots[time] = { status: 'booked', who: 'Client', serv: 'Coupe Homme', price: 2500, done: false };
+          }
+        }
+      });
+      agenda[b.id][day.key] = slots;
+    });
+  });
+  const today = agenda.enzo[DAYS[0].key];
+  [
+    ['09:30', 'Karim D.', 'Coupe Homme', 2500, true],
+    ['10:30', 'Lucas B.', 'Coupe + Barbe', 3500, true],
+    ['11:30', 'Mehdi A.', 'Barbe seule', 1500, false],
+    ['14:00', 'Sacha L.', 'Transformation', 9000, false],
+    ['16:00', 'Noah P.', 'Coupe enfant', 1800, false],
+    ['20:30', 'Tom R.', 'Nocturne · Coupe Homme', 3500, false],
+  ].forEach(([time, who, serv, price, done]) => {
+    today[time] = { status: 'booked', who, serv, price, done };
+  });
+  return agenda;
+}
+
+/* Tarification par formule : prix fixe + majorations optionnelles */
+function quoteFor(formula, _service, slotDate, now) {
+  let price = formula.price ?? 0;
+  const rules = [];
+  const h = slotDate.getHours();
+  const d = slotDate.getDay();
+  if (formula.surN && h >= 22) { price += 2500; rules.push('+25 € nuit'); }
+  else if (formula.surE && h >= 20) { price += 1000; rules.push('+10 € soirée'); }
+  if (formula.surW && (d === 0 || d === 6)) { price = Math.round(price * 1.15); rules.push('Week-end +15 %'); }
+  if (formula.surU && (slotDate - now) / 60000 < 120 && slotDate > now) { price = Math.round(price * 1.2); rules.push('Urgence +20 %'); }
+  if (formula.recur) { price = Math.round(price * 0.85); rules.push('Hebdo -15 %'); }
+  return { price, rules };
+}
+const fmt = (c) =>
+  (c / 100).toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + ' €';
+
+/* ───────── Petits composants ───────── */
+const Kicker = ({ children }) => <Text style={s.kicker}>{children}</Text>;
+const Title = ({ children, em }) => (
+  <Text style={s.title}>
+    {children}
+    {em ? <Text style={s.titleEm}>{em}</Text> : null}
+  </Text>
+);
+const Lead = ({ children }) => <Text style={s.lead}>{children}</Text>;
+
+const Section = ({ children, note }) => (
+  <View style={s.secRow}>
+    <Text style={s.secText}>{children}</Text>
+    {note ? <Text style={s.secNote}>{note}</Text> : null}
+    <View style={s.secLine} />
+  </View>
+);
+
+const Ava = ({ b, lg }) => (
+  <View style={[s.ava, lg && s.avaLg, { backgroundColor: TEX[b.tex] }]}>
+    <Text style={[s.avaText, lg && { fontSize: 30 }]}>{b.ini}</Text>
+  </View>
+);
+
+const Badge = ({ status }) => (
+  <View style={s.badge}>
+    <View style={[s.dot, { backgroundColor: DELAY[status].dot }]} />
+    <Text style={s.badgeText}>{DELAY[status].label}</Text>
+  </View>
+);
+
+const Tag = ({ label }) => (
+  <View style={s.tag}>
+    <Text style={s.tagText}>{label}</Text>
+  </View>
+);
+
+const Chip = ({ label, price, on, onPress, mini }) => (
+  <TouchableOpacity
+    style={[s.chip, mini && s.chipMini, on && s.chipOn]}
+    onPress={onPress}
+    activeOpacity={0.8}
+    disabled={!onPress}
+  >
+    <Text style={[s.chipText, on && s.chipTextOn]}>
+      {label}
+      {price ? <Text style={[s.chipPrice, on && s.chipTextOn]}>  {price}</Text> : null}
+    </Text>
+  </TouchableOpacity>
+);
+
+/* Calendrier mensuel — sélection d’une date sur 2 mois, points de statut par jour */
+// Absences : une periode fermee masque les creneaux cote client, sans les detruire
+const isClosedOn = (closures, dayKey) => {
+  const idx = DAY_INDEX[dayKey];
+  if (idx == null) return false;
+  return (closures || []).some((c) => idx >= c.fromIdx && idx <= c.toIdx);
+};
+
+function Calendar({ sel, onSel, markFor, onlyMarked, range }) {
+  const now = new Date();
+  const [mOff, setMOff] = useState(0);
+  const base = new Date(now.getFullYear(), now.getMonth() + mOff, 1);
+  const year = base.getFullYear();
+  const month = base.getMonth();
+  const firstDow = (base.getDay() + 6) % 7; // semaine qui démarre lundi
+  const nDays = new Date(year, month + 1, 0).getDate();
+  const cells = [];
+  for (let i = 0; i < firstDow; i++) cells.push(null);
+  for (let d = 1; d <= nDays; d++) cells.push(d);
+
+  return (
+    <View style={s.cal}>
+      <View style={s.calHead}>
+        <TouchableOpacity disabled={mOff === 0} onPress={() => setMOff(mOff - 1)}
+          hitSlop={12} style={{ opacity: mOff === 0 ? 0.25 : 1 }}>
+          <Feather name="chevron-left" size={19} color={C.gold} />
+        </TouchableOpacity>
+        <Text style={s.calMonth}>{MO[month]} {year}</Text>
+        <TouchableOpacity disabled={mOff >= 2} onPress={() => setMOff(mOff + 1)}
+          hitSlop={12} style={{ opacity: mOff >= 2 ? 0.25 : 1 }}>
+          <Feather name="chevron-right" size={19} color={C.gold} />
+        </TouchableOpacity>
+      </View>
+      <View style={s.calGrid}>
+        {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((w, i) => (
+          <View key={'w' + i} style={s.calCell}>
+            <Text style={s.calWd}>{w}</Text>
+          </View>
+        ))}
+        {cells.map((d, i) => {
+          if (d === null) return <View key={'b' + i} style={s.calCell} />;
+          const key = new Date(year, month, d).toDateString();
+          const idx = DAY_INDEX[key];
+          const enabled = idx != null && (!onlyMarked || !!(markFor && markFor(key)));
+          const on = enabled && sel === idx;
+          const mark = enabled && markFor ? markFor(key) : null;
+          const inRange = range && range.from != null && idx != null
+            && idx >= range.from && idx <= (range.to != null ? range.to : range.from);
+          return (
+            <TouchableOpacity key={key} style={s.calCell} disabled={!enabled}
+              onPress={() => onSel(idx)} activeOpacity={0.7}>
+              <View style={[s.calNumWrap, inRange && { backgroundColor: 'rgba(217,160,91,0.22)', borderRadius: 14 }, on && s.calNumOn]}>
+                <Text style={[s.calNum, !enabled && { color: '#3E3C38' }, on && { color: C.ink, fontWeight: '700' }]}>
+                  {d}
+                </Text>
+              </View>
+              <View style={[
+                s.calDot,
+                mark === 'open' && { backgroundColor: C.gold },
+                mark === 'booked' && { backgroundColor: C.green },
+              ]} />
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+const Photo = ({ label, tex, uri }) => (
+  <View style={[s.photo, { backgroundColor: TEX[tex] || '#1C1B18' }]}>
+    {uri
+      ? <Image source={{ uri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+      : <Feather name="scissors" size={26} color="rgba(200,169,106,0.45)" />
+    }
+    {label ? <Text style={s.photoLabel}>{label}</Text> : null}
+  </View>
+);
+
+/* Visionneuse plein écran — onDownload (facultatif) ajoute le bouton Télécharger */
+function PhotoViewer({ photo, onClose, onDownload }) {
+  if (!photo) return null;
+  return (
+    <View style={[s.modalOverlay, { justifyContent: 'center', padding: 26 }]}>
+      <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
+      <View style={s.viewerBox}>
+        {photo.uri ? (
+          <Image source={{ uri: photo.uri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+        ) : (
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: TEX[photo.tex] || '#1C1B18', alignItems: 'center', justifyContent: 'center' }]}>
+            <Feather name="scissors" size={52} color="rgba(200,169,106,0.45)" />
+          </View>
+        )}
+      </View>
+      {photo.label ? <Text style={s.viewerLabel}>{photo.label}</Text> : null}
+      {onDownload && (
+        <TouchableOpacity style={s.viewerDl} onPress={() => onDownload(photo)} activeOpacity={0.85}>
+          <Feather name="download" size={15} color={C.ink} />
+          <Text style={s.viewerDlText}>TÉLÉCHARGER</Text>
+        </TouchableOpacity>
+      )}
+      <TouchableOpacity style={s.viewerClose} onPress={onClose} hitSlop={10}>
+        <Feather name="x" size={20} color={C.text} />
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+/* Enregistre dans la galerie du téléphone les photos qui ont un vrai fichier */
+async function savePhotos(photos, toast) {
+  const real = photos.filter((p) => p.uri);
+  if (real.length === 0) {
+    toast('Photos de démonstration — rien à enregistrer.');
+    return;
+  }
+  const { status } = await MediaLibrary.requestPermissionsAsync();
+  if (status !== 'granted') {
+    toast('Permission refusée — autorisez l’accès aux photos.');
+    return;
+  }
+  for (const p of real) await MediaLibrary.saveToLibraryAsync(p.uri);
+  toast(`${real.length} photo${real.length > 1 ? 's' : ''} enregistrée${real.length > 1 ? 's' : ''} dans votre galerie.`);
+}
+
+const Stars = ({ n }) => (
+  <Text style={s.rate}>
+    {'★'.repeat(n)}
+    <Text style={{ opacity: 0.25 }}>{'★'.repeat(5 - n)}</Text>
+  </Text>
+);
+
+const Btn = ({ label, ghost, onPress, icon }) => (
+  <TouchableOpacity style={[s.btn, ghost && s.btnGhost]} onPress={onPress} activeOpacity={0.85}>
+    {icon ? <Feather name={icon} size={15} color={ghost ? C.gold : C.ink} style={{ marginRight: 8 }} /> : null}
+    <Text style={[s.btnText, ghost && { color: C.gold }]}>{label}</Text>
+  </TouchableOpacity>
+);
+
+const Toggle = ({ on, onPress }) => (
+  <TouchableOpacity style={[s.sw, on && s.swOn]} onPress={onPress} activeOpacity={0.8} hitSlop={8}>
+    <View style={[s.swKnob, on && s.swKnobOn]} />
+  </TouchableOpacity>
+);
+
+/* ───────── Panel notifications (PRD §10) ───────── */
+function NotifPanel({ notifs, setNotifs, onClose }) {
+  const [filter, setFilter] = React.useState('all');
+  const unreadCount = notifs.filter((n) => n.unread).length;
+  const markAll = () => setNotifs((ns) => ns.map((n) => ({ ...n, unread: false })));
+  const markOne = (id) => setNotifs((ns) => ns.map((n) => n.id === id ? { ...n, unread: false } : n));
+  const remove = (id) => setNotifs((ns) => ns.filter((n) => n.id !== id));
+  const clearAll = () => { setNotifs([]); };
+
+  const CATS = [
+    { k: 'all', label: 'Tout' },
+    { k: 'resa', label: 'Réservations' },
+    { k: 'alert', label: 'Alertes' },
+    { k: 'promo', label: 'Promos' },
+  ];
+  const catFor = (n) => {
+    if (['check-circle', 'calendar', 'clock'].includes(n.icon)) return 'resa';
+    if (['alert-circle', 'alert-triangle'].includes(n.icon)) return 'alert';
+    return 'promo';
+  };
+  const visible = filter === 'all' ? notifs : notifs.filter((n) => catFor(n) === filter);
+
+  return (
+    <View style={s.modalOverlay}>
+      <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
+      <View style={s.notifPanel}>
+        <View style={{ alignSelf: 'center', width: 40, height: 4, borderRadius: 2,
+          backgroundColor: 'rgba(255,255,255,0.15)', marginBottom: 20 }} />
+
+        <View style={[s.row, { marginBottom: 14, alignItems: 'center' }]}>
+          <View style={s.grow}>
+            <Text style={s.secText}>Notifications</Text>
+            {unreadCount > 0 && (
+              <Text style={[s.btags, { marginTop: 2 }]}>{unreadCount} non lue{unreadCount > 1 ? 's' : ''}</Text>
+            )}
+          </View>
+          <View style={[s.row, { gap: 16 }]}>
+            {unreadCount > 0 && (
+              <TouchableOpacity onPress={markAll} hitSlop={10}>
+                <Text style={[s.authLink, { fontSize: 12 }]}>Tout lire</Text>
+              </TouchableOpacity>
+            )}
+            {notifs.length > 0 && (
+              <TouchableOpacity onPress={clearAll} hitSlop={10}>
+                <Text style={[s.footnoteLeft, { color: C.muted, fontSize: 12 }]}>Effacer tout</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
+          <View style={[s.row, { gap: 7 }]}>
+            {CATS.map((c) => (
+              <TouchableOpacity key={c.k}
+                style={[s.chip, { paddingVertical: 5, paddingHorizontal: 12 },
+                  filter === c.k && { backgroundColor: C.gold, borderColor: C.gold }]}
+                onPress={() => setFilter(c.k)}>
+                <Text style={[s.chipText, filter === c.k && { color: '#000' }]}>{c.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </ScrollView>
+
+        <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 380 }}>
+          {visible.length === 0 ? (
+            <View style={{ alignItems: 'center', paddingVertical: 36 }}>
+              <Feather name="bell-off" size={26} color={C.muted} style={{ marginBottom: 10 }} />
+              <Text style={s.footnote}>Aucune notification</Text>
+            </View>
+          ) : (
+            visible.map((n) => (
+              <View key={n.id} style={[s.notifRow, n.unread && s.notifRowUnread]}>
+                <TouchableOpacity style={[s.row, { flex: 1, gap: 12 }]}
+                  onPress={() => markOne(n.id)} activeOpacity={0.8}>
+                  <View style={[s.notifIcon, { backgroundColor: n.color + '22', borderColor: n.color + '44' }]}>
+                    <Feather name={n.icon} size={16} color={n.color} />
+                  </View>
+                  <View style={s.grow}>
+                    <View style={[s.row, { marginBottom: 3 }]}>
+                      <Text style={[s.bname, { fontSize: 13, flex: 1 }]} numberOfLines={1}>{n.title}</Text>
+                      {n.unread && <View style={s.notifDot} />}
+                    </View>
+                    <Text style={[s.softText, { fontSize: 12, lineHeight: 17 }]} numberOfLines={2}>{n.msg}</Text>
+                    <Text style={[s.statL, { marginTop: 5, fontSize: 10 }]}>{n.time}</Text>
+                  </View>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => remove(n.id)} hitSlop={12} style={{ paddingLeft: 8, paddingTop: 4 }}>
+                  <Feather name="x" size={14} color={C.muted} />
+                </TouchableOpacity>
+              </View>
+            ))
+          )}
+        </ScrollView>
+      </View>
+    </View>
+  );
+}
+/* ───────── Écran d’entrée ───────── */
+/* Logo barbr — wordmark autonome (aucun asset requis) */
+const Logo = ({ size = 22 }) => (
+  <Text
+    style={{
+      fontFamily: SERIF,
+      fontSize: size * 1.15,
+      fontWeight: '600',
+      color: C.text,
+      letterSpacing: size * 0.04,
+    }}>
+    barb<Text style={{ color: C.gold }}>r</Text>
+  </Text>
+);
+
+/* ───────── Écran d'ouverture animé ───────── */
+function IntroScreen({ onDone }) {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0.88)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, { toValue: 1, duration: 900, useNativeDriver: true }),
+      Animated.spring(scaleAnim, { toValue: 1, friction: 7, tension: 40, useNativeDriver: true }),
+    ]).start();
+    const t = setTimeout(onDone, 2400);
+    return () => clearTimeout(t);
+  }, []);
+
+  return (
+    <View style={s.introWrap}>
+      <Animated.View style={[s.introInner, { opacity: fadeAnim, transform: [{ scale: scaleAnim }] }]}>
+        <Logo size={52} />
+        <View style={s.welcomeRule} />
+        <Text style={s.introTag}>L’art de la coupe, à l’heure juste.</Text>
+      </Animated.View>
+      <Animated.View style={[s.introDots, { opacity: fadeAnim }]}>
+        {[0, 1, 2].map((i) => (
+          <View key={i} style={[s.introDot, i === 1 && { backgroundColor: C.gold, transform: [{ scale: 1.4 }] }]} />
+        ))}
+      </Animated.View>
+    </View>
+  );
+}
+
+
+function WelcomeScreen({ choose }) {
+  return (
+    <View style={s.welcome}>
+      <View style={{ alignItems: 'center', marginBottom: 40 }}>
+        <Logo size={44} />
+        <View style={s.welcomeRule} />
+        <Text style={s.welcomeTag}>L’art de la coupe, à l’heure juste.</Text>
+      </View>
+      {[
+        ['client', 'user', 'Espace Client', 'Trouver un artiste près de vous,\nréserver, retrouver toutes vos coupes.'],
+        ['barber', 'scissors', 'Espace Barber', 'Ouvrir vos créneaux, créer vos formules,\nsuivre votre planning et votre activité.'],
+      ].map(([role, icon, title, sub]) => (
+        <TouchableOpacity key={role} style={s.welcomeCard} onPress={() => choose(role)} activeOpacity={0.85}>
+          <View style={s.welcomeIcon}>
+            <Feather name={icon} size={21} color={C.gold2} />
+          </View>
+          <View style={s.grow}>
+            <Text style={s.welcomeCardTitle}>{title}</Text>
+            <Text style={s.welcomeCardSub}>{sub}</Text>
+          </View>
+          <Feather name="arrow-right" size={18} color={C.gold} />
+        </TouchableOpacity>
+      ))}
+      <Text style={s.welcomeFoot}>Démo — comptes fictifs, aucune donnée envoyée</Text>
+    </View>
+  );
+}
+
+/* ───────── Authentification ───────── */
+function Field({ label, ...props }) {
+  return (
+    <>
+      <Text style={s.fieldLabel}>{label}</Text>
+      <TextInput style={s.input} placeholderTextColor="#5A5852" {...props} />
+    </>
+  );
+}
+
+function LegalModal({ mode, onClose }) {
+  const isTerms = mode === 'terms';
+  const termsContent = [
+    ['Objet', "L'application barbr permet aux clients de réserver des prestations de barbier et aux professionnels de gérer leur activité. L'utilisation de l'application implique l'acceptation des présentes conditions."],
+    ['Compte utilisateur', "Vous êtes responsable de la confidentialité de vos identifiants. Toute activité effectuée depuis votre compte vous est imputable. Vous devez avoir au moins 16 ans pour créer un compte."],
+    ['Réservations', "Une réservation confirmée engage le client. Tout annulation doit être effectuée au moins 2h avant le rendez-vous. Des frais d'annulation tardive peuvent s'appliquer selon la politique du barber."],
+    ['Paiement', "Les paiements sont traités par Stripe (CB, Apple Pay, Google Pay) ou en espèces sur place. Les prix affichés incluent les majorations dynamiques (soirée, nuit, week-end, urgence)."],
+    ['Résiliation', "Vous pouvez supprimer votre compte à tout moment depuis votre profil. Nous nous réservons le droit de suspendre tout compte en cas d'utilisation frauduleuse ou abusive."],
+    ['Droit applicable', "Les présentes CGU sont soumises au droit français. Tout litige sera porté devant les tribunaux compétents de Paris."],
+  ];
+  const privacyContent = [
+    ['Données collectées', "Nous collectons : prénom, nom, e-mail, numéro de téléphone, historique des réservations, photos de prestations (avec votre accord), localisation approximative (recherche de barbers)."],
+    ['Finalité', "Vos données sont utilisées pour : gérer vos réservations, vous envoyer des notifications (rappels, alertes), faire fonctionner le programme de fidélité, améliorer nos services."],
+    ['Conservation', "Vos données sont conservées pendant la durée de votre compte, puis 3 ans après suppression pour des obligations légales. Les photos peuvent être supprimées à tout moment."],
+    ['Partage', "Vos données ne sont jamais vendues à des tiers. Elles sont partagées uniquement avec votre barber pour la gestion des rendez-vous, et avec nos prestataires techniques (Firebase, Stripe, AWS S3)."],
+    ['Vos droits (RGPD)', "Vous disposez d'un droit d'accès, de rectification, de suppression et de portabilité de vos données. Pour exercer ces droits : privacy@barbr.app"],
+    ['Cookies', "L'application utilise des identifiants techniques (tokens, device ID) nécessaires au fonctionnement. Aucun cookie publicitaire n'est utilisé."],
+    ['Contact', "DPO : privacy@barbr.app — Siège : barbr SAS, 12 rue Nationale, 75001 Paris."],
+  ];
+  const content = isTerms ? termsContent : privacyContent;
+  return (
+    <View style={s.modalOverlay}>
+      <View style={[s.modal, { maxHeight: '88%', padding: 0, overflow: 'hidden' }]}>
+        <View style={{ backgroundColor: C.surface, padding: 20, borderBottomWidth: 1, borderBottomColor: C.line }}>
+          <View style={s.row}>
+            <Text style={[s.bname, { fontFamily: SERIF, fontSize: 17, flex: 1 }]}>
+              {isTerms ? "Conditions d'utilisation" : 'Politique de confidentialité'}
+            </Text>
+            <TouchableOpacity onPress={onClose} hitSlop={10}>
+              <Feather name="x" size={20} color={C.muted} />
+            </TouchableOpacity>
+          </View>
+          <Text style={[s.btags, { marginTop: 4 }]}>barbr SAS · Version 1.0 · Juin 2026</Text>
+        </View>
+        <ScrollView style={{ padding: 20 }} showsVerticalScrollIndicator={false}>
+          {content.map(([title, body]) => (
+            <View key={title} style={{ marginBottom: 20 }}>
+              <Text style={[s.bname, { fontSize: 13.5, marginBottom: 6, color: C.gold }]}>{title}</Text>
+              <Text style={[s.softText, { lineHeight: 20, fontSize: 13 }]}>{body}</Text>
+            </View>
+          ))}
+          <View style={{ height: 30 }} />
+        </ScrollView>
+        <View style={{ padding: 16, borderTopWidth: 1, borderTopColor: C.line }}>
+          <Btn label="J'AI LU ET COMPRIS" onPress={onClose} />
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function AuthScreen({ role, onSuccess, onBack }) {
+  const [mode, setMode] = useState('login');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState(null);
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [legalOpen, setLegalOpen] = useState(null); // 'terms' | 'privacy' | null
+  const signup = mode === 'signup';
+
+  const submit = () => {
+    if (!email.trim() || !password) {
+      setError('Renseignez votre e-mail et votre mot de passe.');
+      return;
+    }
+    if (signup && (!firstName.trim() || !lastName.trim())) {
+      setError('Renseignez votre prénom et votre nom.');
+      return;
+    }
+    if (signup && role === 'barber' && !phone.trim()) {
+      setError('Le téléphone est requis — vos clients doivent pouvoir vous joindre.');
+      return;
+    }
+    if (signup && !termsAccepted) {
+      setError('Veuillez accepter les CGU et la politique de confidentialité.');
+      return;
+    }
+    setError(null);
+    onSuccess(
+      {
+        firstName: firstName.trim() || 'Mathéo',
+        lastName: lastName.trim() || 'D.',
+        email: email.trim(),
+        role,
+        plan: null,
+      },
+      { isNew: signup },
+    );
+  };
+
+  return (
+    <>
+    <ScrollView style={s.screen} contentContainerStyle={[s.screenPad, { paddingTop: 8 }]} keyboardShouldPersistTaps="handled">
+      <TouchableOpacity style={[s.circleBtn, { marginBottom: 22 }]} onPress={onBack} hitSlop={8}>
+        <Feather name="arrow-left" size={18} color={C.text} />
+      </TouchableOpacity>
+      <Kicker>{role === 'barber' ? 'ESPACE BARBER' : 'ESPACE CLIENT'}</Kicker>
+      <Title em={signup ? 'compte' : null}>{signup ? 'Créer un ' : 'Connexion'}</Title>
+      <Lead>
+        {signup
+          ? role === 'barber'
+            ? 'Quelques informations, votre abonnement, et vos premiers clients arrivent.'
+            : 'Une minute suffit — votre prochaine coupe vous attend.'
+          : 'Heureux de vous revoir.'}
+      </Lead>
+
+      {signup && (
+        <>
+          <Field label="PRÉNOM" placeholder="Mathéo" value={firstName} onChangeText={setFirstName} />
+          <Field label="NOM" placeholder="Dupont" value={lastName} onChangeText={setLastName} />
+        </>
+      )}
+      <Field label="E-MAIL" placeholder="vous@exemple.fr" autoCapitalize="none"
+        keyboardType="email-address" value={email} onChangeText={setEmail} />
+      {signup && role === 'barber' && (
+        <Field label="TÉLÉPHONE" placeholder="06 12 34 56 78" keyboardType="phone-pad"
+          value={phone} onChangeText={setPhone} />
+      )}
+      {signup && role === 'client' && (
+        <Field label="TÉLÉPHONE (facultatif)" placeholder="06 12 34 56 78" keyboardType="phone-pad"
+          value={phone} onChangeText={setPhone} />
+      )}
+      <Field label="MOT DE PASSE" placeholder="••••••••" secureTextEntry
+        value={password} onChangeText={setPassword} />
+
+      {signup && (
+        <View style={[s.row, { marginTop: 14, alignItems: 'flex-start', gap: 10 }]}>
+          <TouchableOpacity onPress={() => setTermsAccepted(v => !v)} hitSlop={6}
+            style={{ width: 20, height: 20, borderRadius: 4, borderWidth: 1.5,
+              borderColor: termsAccepted ? C.gold : C.muted,
+              backgroundColor: termsAccepted ? C.gold : 'transparent',
+              alignItems: 'center', justifyContent: 'center', marginTop: 2 }}>
+            {termsAccepted && <Feather name="check" size={13} color="#000" />}
+          </TouchableOpacity>
+          <Text style={[s.softText, { flex: 1, fontSize: 12.5, lineHeight: 18 }]}>
+            {`J’accepte les `}
+            <Text style={{ color: C.gold, textDecorationLine: 'underline' }} onPress={() => setLegalOpen('terms')}>
+              {`Conditions d’utilisation`}
+            </Text>
+            {` et la `}
+            <Text style={{ color: C.gold, textDecorationLine: 'underline' }} onPress={() => setLegalOpen('privacy')}>
+              {`Politique de confidentialité`}
+            </Text>
+          </Text>
+        </View>
+      )}
+
+      {error && <Text style={s.authError}>{error}</Text>}
+
+      <Btn label={signup ? (role === 'barber' ? 'CONTINUER — ABONNEMENT' : 'CRÉER MON COMPTE') : 'SE CONNECTER'} onPress={submit} />
+
+      {/* Connexion sociale — Google et Apple */}
+      <View style={s.socialRow}>
+        <View style={s.socialLine} />
+        <Text style={s.socialOr}>ou continuer avec</Text>
+        <View style={s.socialLine} />
+      </View>
+      <View style={[s.row, { gap: 11 }]}>
+        {[
+          { label: 'Google', icon: 'globe', name: 'Demo Google' },
+          { label: 'Apple', icon: 'smartphone', name: 'Demo Apple' },
+        ].map(({ label, icon, name }) => (
+          <TouchableOpacity key={label} style={[s.socialBtn, s.grow]}
+            onPress={() => onSuccess({ firstName: name.split(' ')[0], lastName: name.split(' ')[1], email: `${label.toLowerCase()}@demo.fr`, role, plan: null }, { isNew: false })}
+            activeOpacity={0.85}>
+            <Feather name={icon} size={15} color={C.text} />
+            <Text style={s.socialBtnText}>{label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      <TouchableOpacity onPress={() => { setMode(signup ? 'login' : 'signup'); setError(null); }}
+        hitSlop={8} style={{ marginTop: 20, alignItems: 'center' }}>
+        <Text style={s.authLink}>
+          {signup ? 'Déjà inscrit ? Se connecter' : 'Pas encore de compte ? Créer un compte'}
+        </Text>
+      </TouchableOpacity>
+    </ScrollView>
+    {legalOpen && <LegalModal mode={legalOpen} onClose={() => setLegalOpen(null)} />}
+    </>
+  );
+}
+
+/* Abonnement barber — l’app se rémunère sur l’outil, pas sur les coupes */
+const PLANS = [
+  {
+    id: 'starter', name: 'Starter', price: 2900, badge: null,
+    features: ['Agenda & créneaux en ligne', 'Jusqu’à 3 formules', 'Notifications clients', 'Statistiques de base'],
+  },
+  {
+    id: 'pro', name: 'Pro', price: 5900, badge: 'POPULAIRE',
+    features: ['Tout le Starter', 'Formules illimitées', 'Boutique intégrée', 'Statistiques avancées', 'Support prioritaire'],
+  },
+];
+
+function PlanScreen({ onChoose, onBack }) {
+  const [sel, setSel] = useState('pro');
+  return (
+    <ScrollView style={s.screen} contentContainerStyle={[s.screenPad, { paddingTop: 8 }]}>
+      <TouchableOpacity style={[s.circleBtn, { marginBottom: 22 }]} onPress={onBack} hitSlop={8}>
+        <Feather name="arrow-left" size={18} color={C.text} />
+      </TouchableOpacity>
+      <Kicker>ESPACE BARBER · ABONNEMENT</Kicker>
+      <Title em="formule">Votre </Title>
+      <Lead>14 jours d’essai offerts, sans engagement. Annulable à tout moment.</Lead>
+
+      {PLANS.map((p) => {
+        const on = sel === p.id;
+        return (
+          <TouchableOpacity key={p.id} style={[s.planCard, on && s.planCardOn]}
+            onPress={() => setSel(p.id)} activeOpacity={0.85}>
+            <View style={s.row}>
+              <Text style={[s.bname, { fontFamily: SERIF, fontSize: 19, fontWeight: '600' }, s.grow]}>{p.name}</Text>
+              {p.badge && (
+                <View style={s.planBadge}>
+                  <Text style={s.planBadgeText}>{p.badge}</Text>
+                </View>
+              )}
+            </View>
+            <Text style={s.planPrice}>
+              {fmt(p.price)}<Text style={{ fontSize: 13, color: C.muted }}> /mois</Text>
+            </Text>
+            <View style={{ marginTop: 10 }}>
+              {p.features.map((f) => (
+                <View key={f} style={s.planFeature}>
+                  <Feather name="check" size={13} color={on ? C.gold : C.green} />
+                  <Text style={[s.softText, { color: on ? C.text : C.soft }]}>{f}</Text>
+                </View>
+              ))}
+            </View>
+          </TouchableOpacity>
+        );
+      })}
+
+      <Btn label="CONTINUER — PAIEMENT" onPress={() => onChoose(sel)} />
+      <Text style={s.footnote}>L’abonnement finance l’outil : aucune commission sur vos prestations.</Text>
+    </ScrollView>
+  );
+}
+
+function PayScreen({ user, plan, onConfirm, onBack }) {
+  const p = PLANS.find((x) => x.id === plan);
+  const [cardNum, setCardNum] = useState('');
+  const [holder, setHolder] = useState(`${user.firstName} ${user.lastName}`);
+  const [expiry, setExpiry] = useState('');
+  const [cvv, setCvv] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const fmtCard = (t) => {
+    const digits = t.replace(/\D/g, '').slice(0, 16);
+    setCardNum(digits.replace(/(.{4})/g, '$1 ').trim());
+  };
+  const fmtExpiry = (t) => {
+    const digits = t.replace(/\D/g, '').slice(0, 4);
+    setExpiry(digits.length > 2 ? digits.slice(0, 2) + '/' + digits.slice(2) : digits);
+  };
+
+  const pay = () => {
+    if (cardNum.replace(/\D/g, '').length < 16 || expiry.length < 5 || cvv.length < 3) {
+      setError('Vérifiez les informations de votre carte.');
+      return;
+    }
+    setError(null);
+    setLoading(true);
+    setTimeout(onConfirm, 1400);
+  };
+
+  return (
+    <ScrollView style={s.screen} contentContainerStyle={[s.screenPad, { paddingTop: 8 }]} keyboardShouldPersistTaps="handled">
+      <TouchableOpacity style={[s.circleBtn, { marginBottom: 22 }]} onPress={onBack} hitSlop={8}>
+        <Feather name="arrow-left" size={18} color={C.text} />
+      </TouchableOpacity>
+      <Kicker>PAIEMENT SÉCURISÉ</Kicker>
+      <Title>Récapitulatif</Title>
+
+      <View style={[s.card, { borderColor: C.lineGold }]}>
+        <View style={s.row}>
+          <View style={s.grow}>
+            <Text style={[s.bname, { fontSize: 15 }]}>barbr {p.name}</Text>
+            <Text style={[s.btags, { marginTop: 3 }]}>14 jours d’essai puis {fmt(p.price)}/mois · sans engagement</Text>
+          </View>
+          <Text style={[s.price, { fontSize: 20 }]}>{fmt(p.price)}</Text>
+        </View>
+      </View>
+
+      <Section>Carte bancaire</Section>
+      <Field label="NUMÉRO DE CARTE" placeholder="4242 4242 4242 4242" keyboardType="numeric"
+        value={cardNum} onChangeText={fmtCard} />
+      <Field label="TITULAIRE" placeholder="Prénom Nom" value={holder} onChangeText={setHolder} />
+      <View style={[s.row, { gap: 11, alignItems: 'flex-start' }]}>
+        <View style={s.grow}>
+          <Field label="EXPIRATION" placeholder="MM/AA" keyboardType="numeric"
+            value={expiry} onChangeText={fmtExpiry} />
+        </View>
+        <View style={s.grow}>
+          <Field label="CVV" placeholder="123" keyboardType="numeric" secureTextEntry maxLength={4}
+            value={cvv} onChangeText={setCvv} />
+        </View>
+      </View>
+
+      {error && <Text style={s.authError}>{error}</Text>}
+
+      {loading ? (
+        <View style={[s.btn, { backgroundColor: 'transparent', borderWidth: 1, borderColor: C.lineGold }]}>
+          <ActivityIndicator size="small" color={C.gold} />
+        </View>
+      ) : (
+        <Btn icon="lock" label={`S’ABONNER · ${fmt(p.price)}/MOIS`} onPress={pay} />
+      )}
+      <Text style={s.footnote}>Démo — aucun prélèvement réel. Paiement Stripe dans la version connectée.</Text>
+    </ScrollView>
+  );
+}
+
+/* ───────── Espace CLIENT ───────── */
+const FADE_TAGS = ['Fade', 'Burst Fade', 'Taper'];
+
+function BigCard({ b, onPress }) {
+  return (
+    <TouchableOpacity style={s.bigCard} onPress={onPress} activeOpacity={0.85}>
+      <View style={[s.bigArt, { backgroundColor: b.coverColor || TEX[b.tex] }]}>
+        {b.coverImage
+          ? <Image source={{ uri: b.coverImage }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+          : <Text style={s.bigIni}>{b.ini}</Text>}
+        <View style={s.bigVenue}>
+          <Text style={s.bigVenueText}>{VENUES[b.venue]}</Text>
+        </View>
+        <View style={s.bigShade} />
+        <View style={s.bigInfo}>
+          <Text style={[s.bname, { fontSize: 14.5 }]} numberOfLines={1}>{b.name}</Text>
+          <Text style={s.btags} numberOfLines={1}>{b.city} · {String(b.dist).replace('.', ',')} km</Text>
+          <Text style={[s.rate, { marginTop: 3 }]}>★ {b.rating}</Text>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+const EXPLORE_TIPS = [
+  { icon: 'camera', title: 'Apportez une photo', sub: 'Montrez une référence à votre barber pour éviter les malentendus.' },
+  { icon: 'clock', title: "Réservez à l'avance", sub: '2 à 3 jours avant pour décrocher les meilleurs créneaux.' },
+  { icon: 'gift', title: 'Programme fidélité', sub: '1 € dépensé = 1 point. Cumulez et débloquez des récompenses.' },
+  { icon: 'moon', title: 'Tarifs soirée', sub: 'Les prix varient après 20 h. Vérifiez le montant avant de confirmer.' },
+  { icon: 'image', title: 'Photos avant/après', sub: 'Retrouvez toutes vos coupes dans "Mes coupes".' },
+];
+
+function ExploreScreen({ barbers, user, openBarber, favoriteBarber, onProCTA, toast }) {
+  const [query, setQuery] = useState('');
+  const [style, setStyle] = useState(null);
+  const [city, setCity] = useState('');
+  const [locLoading, setLocLoading] = useState(true);
+  const [editingLoc, setEditingLoc] = useState(false);
+  const [locInput, setLocInput] = useState('');
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          setCity('Localisation refusée');
+          return;
+        }
+        const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        const [geo] = await Location.reverseGeocodeAsync({
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+        });
+        const label = [geo.city || geo.district || geo.subregion, geo.country]
+          .filter(Boolean).join(', ');
+        setCity(label || 'Position obtenue');
+      } catch {
+        setCity('Position indisponible');
+      } finally {
+        setLocLoading(false);
+      }
+    })();
+  }, []);
+
+  const confirmCity = () => {
+    const v = locInput.trim();
+    if (v) setCity(v);
+    setEditingLoc(false);
+    setLocInput('');
+  };
+
+  const q = query.trim().toLowerCase();
+  const filtering = q !== '' || style != null;
+  const sorted = [...barbers].sort((a, b) => a.dist - b.dist);
+  const list = sorted.filter((b) => {
+    const hay = `${b.name} ${b.salon} ${b.city} ${b.tags.join(' ')}`.toLowerCase();
+    return (!q || hay.includes(q)) && (!style || b.tags.includes(style));
+  });
+
+  const Row = ({ title, note, data }) =>
+    data.length === 0 ? null : (
+      <>
+        <Section note={note}>{title}</Section>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}
+          style={{ marginHorizontal: -PAD }} contentContainerStyle={{ paddingHorizontal: PAD }}>
+          {data.map((b) => <BigCard key={b.id} b={b} onPress={() => openBarber(b)} />)}
+        </ScrollView>
+      </>
+    );
+
+  const hello = new Date().getHours() >= 18 ? 'BONSOIR' : 'BONJOUR';
+  return (
+    <ScrollView style={s.screen} contentContainerStyle={s.screenPad} keyboardShouldPersistTaps="handled">
+      <Kicker>{hello}</Kicker>
+      <Title>{user ? user.firstName : 'Bienvenue'}</Title>
+      {editingLoc ? (
+        <View style={s.locEditBox}>
+          <Feather name="map-pin" size={13} color={C.gold} />
+          <TextInput
+            style={s.locInput}
+            value={locInput}
+            onChangeText={setLocInput}
+            placeholder="Ville, code postal…"
+            placeholderTextColor="#5A5852"
+            autoFocus
+            returnKeyType="done"
+            onSubmitEditing={confirmCity}
+          />
+          <TouchableOpacity onPress={confirmCity} hitSlop={10}>
+            <Text style={[s.locEdit, { color: C.green }]}>OK</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setEditingLoc(false)} hitSlop={10}>
+            <Feather name="x" size={14} color={C.muted} />
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <TouchableOpacity style={s.locRow} onPress={() => { setLocInput(city); setEditingLoc(true); }} activeOpacity={0.7}>
+          {locLoading
+            ? <ActivityIndicator size={12} color={C.gold} />
+            : <Feather name="map-pin" size={13} color={C.gold} />}
+          <Text style={s.locText} numberOfLines={1}>{locLoading ? 'Localisation…' : (city || 'Définir ma position')}</Text>
+          <Feather name="edit-2" size={11} color={C.gold} style={{ marginLeft: 4 }} />
+        </TouchableOpacity>
+      )}
+
+      <View style={s.search}>
+        <Feather name="search" size={16} color={C.muted} />
+        <TextInput
+          style={s.searchInput}
+          placeholder="Un barber, un salon, un style…"
+          placeholderTextColor="#5A5852"
+          value={query}
+          onChangeText={setQuery}
+          returnKeyType="search"
+        />
+        {query !== '' && (
+          <TouchableOpacity onPress={() => setQuery('')} hitSlop={8}>
+            <Feather name="x" size={15} color={C.muted} />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 6 }}>
+        <View style={[s.wrap, { flexWrap: 'nowrap' }]}>
+          {STYLES.map((st) => (
+            <Chip key={st} mini label={st} on={style === st}
+              onPress={() => setStyle(style === st ? null : st)} />
+          ))}
+        </View>
+      </ScrollView>
+
+      {filtering ? (
+        <>
+          <Section note={`${list.length} artiste${list.length > 1 ? 's' : ''} · du plus proche au plus loin`}>
+            Résultats
+          </Section>
+          {list.length === 0 ? (
+            <Text style={s.footnote}>Aucun artiste ne correspond.{'\n'}Essayez un autre style ou effacez la recherche.</Text>
+          ) : (
+            list.map((b) => (
+              <TouchableOpacity key={b.id} style={s.card} onPress={() => openBarber(b)} activeOpacity={0.85}>
+                <View style={s.row}>
+                  <Ava b={b} />
+                  <View style={s.grow}>
+                    <Text style={s.bname}>{b.name}</Text>
+                    <View style={[s.row, { gap: 5, marginTop: 2 }]}>
+                      <Feather name="map-pin" size={10} color={C.gold} />
+                      <Text style={s.btags}>{b.salon} · {String(b.dist).replace('.', ',')} km</Text>
+                    </View>
+                    {b.address ? (
+                      <Text style={[s.btags, { marginTop: 1, color: C.muted }]} numberOfLines={1}>{b.address}</Text>
+                    ) : null}
+                    <View style={[s.row, { gap: 12, marginTop: 6 }]}>
+                      <Badge status={b.delay} />
+                      <Text style={s.rate}>★ {b.rating}</Text>
+                    </View>
+                  </View>
+                  <Feather name="chevron-right" size={18} color="#56534E" />
+                </View>
+                <View style={[s.wrap, { marginTop: 11, gap: 6 }]}>
+                  {b.tags.map((t) => <Tag key={t} label={t} />)}
+                </View>
+              </TouchableOpacity>
+            ))
+          )}
+        </>
+      ) : (
+        <>
+          {favoriteBarber && (
+            <>
+              <Section>Mon barber</Section>
+              {barbers.filter((b) => b.id === favoriteBarber).map((b) => (
+                <TouchableOpacity key={b.id} style={[s.card, { borderColor: C.lineGold }]}
+                  onPress={() => openBarber(b)} activeOpacity={0.85}>
+                  <View style={s.row}>
+                    <Ava b={b} />
+                    <View style={s.grow}>
+                      <Text style={s.bname}>{b.name}</Text>
+                      <Text style={s.btags}>{b.salon} · {String(b.dist).replace('.', ',')} km</Text>
+                      <View style={[s.row, { gap: 12, marginTop: 6 }]}>
+                        <Badge status={b.delay} />
+                        <Text style={s.rate}>★ {b.rating}</Text>
+                      </View>
+                    </View>
+                    <View style={[s.tag, { alignSelf: 'flex-start', backgroundColor: 'rgba(200,169,106,0.15)', borderColor: C.gold }]}>
+                      <Text style={[s.tagText, { color: C.gold }]}>MON BARBER</Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </>
+          )}
+          <Row title="Autour de vous" note="du plus proche au plus loin" data={sorted} />
+          <Row title="Studios privés" note="un client à la fois" data={sorted.filter((b) => b.venue === 'studio')} />
+          <Row title="À domicile" note="ils se déplacent" data={sorted.filter((b) => b.venue === 'domicile')} />
+          <Section>Conseils</Section>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}
+            style={{ marginHorizontal: -PAD, marginBottom: 4 }}
+            contentContainerStyle={{ paddingHorizontal: PAD, gap: 10 }}>
+            {EXPLORE_TIPS.map((tip) => (
+              <View key={tip.icon} style={[s.card, { width: 190, marginBottom: 0, borderColor: C.line }]}>
+                <Feather name={tip.icon} size={18} color={C.gold} style={{ marginBottom: 8 }} />
+                <Text style={[s.bname, { fontSize: 13, marginBottom: 4 }]}>{tip.title}</Text>
+                <Text style={[s.softText, { fontSize: 11.5, lineHeight: 16 }]}>{tip.sub}</Text>
+              </View>
+            ))}
+          </ScrollView>
+          <Row title="Spécialistes fade" note="burst, taper, dégradés"
+            data={sorted.filter((b) => b.tags.some((t) => FADE_TAGS.includes(t)))} />
+          {onProCTA && (
+            <TouchableOpacity
+              style={{
+                marginTop: 28, borderRadius: 20, borderWidth: 1, borderColor: C.lineGold,
+                backgroundColor: 'rgba(200,169,106,0.07)', overflow: 'hidden',
+              }}
+              onPress={onProCTA} activeOpacity={0.85}>
+              <View style={{ padding: 22, gap: 14 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+                  <View style={{ width: 52, height: 52, borderRadius: 26,
+                    backgroundColor: 'rgba(200,169,106,0.15)', alignItems: 'center', justifyContent: 'center' }}>
+                    <Feather name="scissors" size={24} color={C.gold} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: C.gold, fontSize: 10, fontWeight: '700', letterSpacing: 1.2, marginBottom: 4 }}>
+                      ESPACE PRO
+                    </Text>
+                    <Text style={[s.bname, { fontSize: 16 }]}>Vous êtes professionnel ?</Text>
+                  </View>
+                  <Feather name="arrow-right" size={20} color={C.gold} />
+                </View>
+                <Text style={[s.softText, { lineHeight: 18 }]}>
+                  Créez votre fiche barber, gérez votre agenda, vos formules et développez votre clientèle sur barbr.
+                </Text>
+                <View style={{ backgroundColor: C.gold, borderRadius: 10, paddingVertical: 12, alignItems: 'center' }}>
+                  <Text style={{ color: C.ink, fontWeight: '800', fontSize: 13, letterSpacing: 0.8 }}>
+                    REJOINDRE BARBR PRO
+                  </Text>
+                </View>
+              </View>
+            </TouchableOpacity>
+          )}
+        </>
+      )}
+    </ScrollView>
+  );
+}
+
+function BarberDetailScreen({ barber, services, products, favoriteBarber, onToggleFav, onBack, onBook, toast }) {
+  const [dtab, setDtab] = useState('about');
+  const [more, setMore] = useState(false);
+  const [viewer, setViewer] = useState(null);
+  const shopProducts = (products || []).filter((p) => (p.stock || 0) > 0);
+  const hasShop = barber.shopEnabled && shopProducts.length > 0;
+  const isFav = favoriteBarber === barber.id;
+
+  return (
+    <View style={{ flex: 1 }}>
+      <ScrollView style={s.screen} contentContainerStyle={{ paddingBottom: 120 }}>
+        {/* Hero */}
+        <View style={[s.heroArt, { backgroundColor: barber.coverColor || TEX[barber.tex] }]}>
+          {barber.coverImage
+            ? <Image source={{ uri: barber.coverImage }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+            : null}
+          <Text style={[s.heroIni, barber.coverImage && { opacity: 0 }]}>{barber.ini}</Text>
+          <View style={s.heroTop}>
+            <TouchableOpacity style={s.circleBtn} onPress={onBack} hitSlop={8}>
+              <Feather name="chevron-left" size={19} color={C.text} />
+            </TouchableOpacity>
+            <View style={{ flex: 1 }} />
+            {onToggleFav && (
+              <TouchableOpacity style={s.circleBtn} hitSlop={6}
+                onPress={() => onToggleFav(barber.id)}>
+                <Feather name={isFav ? 'star' : 'star'} size={16}
+                  color={isFav ? C.gold : 'rgba(255,255,255,0.5)'} />
+              </TouchableOpacity>
+            )}
+            {[
+              ['instagram', barber.instagram],
+              ['music', barber.tiktok],
+              ['facebook', barber.facebook],
+            ].map(([ic, url]) => url ? (
+              <TouchableOpacity key={ic} style={s.circleBtn} hitSlop={6}
+                onPress={() => Linking.openURL(url)} activeOpacity={0.8}>
+                <Feather name={ic} size={16} color={C.gold2} />
+              </TouchableOpacity>
+            ) : null)}
+            <TouchableOpacity style={s.circleBtn} hitSlop={6}
+              onPress={() => toast(`Partage du profil de ${barber.name.split(' ')[0]} — relié dans la version connectée.`)}>
+              <Feather name="share-2" size={16} color={C.text} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Identité */}
+        <View style={{ paddingHorizontal: PAD, paddingTop: 16 }}>
+          <View style={[s.row, { gap: 10, alignItems: 'flex-start' }]}>
+            <Text style={[s.title, { fontSize: 26, lineHeight: 30, marginBottom: 0, flex: 1 }]}>{barber.name}</Text>
+            <View style={{ gap: 6, alignItems: 'flex-end', marginTop: 4 }}>
+              <View style={[s.tag]}>
+                <Text style={s.tagText}>{VENUES[barber.venue]}</Text>
+              </View>
+              {isFav && (
+                <View style={[s.tag, { backgroundColor: 'rgba(200,169,106,0.18)', borderColor: C.gold }]}>
+                  <Text style={[s.tagText, { color: C.gold }]}>MON BARBER</Text>
+                </View>
+              )}
+            </View>
+          </View>
+          <View style={[s.row, { gap: 12, marginTop: 8 }]}>
+            <Text style={s.rate}>★ {barber.rating}</Text>
+            <Badge status={barber.delay} />
+          </View>
+          <TouchableOpacity
+            style={[s.row, { gap: 6, marginTop: 7 }]}
+            onPress={() => Linking.openURL(`https://maps.apple.com/?q=${encodeURIComponent(barber.address)}`)}
+            hitSlop={6} activeOpacity={0.7}>
+            <Feather name="map-pin" size={11} color={C.gold} />
+            <Text style={[s.btags, { textDecorationLine: 'underline', color: C.gold }]}>{barber.address}</Text>
+            <Text style={s.btags}>· {String(barber.dist).replace('.', ',')} km</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Onglets */}
+        <View style={s.dtabs}>
+          {[['about', 'À propos'], ['prest', 'Prestations'], ...(hasShop ? [['boutique', 'Boutique']] : []), ['avis', 'Avis']].map(([k, l]) => (
+            <TouchableOpacity key={k} style={[s.dtab, dtab === k && s.dtabOn]} onPress={() => setDtab(k)}>
+              <Text style={[s.dtabText, dtab === k && { color: C.gold2 }]}>{l}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <View style={{ paddingHorizontal: PAD }}>
+          {dtab === 'about' && (
+            <>
+              <Section>Son histoire</Section>
+              <Text style={s.bio}>
+                {barber.bio}{more ? '\n\n' + barber.story : ''}
+              </Text>
+              <TouchableOpacity onPress={() => setMore(!more)} hitSlop={8} style={{ marginTop: -8, marginBottom: 4 }}>
+                <Text style={s.moreLink}>{more ? 'Voir moins' : 'Voir plus'}</Text>
+              </TouchableOpacity>
+
+              <Section note="appuyez pour agrandir">Réalisations</Section>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                {(barber.photos || [{tex:0},{tex:1},{tex:2},{tex:3}]).map((ph, i) => (
+                  <TouchableOpacity key={ph.id || i} activeOpacity={0.85} onPress={() => setViewer(ph)}>
+                    <Photo label={ph.label} tex={ph.tex} uri={ph.uri} />
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              {(barber.depositPct > 0 || barber.noticeHours > 0 || barber.planningNote) && (
+                <>
+                  <Section>Conditions de réservation</Section>
+                  <View style={[s.card, { gap: 10 }]}>
+                    {barber.depositPct > 0 && (
+                      <View style={s.row}>
+                        <Feather name="credit-card" size={14} color={C.gold} />
+                        <Text style={[s.softText, s.grow]}>Acompte de {barber.depositPct} % requis à la réservation</Text>
+                      </View>
+                    )}
+                    {barber.noticeHours > 0 && (
+                      <View style={s.row}>
+                        <Feather name="clock" size={14} color={C.gold} />
+                        <Text style={[s.softText, s.grow]}>Réservation au moins {barber.noticeHours} h à l'avance</Text>
+                      </View>
+                    )}
+                    {barber.cancelHours > 0 && (
+                      <View style={s.row}>
+                        <Feather name="x-circle" size={14} color={C.gold} />
+                        <Text style={[s.softText, s.grow]}>Annulation gratuite jusqu'à {barber.cancelHours} h avant le RDV</Text>
+                      </View>
+                    )}
+                    {barber.planningNote ? (
+                      <View style={s.row}>
+                        <Feather name="info" size={14} color={C.gold} />
+                        <Text style={[s.softText, s.grow]}>{barber.planningNote}</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                </>
+              )}
+              <Section>Lieu de coupe</Section>
+              <View style={[s.place, { backgroundColor: barber.coverColor || TEX[(barber.tex + 1) % 4] }]}>
+                <Feather name={barber.venue === 'domicile' ? 'home' : barber.venue === 'studio' ? 'star' : 'scissors'} size={26} color="rgba(200,169,106,0.45)" />
+                <Text style={s.placeLabel}>
+                  {barber.venue === 'domicile'
+                    ? `Chez vous — ${barber.address}`
+                    : `${VENUES[barber.venue] || 'En salon'} · ${barber.salon}`}
+                </Text>
+                {barber.address && barber.venue !== 'domicile' && (
+                  <Text style={[s.placeLabel, { opacity: 0.7 }]}>{barber.address}</Text>
+                )}
+              </View>
+              {(barber.salonPhotos || []).length > 0 && (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 10 }}>
+                  {barber.salonPhotos.map((ph) => (
+                    <TouchableOpacity key={ph.id} activeOpacity={0.85} onPress={() => setViewer(ph)}>
+                      <Photo label={ph.label} tex={ph.tex} uri={ph.uri} />
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              )}
+
+              {(barber.instagram || barber.tiktok || barber.facebook) && (
+                <>
+                  <Section>Réseaux sociaux</Section>
+                  <View style={[s.row, { gap: 10, flexWrap: 'wrap' }]}>
+                    {[
+                      ['instagram', 'Instagram', barber.instagram],
+                      ['music', 'TikTok', barber.tiktok],
+                      ['facebook', 'Facebook', barber.facebook],
+                    ].filter(([,, url]) => url).map(([ic, label, url]) => (
+                      <TouchableOpacity key={ic}
+                        style={[s.card, s.row, { gap: 8, paddingVertical: 10, paddingHorizontal: 14, marginBottom: 0, borderColor: C.lineGold }]}
+                        onPress={() => Linking.openURL(url)} activeOpacity={0.8}>
+                        <Feather name={ic} size={15} color={C.gold} />
+                        <Text style={[s.btags, { color: C.gold2, fontSize: 13 }]}>{label}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </>
+              )}
+
+              <Section>Compétences</Section>
+              <View style={[s.wrap, { gap: 6 }]}>
+                {barber.tags.map((t) => <Tag key={t} label={t} />)}
+              </View>
+
+              <Section>En chiffres</Section>
+              <View style={s.stats}>
+                {[
+                  [barber.clients, 'CLIENTS'],
+                  [barber.prestations, 'COUPES'],
+                  [barber.years + ' ans', 'MÉTIER'],
+                  [barber.ponct + ' %', 'PONCTUEL'],
+                ].map(([v, l], i) => (
+                  <View key={l} style={[s.stat, i > 0 && { borderLeftWidth: 1, borderLeftColor: C.line }]}>
+                    <Text style={s.statV}>{v}</Text>
+                    <Text style={s.statL}>{l}</Text>
+                  </View>
+                ))}
+              </View>
+            </>
+          )}
+
+          {dtab === 'prest' && (
+            <>
+              <Section note="tarif de base — varie selon l’horaire">Prestations</Section>
+              {services.map((sv) => (
+                <View key={sv.id} style={[s.card, s.row]}>
+                  <View style={s.grow}>
+                    <Text style={[s.bname, { fontSize: 14 }]}>{sv.name}</Text>
+                    <Text style={[s.btags, { marginTop: 2 }]}>{sv.dur} min</Text>
+                  </View>
+                  <Text style={s.price}>{fmt(sv.price)}</Text>
+                </View>
+              ))}
+              <Text style={s.footnote}>
+                Soirée après 20 h, nuit après 22 h, week-end et urgence : le prix exact s’affiche sur chaque créneau au moment de réserver.
+              </Text>
+            </>
+          )}
+
+          {dtab === 'avis' && (
+            <>
+              <Section note={`note moyenne ★ ${barber.rating}`}>Avis</Section>
+              <View style={s.card}>
+                {barber.reviews.map((r, i) => (
+                  <View key={r.who + '-' + i} style={[s.review, i > 0 && { borderTopWidth: 1, borderTopColor: C.line }]}>
+                    <View style={s.row}>
+                      <Text style={[s.bname, s.grow, { fontSize: 13 }]}>{r.who}</Text>
+                      <Stars n={r.note} />
+            
+          {dtab === 'boutique' && hasShop && (
+            <>
+              <Section note={barber.shopMode === 'ecommerce' ? 'commande en ligne' : 'disponible en salon'}>
+                Produits
+              </Section>
+              {shopProducts.map((p) => (
+                <View key={p.id} style={[s.card, s.row]}>
+                  <View style={[s.prodIco, { marginRight: 12 }]}>
+                    <Feather name={p.ic || 'box'} size={18} color={C.gold} />
+                  </View>
+                  <View style={s.grow}>
+                    <Text style={[s.bname, { fontSize: 13.5 }]}>{p.name}</Text>
+                    <Text style={[s.btags, { marginTop: 2 }]}>{p.cat} · {p.stock} en stock</Text>
+                  </View>
+                  <View style={{ alignItems: 'flex-end', gap: 6 }}>
+                    <Text style={s.price}>{fmt(p.price)}</Text>
+                    {barber.shopMode === 'ecommerce' ? (
+                      <TouchableOpacity
+                        style={{ backgroundColor: C.gold, paddingHorizontal: 9, paddingVertical: 4, borderRadius: 6 }}
+                        onPress={() => toast(p.name + ' ajouté au panier.' )}>
+                        <Text style={{ color: '#000', fontSize: 10, fontWeight: '700' }}>AJOUTER</Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <View style={[s.vitrineTag, { paddingHorizontal: 7, paddingVertical: 3 }]}>
+                        <Text style={[s.vitrineTagText, { fontSize: 9 }]}>EN SALON</Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+              ))}
+            </>
+          )}
+        </View>
+                    {r.txt ? <Text style={s.reviewTxt}>« {r.txt} »</Text> : null}
+                  </View>
+                ))}
+              </View>
+            </>
+          )}
+        </View>
+      </ScrollView>
+
+      {/* Réservation — toujours visible */}
+      <View style={s.cta}>
+        <Btn label="RÉSERVER L’ARTISTE" onPress={() => onBook(barber.id)} />
+      </View>
+
+      <PhotoViewer photo={viewer} onClose={() => setViewer(null)} />
+    </View>
+  );
+}
+
+/* Créneaux ouverts, filtrés par fenêtre horaire de la formule.
+   On lit directement l’agenda : chaque barber peut avoir sa propre grille. */
+function openSlotsFor(agenda, dayIdx, barberId, window, fromH, closures) {
+  const day = DAYS[dayIdx];
+  const now = new Date();
+  const closed = isClosedOn(closures, day.key);
+  const list = barberId === 'any' ? BARBERS : BARBERS.filter((b) => b.id === barberId);
+  const seen = {};
+  const out = [];
+  for (const b of list) {
+    if (closed && b.id === 'enzo') continue;
+    const slots = agenda[b.id]?.[day.key] || {};
+    for (const [time, sl] of Object.entries(slots)) {
+      if (sl.status !== 'open' || !inWindow(time, window, fromH) || seen[time]) continue;
+      const date = timeToDate(day, time);
+      if (date < now) continue;
+      seen[time] = true;
+      out.push({ time, date, barber: b, home: !!sl.home });
+    }
+  }
+  return out.sort((a, b) => a.time.localeCompare(b.time));
+}
+
+function BookBarberPicker({ bList, favoriteBarber, booking, setBooking }) {
+  const [bkQuery, setBkQuery] = React.useState('');
+  const [bkVenue, setBkVenue] = React.useState(null);
+  const [bkTag, setBkTag] = React.useState(null);
+
+  const q = bkQuery.trim().toLowerCase();
+  const sorted = [...bList].sort((a, b) => a.dist - b.dist);
+  const fav = sorted.find((b) => b.id === favoriteBarber) || null;
+  const isFiltering = q !== '' || bkVenue != null || bkTag != null;
+
+  const filtered = sorted.filter((b) => {
+    const hay = (b.name + ' ' + b.salon + ' ' + b.city + ' ' + b.tags.join(' ')).toLowerCase();
+    const matchQ = !q || hay.includes(q);
+    const matchV = !bkVenue || b.venue === bkVenue;
+    const matchT = !bkTag || b.tags.includes(bkTag);
+    return matchQ && matchV && matchT;
+  });
+
+  const VENUE_CHIPS = [['salon', 'En salon'], ['studio', 'Studio'], ['domicile', 'Domicile']];
+  const TAG_CHIPS = ['Fade', 'Burst Fade', 'Barbe', 'Transformation', 'Locks', 'Coloration'];
+
+  return (
+    <ScrollView style={s.screen} contentContainerStyle={s.screenPad} keyboardShouldPersistTaps="handled">
+      <Kicker>RENDEZ-VOUS</Kicker>
+      <Title em="qui">Avec </Title>
+
+      <View style={s.search}>
+        <Feather name="search" size={16} color={C.muted} />
+        <TextInput
+          style={s.searchInput}
+          placeholder="Barber, ville, style..."
+          placeholderTextColor="#5A5852"
+          value={bkQuery}
+          onChangeText={setBkQuery}
+        />
+        {bkQuery !== '' && (
+          <TouchableOpacity onPress={() => setBkQuery('')} hitSlop={8}>
+            <Feather name="x" size={15} color={C.muted} />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
+        <View style={[s.wrap, { flexWrap: 'nowrap', gap: 6 }]}>
+          {VENUE_CHIPS.map(([v, label]) => (
+            <Chip key={v} mini label={label} on={bkVenue === v}
+              onPress={() => setBkVenue(bkVenue === v ? null : v)} />
+          ))}
+          {TAG_CHIPS.map((t) => (
+            <Chip key={t} mini label={t} on={bkTag === t}
+              onPress={() => setBkTag(bkTag === t ? null : t)} />
+          ))}
+        </View>
+      </ScrollView>
+
+      {!isFiltering && fav && (
+        <>
+          <Section>Mon barber</Section>
+          <TouchableOpacity style={[s.card, { borderColor: C.lineGold }]}
+            onPress={() => setBooking({ ...booking, barber: fav.id, formula: null })} activeOpacity={0.85}>
+            <View style={s.row}>
+              <Ava b={fav} />
+              <View style={s.grow}>
+                <Text style={s.bname}>{fav.name}</Text>
+                <View style={[s.row, { gap: 5, marginTop: 2 }]}>
+                  <Feather name="map-pin" size={10} color={C.gold} />
+                  <Text style={s.btags}>{fav.salon} {String(fav.dist).replace('.', ',')} km</Text>
+                </View>
+                <View style={[s.row, { gap: 12, marginTop: 5 }]}>
+                  <Badge status={fav.delay} />
+                  <Text style={s.rate}>★ {fav.rating}</Text>
+                </View>
+              </View>
+              <View style={[s.tag, { alignSelf: 'flex-start', backgroundColor: 'rgba(200,169,106,0.15)', borderColor: C.gold }]}>
+                <Text style={[s.tagText, { color: C.gold }]}>MON BARBER</Text>
+              </View>
+            </View>
+            <View style={[s.wrap, { marginTop: 10, gap: 6 }]}>
+              {fav.tags.map((t) => <Tag key={t} label={t} />)}
+            </View>
+          </TouchableOpacity>
+        </>
+      )}
+
+      <Section note={isFiltering ? (filtered.length + ' artiste' + (filtered.length !== 1 ? 's' : '')) : 'du plus proche au plus loin'}>
+        {isFiltering ? 'Résultats' : 'Tous les artistes'}
+      </Section>
+
+      {filtered.length === 0 ? (
+        <Text style={s.footnote}>Aucun artiste ne correspond. Essayez un autre filtre.</Text>
+      ) : (
+        filtered.map((b) => (
+          <TouchableOpacity key={b.id}
+            style={[s.card, !isFiltering && b.id === favoriteBarber && { borderColor: C.lineGold }]}
+            onPress={() => setBooking({ ...booking, barber: b.id, formula: null })} activeOpacity={0.85}>
+            <View style={s.row}>
+              <Ava b={b} />
+              <View style={s.grow}>
+                <Text style={s.bname}>{b.name}</Text>
+                <View style={[s.row, { gap: 5, marginTop: 2 }]}>
+                  <Feather name="map-pin" size={10} color={C.gold} />
+                  <Text style={s.btags}>{b.salon} {String(b.dist).replace('.', ',')} km {b.city}</Text>
+                </View>
+                <View style={[s.row, { gap: 12, marginTop: 5 }]}>
+                  <Badge status={b.delay} />
+                  <Text style={s.rate}>★ {b.rating}</Text>
+                </View>
+              </View>
+              <Feather name="chevron-right" size={18} color={b.id === favoriteBarber ? C.gold : C.muted} />
+            </View>
+            <View style={[s.wrap, { marginTop: 10, gap: 6 }]}>
+              {b.tags.map((t) => <Tag key={t} label={t} />)}
+            </View>
+          </TouchableOpacity>
+        ))
+      )}
+    </ScrollView>
+  );
+}
+
+
+function BookScreen({ agenda, formulas, services, booking, setBooking, dayIdx, setDayIdx, onConfirm, barbers: allBarbers, favoriteBarber, homeFee, closures, waitlist, onWaitlist, toast }) {
+  if (booking.done) {
+    const d = booking.done;
+    return (
+      <ScrollView style={s.screen} contentContainerStyle={s.screenPad}>
+        <Kicker>CONFIRMATION</Kicker>
+        <Title em="réservé">C’est </Title>
+        <Lead>Nous vous attendons. Un rappel sera envoyé la veille et une heure avant.</Lead>
+        <View style={[s.card, { borderColor: C.lineGold }]}>
+          <Text style={[s.bname, { fontSize: 17 }]}>{d.serv}</Text>
+          <Text style={[s.btags, { marginVertical: 6 }]}>{d.day} à {d.time} · avec {d.barber}</Text>
+          {d.rules.length > 0 && <Text style={s.ruleText}>{d.rules.join('  +  ')}</Text>}
+          {d.address && (
+            <View style={[s.row, { marginTop: 8, gap: 6 }]}>
+              <Feather name="map-pin" size={13} color={C.gold} />
+              <Text style={[s.btags, { flex: 1 }]}>{d.address}</Text>
+            </View>
+          )}
+          <Text style={[s.price, { fontSize: 24, marginTop: 8 }]}>{fmt(d.price)}</Text>
+        </View>
+        {d.recur && (
+          <View style={[s.card, s.row]}>
+            <Feather name="refresh-cw" size={19} color={C.gold} />
+            <Text style={[s.softText, s.grow]}>
+              Rendez-vous hebdomadaire : ce créneau est reconduit chaque semaine, annulable à tout moment.
+            </Text>
+          </View>
+        )}
+        {[
+          ['bell', 'Rappels automatiques : la veille puis 1 h avant le rendez-vous.'],
+          ...(d.loyalty ? [['gift', `+${Math.floor(d.price / 100)} points fidélité crédités chez ${d.barber} — 1 € dépensé = 1 point.`]] : []),
+        ].map(([ic, txt]) => (
+          <View key={ic} style={[s.card, s.row]}>
+            <Feather name={ic} size={19} color={C.gold} />
+            <Text style={[s.softText, s.grow]}>{txt}</Text>
+          </View>
+        ))}
+        <Btn ghost icon="calendar" label="AJOUTER AU CALENDRIER" onPress={() => toast && toast('RDV ajouté à votre calendrier.')} />
+        <Btn ghost label="NOUVELLE RÉSERVATION"
+          onPress={() => setBooking({ barber: 'any', formula: null, service: null, done: null, pendingSlot: null, address: '' })} />
+      </ScrollView>
+    );
+  }
+
+  const bList = allBarbers || BARBERS;
+  const selectedBarber = bList.find((b) => b.id === booking.barber);
+  const isHomecall = selectedBarber?.venue === 'domicile';
+
+  // Etape 1 : selection du barber
+  if (booking.barber === 'any') {
+    return <BookBarberPicker bList={bList} favoriteBarber={favoriteBarber} booking={booking} setBooking={setBooking} />;
+  }
+
+  if (booking.pendingSlot) {
+    const ps = booking.pendingSlot;
+    return (
+      <ScrollView style={s.screen} contentContainerStyle={s.screenPad} keyboardShouldPersistTaps="handled">
+        <Kicker>DOMICILE</Kicker>
+        <Title>Votre adresse</Title>
+        <Lead>Le barber se rend chez vous. Indiquez votre adresse pour qu'il puisse se préparer.</Lead>
+        <View style={[s.card, { borderColor: C.lineGold }]}>
+          <Text style={[s.bname, { fontSize: 17 }]}>{ps.formula.name}</Text>
+          <Text style={[s.btags, { marginVertical: 6 }]}>{DAYS[dayIdx].label} · {ps.slot.time} · {ps.slot.barber.name}</Text>
+          {ps.quote.rules.length > 0 && <Text style={s.ruleText}>{ps.quote.rules.join('  +  ')}</Text>}
+          <Text style={[s.price, { fontSize: 22, marginTop: 6 }]}>{fmt(ps.quote.price)}</Text>
+        </View>
+        <Section>Adresse d'intervention</Section>
+        <View style={[s.card, { paddingVertical: 12 }]}>
+          <Feather name="map-pin" size={14} color={C.gold} style={{ marginBottom: 8 }} />
+          <TextInput
+            style={[s.softText, { minHeight: 60, textAlignVertical: 'top', color: C.text, fontSize: 14 }]}
+            placeholder="Ex : 5 rue des Lilas, 59000 Lille"
+            placeholderTextColor={C.muted}
+            value={booking.address}
+            onChangeText={(v) => setBooking({ ...booking, address: v })}
+            multiline
+          />
+        </View>
+        <Btn label="CONFIRMER LE RDV"
+          onPress={() => onConfirm(ps.formula, ps.service, ps.slot, ps.quote, booking.address)} />
+        <TouchableOpacity style={{ marginTop: 14, alignItems: 'center' }}
+          onPress={() => setBooking({ ...booking, pendingSlot: null })} activeOpacity={0.7}>
+          <Text style={s.authLink}>Retour aux créneaux</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    );
+  }
+
+
+  // Formules proposées : celles du barber choisi (toutes actives), génériques sinon
+  const available = booking.barber === 'enzo'
+    ? formulas.filter((f) => f.active)
+    : booking.barber === 'any'
+      ? formulas.filter((f) => f.active && (f.id === 'f1' || f.id === 'f2'))
+      : initFormulas().filter((f) => f.active);
+  const formula = available.find((f) => f.id === booking.formula) || null;
+  const service = services.find((x) => x.id === booking.service);
+  const ready = !!formula;
+  const slots = ready ? openSlotsFor(agenda, dayIdx, booking.barber, formula.window, formula.fromH, closures) : [];
+  const now = new Date();
+  const waitlisted = (waitlist || []).some((e) => e.dayKey === DAYS[dayIdx].key);
+
+  return (
+    <ScrollView style={s.screen} contentContainerStyle={s.screenPad}>
+      <Kicker>RENDEZ-VOUS</Kicker>
+      <Title>Réserver</Title>
+      <Lead>La formule, puis le créneau — parmi les disponibilités ouvertes.</Lead>
+
+      {(() => {
+        const selB = bList.find((b) => b.id === booking.barber);
+        return selB ? (
+          <TouchableOpacity style={[s.card, s.row, { borderColor: C.lineGold }]}
+            onPress={() => setBooking({ ...booking, barber: 'any', formula: null })} activeOpacity={0.85}>
+            <Ava b={selB} />
+            <View style={s.grow}>
+              <Text style={s.bname}>{selB.name}</Text>
+              <Text style={s.btags}>{selB.salon}</Text>
+            </View>
+            <Text style={[s.authLink, { fontSize: 12 }]}>Changer</Text>
+          </TouchableOpacity>
+        ) : null;
+      })()}
+
+      <Section>La formule</Section>
+      {available.map((f) => {
+        const on = booking.formula === f.id;
+        return (
+          <TouchableOpacity key={f.id} style={[s.opt, on && s.optOn]} activeOpacity={0.8}
+            onPress={() => setBooking({ ...booking, formula: f.id })}>
+            <Feather name={f.icon} size={17} color={on ? C.gold : C.muted} />
+            <View style={s.grow}>
+              <View style={s.row}>
+                <Text style={[s.optText, s.grow]}>{f.name}</Text>
+                <Text style={s.formulaMeta}>
+                  {f.dur} min · {WINDOWS[f.window]}{f.price != null ? ` · ${fmt(f.price)}` : ''}{f.recur ? ' · −15 %' : ''}
+                </Text>
+              </View>
+              <Text style={[s.btags, { marginTop: 3 }]}>{f.desc}</Text>
+            </View>
+          </TouchableOpacity>
+        );
+      })}
+
+      {ready && (
+        <>
+          <Section note="point doré = disponibilités">Le jour</Section>
+          <Calendar sel={dayIdx} onSel={setDayIdx} onlyMarked
+            markFor={(key) => {
+            const list = booking.barber === 'any' ? BARBERS : BARBERS.filter((b) => b.id === booking.barber);
+            const shut = isClosedOn(closures, key);
+            for (const b of list) {
+              if (shut && b.id === 'enzo') continue;
+              const d = agenda[b.id]?.[key] || {};
+              for (const [time, sl] of Object.entries(d)) {
+                if (sl.status === 'open' && inWindow(time, formula.window)) return 'open';
+              }
+            }
+            return null;
+          }} />
+          <Section note={`${DAYS[dayIdx].label} · ${slots.length} créneau${slots.length > 1 ? 'x' : ''} ouvert${slots.length > 1 ? 's' : ''}`}>
+            Le créneau
+          </Section>
+          {slots.length === 0 ? (
+            <>
+            <Text style={s.footnote}>
+              Aucun créneau ouvert ce jour pour cette formule.{'\n'}
+              {formula.window === 'night'
+                ? 'La formule Nocturne ne propose que les créneaux après 20 h.'
+                : 'Essayez un autre jour ou un autre artiste.'}
+            </Text>
+            <Btn ghost icon="bell"
+              label={waitlisted ? 'INSCRIT — VOUS SEREZ NOTIFIÉ' : 'ME NOTIFIER SI UN CRÉNEAU SE LIBÈRE'}
+              onPress={() => { if (!waitlisted && onWaitlist) onWaitlist(dayIdx, formula); }} />
+            </>
+          ) : (
+            <>
+              {slots.map((sl) => {
+                const q0 = quoteFor(formula, service, sl.date, now);
+                const homeSlot = isHomecall || sl.home;
+                const q = homeSlot && (homeFee ?? 0) > 0
+                  ? { price: q0.price + homeFee, rules: [...q0.rules, '+' + homeFee / 100 + ' € domicile'] }
+                  : q0;
+                return (
+                  <TouchableOpacity key={sl.barber.id + sl.time}
+                    style={[s.card, s.row, homeSlot && { borderColor: 'rgba(143,180,217,0.45)' }]}
+                    onPress={() => { if (homeSlot) { setBooking({ ...booking, pendingSlot: { formula, service, slot: sl, quote: q } }); } else { onConfirm(formula, service, sl, q); } }} activeOpacity={0.8}>
+                    <Text style={s.slotTime}>{sl.time}</Text>
+                    <View style={s.grow}>
+                      <View style={[s.row, { gap: 6 }]}>
+                        <Text style={s.softText}>{sl.barber.name}</Text>
+                        {homeSlot && <Feather name="home" size={12} color="#8FB4D9" />}
+                        {homeSlot && <Text style={[s.btags, { color: '#8FB4D9' }]}>à domicile</Text>}
+                      </View>
+                      {q.rules.length > 0 && <Text style={s.ruleText}>{q.rules.join('  +  ')}</Text>}
+                    </View>
+                    <Text style={s.price}>{fmt(q.price)}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+              {(formula.surE || formula.surN || formula.surW || formula.surU) && (
+                <Text style={s.footnote}>
+                  Les majorations actives sur cette formule s'appliquent selon l'horaire.
+                </Text>
+              )}
+            </>
+          )}
+        </>
+      )}
+    </ScrollView>
+  );
+}
+
+function CutsScreen({ history, setHistory, setBarbers, user, onRebook, toast }) {
+  const [pendingRate, setPendingRate] = useState(null); // { id, n }
+  const [comment, setComment] = useState('');
+  const [viewer, setViewer] = useState(null);
+
+  const publishReview = (h) => {
+    const n = pendingRate.n;
+    setHistory((hs) => hs.map((x) => (x.id === h.id ? { ...x, rating: n } : x)));
+    if (h.barberId) {
+      const txt = comment.trim();
+      setBarbers((bs) => bs.map((b) =>
+        b.id === h.barberId
+          ? { ...b, reviews: [{ who: user?.firstName || 'Client', note: n, txt }, ...b.reviews] }
+          : b
+      ));
+    }
+    setPendingRate(null);
+    setComment('');
+    toast(`Merci pour votre avis — ${'★'.repeat(n)} pour ${h.barber}.`);
+  };
+
+  return (
+    <View style={{ flex: 1 }}>
+    <ScrollView style={s.screen} contentContainerStyle={s.screenPad} keyboardShouldPersistTaps="handled">
+      <Kicker>GALERIE PERSONNELLE</Kicker>
+      <Title em="coupes">Mes </Title>
+      <Lead>Après chaque prestation, votre barber photographie le résultat. Tout reste ici.</Lead>
+      {history.length === 0 && (
+        <Text style={s.footnote}>Aucune coupe pour l’instant — votre première apparaîtra ici.</Text>
+      )}
+      {history.map((h) => (
+        <View key={h.id} style={s.card}>
+          <Text style={[s.bname, { fontSize: 15 }]}>{h.servs}</Text>
+          <Text style={[s.btags, { marginTop: 3, marginBottom: 12 }]}>
+            {h.date} · {h.barber} · <Text style={{ color: C.gold }}>{fmt(h.price)}</Text>
+          </Text>
+          {h.photos.length > 0 ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              {h.photos.map((ph) => (
+                <TouchableOpacity key={ph.id} activeOpacity={0.85} onPress={() => setViewer(ph)}>
+                  <Photo label={ph.label} tex={ph.tex} uri={ph.uri} />
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          ) : (
+            <Text style={s.footnote}>Pas de photo pour cette prestation.</Text>
+          )}
+
+          {/* ── Avis 5 étoiles ── */}
+          {h.rating != null ? (
+            <View style={[s.row, { gap: 8, marginTop: 13 }]}>
+              <Stars n={h.rating} />
+              <Text style={s.btags}>Votre avis</Text>
+            </View>
+          ) : (
+            <View style={s.rateBox}>
+              <Text style={[s.btags, { marginBottom: 8 }]}>Comment s’est passée cette coupe ?</Text>
+              <View style={[s.row, { gap: 6, marginBottom: 4 }]}>
+                {[1, 2, 3, 4, 5].map((n) => {
+                  const on = pendingRate?.id === h.id && pendingRate.n >= n;
+                  return (
+                    <TouchableOpacity key={n} hitSlop={6}
+                      onPress={() => setPendingRate({ id: h.id, n })}>
+                      <Text style={[s.rateStarBig, on && { color: C.gold, opacity: 1 }]}>★</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              {pendingRate?.id === h.id && (
+                <>
+                  <TextInput style={[s.input, { marginTop: 8 }]} value={comment} onChangeText={setComment}
+                    placeholder="Un mot sur la prestation ? (facultatif)" placeholderTextColor="#5A5852" />
+                  <Btn label={`PUBLIER MON AVIS ${'★'.repeat(pendingRate.n)}`} onPress={() => publishReview(h)} />
+                </>
+              )}
+            </View>
+          )}
+
+          <View style={[s.wrap, { marginTop: 13 }]}>
+            <Chip mini label="Télécharger" onPress={() => savePhotos(h.photos, toast)} />
+            <Chip mini label="Partager" onPress={() => toast('Lien de partage copié.')} />
+            <Chip mini label="Montrer" onPress={() => toast('À montrer à votre prochain barber.')} />
+            {h.barberId && onRebook ? <Chip mini label="Reprendre RDV" onPress={() => onRebook(h.barberId)} /> : null}
+          </View>
+        </View>
+      ))}
+    </ScrollView>
+    <PhotoViewer photo={viewer} onClose={() => setViewer(null)}
+      onDownload={(ph) => savePhotos([ph], toast)} />
+    </View>
+  );
+}
+
+function ShopScreen({ products, cat, setCat, cart, addCart, shopMode, toast }) {
+  const list = products.filter((p) => cat === 'ALL' || p.cat === cat);
+  return (
+    <ScrollView style={s.screen} contentContainerStyle={s.screenPad}>
+      <Kicker>BOUTIQUE</Kicker>
+      <Title em="essentiels">Les </Title>
+      <Lead>Les produits utilisés au salon, livrés chez vous ou à retirer sur place.</Lead>
+      <View style={[s.wrap, { marginBottom: 16 }]}>
+        {CATS.map(([k, l]) => (
+          <Chip key={k} mini label={l} on={cat === k} onPress={() => setCat(k)} />
+        ))}
+      </View>
+      <View style={s.grid}>
+        {list.map((p) => (
+          <View key={p.id} style={s.pcard}>
+            <View style={[s.pimg, { backgroundColor: TEX[p.tex] }]}>
+              <Feather name={p.ic} size={26} color="rgba(200,169,106,0.5)" />
+            </View>
+            <Text style={s.pname} numberOfLines={2}>{p.name}</Text>
+            <Text style={s.pprice}>{fmt(p.price)}</Text>
+            <Text style={s.pstock}>{p.stock > 0 ? `${p.stock} en stock` : 'Épuisé'}</Text>
+            {shopMode === 'ecommerce' ? (
+              <TouchableOpacity style={s.add} onPress={() => addCart(p)} activeOpacity={0.8} disabled={p.stock === 0}>
+                <Text style={s.addText}>{p.stock === 0 ? 'ÉPUISÉ' : 'AJOUTER'}</Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={s.vitrineTag}>
+                <Feather name="map-pin" size={9} color={C.gold} />
+                <Text style={s.vitrineTagText}>EN SALON</Text>
+              </View>
+            )}
+          </View>
+        ))}
+      </View>
+      {cart > 0 && (
+        <Btn label={`COMMANDER · ${cart} ARTICLE${cart > 1 ? 'S' : ''}`}
+          onPress={() => toast('Paiement Stripe — CB, Apple Pay, Google Pay.')} />
+      )}
+    </ScrollView>
+  );
+}
+
+function MeScreen({ user, points, setPoints, barbers, upcoming, waitlist, onCancelRdv, onMoveRdv, canCancel, onRemoveWaitlist, favoriteBarber, onLogout, toast }) {
+  const [confirmRedeem, setConfirmRedeem] = React.useState(null);
+  const [notifSms, setNotifSms] = React.useState(true);
+  const [notifEmail, setNotifEmail] = React.useState(true);
+  const [notifPush, setNotifPush] = React.useState(true);
+  const [clientPhone, setClientPhone] = React.useState(user?.phone || '');
+  const [editingPhone, setEditingPhone] = React.useState(false);
+  const [voucher, setVoucher] = React.useState(null);
+  const [legalOpenMe, setLegalOpenMe] = React.useState(null);
+  const [refInput, setRefInput] = React.useState('');
+  const [refUsed, setRefUsed] = React.useState(false);
+  const loyaltyBarbers = barbers.filter((b) => b.loyalty);
+
+  const doRedeem = (b, t) => {
+    const suffix = Math.random().toString(36).slice(2, 6).toUpperCase();
+    const code = b.name.split(' ')[0].toUpperCase() + '-' + suffix;
+    setPoints((p) => ({ ...p, [b.id]: Math.max(0, (p[b.id] || 0) - t.pts) }));
+    setVoucher({ label: t.label, code, barberName: b.name, pts: t.pts });
+    setConfirmRedeem(null);
+  };
+
+  return (
+    <>
+    <ScrollView style={s.screen} contentContainerStyle={s.screenPad}>
+      <Kicker>ESPACE PERSONNEL</Kicker>
+      <Title>{user ? user.firstName : 'Profil'}</Title>
+      <Lead>{user ? user.email : 'Membre depuis mars 2026'}</Lead>
+
+      {favoriteBarber && barbers.filter((b) => b.id === favoriteBarber).map((b) => (
+        <View key={b.id} style={[s.card, { borderColor: C.lineGold }]}>
+          <Text style={s.statL}>MON BARBER</Text>
+          <View style={[s.row, { marginTop: 8 }]}>
+            <Ava b={b} />
+            <View style={s.grow}>
+              <Text style={s.bname}>{b.name}</Text>
+              <Text style={s.btags}>{b.salon}</Text>
+              <Badge status={b.delay} />
+            </View>
+            <Text style={s.rate}>★ {b.rating}</Text>
+          </View>
+        </View>
+      ))}
+
+      {loyaltyBarbers.length > 0 && (
+        <>
+          <Section>Programme fidélité</Section>
+          {loyaltyBarbers.map((b) => {
+            const pts = points[b.id] || 0;
+            const tiers = (b.loyaltyTiers || []).slice().sort((a, x) => a.pts - x.pts);
+            const unlocked = tiers.filter((t) => pts >= t.pts);
+            const locked = tiers.filter((t) => pts < t.pts);
+            const nextTier = locked[0] || null;
+            const prevPts = unlocked.length > 0 ? unlocked[unlocked.length - 1].pts : 0;
+            const progress = nextTier
+              ? Math.min(1, (pts - prevPts) / Math.max(1, nextTier.pts - prevPts)) : 1;
+            const barberName = b.name.split(' ')[0];
+            return (
+              <View key={b.id} style={[s.card, { borderColor: C.lineGold }]}>
+                <View style={s.row}>
+                  <View style={s.grow}>
+                    <Text style={s.statL}>FIDÉLITÉ · CHEZ {barberName.toUpperCase()}</Text>
+                    <View style={[s.row, { alignItems: 'baseline', gap: 6 }]}>
+                      <Text style={s.points}>{pts}</Text>
+                      <Text style={[s.softText, { fontSize: 14 }]}>pts</Text>
+                    </View>
+                  </View>
+                  <View style={{ position: 'relative' }}>
+                    <Feather name="gift" size={26} color={C.gold} />
+                    {unlocked.length > 0 && (
+                      <View style={s.bellBadge}><Text style={s.bellBadgeText}>{unlocked.length}</Text></View>
+                    )}
+                  </View>
+                </View>
+
+                {nextTier ? (
+                  <View style={{ marginTop: 10 }}>
+                    <View style={[s.row, { justifyContent: 'space-between', marginBottom: 5 }]}>
+                      <Text style={[s.footnoteLeft, { color: C.muted, flex: 1 }]}>Prochain : {nextTier.label}</Text>
+                      <Text style={[s.footnoteLeft, { color: C.gold }]}>{nextTier.pts - pts} pts</Text>
+                    </View>
+                    <View style={{ height: 5, backgroundColor: C.line, borderRadius: 3 }}>
+                      <View style={{ height: 5, backgroundColor: C.gold, borderRadius: 3,
+                        width: Math.round(progress * 100) + '%' }} />
+                    </View>
+                  </View>
+                ) : tiers.length > 0 ? (
+                  <View style={[s.row, { marginTop: 10, gap: 6 }]}>
+                    <Feather name="award" size={14} color={C.gold} />
+                    <Text style={[s.footnoteLeft, { color: C.gold }]}>Tous les paliers débloqués !</Text>
+                  </View>
+                ) : null}
+
+                {unlocked.length > 0 && (
+                  <>
+                    <View style={s.divider} />
+                    <Text style={[s.statL, { marginBottom: 8 }]}>RÉCOMPENSES DISPONIBLES</Text>
+                    {unlocked.map((t) => (
+                      <View key={t.id} style={[s.card, { borderColor: C.lineGold, marginBottom: 8, padding: 12 }]}>
+                        <View style={[s.row, { marginBottom: 10 }]}>
+                          <Feather name="tag" size={14} color={C.gold} />
+                          <Text style={[s.bname, { flex: 1, marginLeft: 8, fontSize: 13 }]}>{t.label}</Text>
+                        </View>
+                        <View style={[s.row, { justifyContent: 'space-between', alignItems: 'center' }]}>
+                          <Text style={[s.footnoteLeft, { color: C.muted }]}>Coût : {t.pts} pts</Text>
+                          <TouchableOpacity
+                            style={{ backgroundColor: C.gold, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 7 }}
+                            onPress={() => setConfirmRedeem({ b, t })}>
+                            <Text style={{ color: '#000', fontSize: 11, fontWeight: '700', letterSpacing: 0.8 }}>OBTENIR LE COUPON</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    ))}
+                  </>
+                )}
+
+                {locked.length > 0 && (
+                  <>
+                    <View style={s.divider} />
+                    <Text style={[s.statL, { marginBottom: 6 }]}>À DÉBLOQUER</Text>
+                    {locked.map((t, i) => (
+                      <View key={t.id} style={[s.row, { marginBottom: 6, opacity: i === 0 ? 0.8 : 0.4 }]}>
+                        <Feather name={i === 0 ? 'unlock' : 'lock'} size={13} color={C.muted} />
+                        <Text style={[s.softText, { flex: 1, marginLeft: 8, fontSize: 12 }]}>{t.label}</Text>
+                        <Text style={[s.footnoteLeft, { color: C.muted }]}>{t.pts} pts</Text>
+                      </View>
+                    ))}
+                  </>
+                )}
+
+                <View style={s.divider} />
+                <Text style={s.footnoteLeft}>
+                  {b.loyaltyRate || 1} point par € dépensé — valable uniquement chez {b.name}.
+                </Text>
+              </View>
+            );
+          })}
+        </>
+      )}
+
+      <Section>À venir</Section>
+      {upcoming.length === 0 ? (
+        <Text style={s.footnote}>
+          {`Aucun rendez-vous à venir.\nRéservez votre prochaine coupe dans l’onglet Réserver.`}
+        </Text>
+      ) : (
+        upcoming.map((u, i) => (
+          <View key={u.id || i} style={s.card}>
+            <View style={s.row}>
+              <Feather name={u.recur ? 'refresh-cw' : 'calendar'} size={18} color={C.gold} />
+              <View style={s.grow}>
+                <Text style={[s.bname, { fontSize: 13.5 }]}>{u.serv} · {u.day} {u.time}</Text>
+                <Text style={[s.btags, { marginTop: 2 }]}>
+                  avec {u.barber}{u.recur ? ' · chaque semaine' : ''}
+                </Text>
+              </View>
+              <Text style={[s.price, { fontSize: 15 }]}>{fmt(u.price)}</Text>
+            </View>
+            <View style={[s.wrap, { marginTop: 10, gap: 6 }]}>
+              <Chip mini label="Déplacer" onPress={() => onMoveRdv && onMoveRdv(u)} />
+              <Chip mini label="Annuler" onPress={() => {
+                if (canCancel && !canCancel(u)) { toast('Trop tard pour annuler — contactez votre barber.'); return; }
+                onCancelRdv && onCancelRdv(u);
+              }} />
+              <Chip mini label="Calendrier" onPress={() => toast('RDV ajouté à votre calendrier.')} />
+            </View>
+          </View>
+        ))
+      )}
+      {waitlist && waitlist.length > 0 && (
+        <>
+          <Section note="vous serez notifié si un créneau se libère">Liste d'attente</Section>
+          {waitlist.map((w) => (
+            <View key={w.id} style={[s.card, s.row]}>
+              <Feather name="bell" size={16} color={C.gold} />
+              <View style={s.grow}>
+                <Text style={[s.bname, { fontSize: 13 }]}>{w.dayLabel}</Text>
+                <Text style={s.btags}>{w.formulaName}</Text>
+              </View>
+              <TouchableOpacity onPress={() => onRemoveWaitlist && onRemoveWaitlist(w.id)} hitSlop={8}>
+                <Feather name="x" size={16} color={C.muted} />
+              </TouchableOpacity>
+            </View>
+          ))}
+        </>
+      )}
+      <Section note="10 pts offerts à vous et votre filleul">Parrainage</Section>
+      <View style={s.card}>
+        <Text style={s.fieldLabel}>VOTRE CODE</Text>
+        <View style={[s.row, { marginTop: 6 }]}>
+          <Text style={[s.bname, { fontSize: 16, letterSpacing: 2, flex: 1 }]}>BARBR-{(user?.firstName || 'CLIENT').toUpperCase()}</Text>
+          <Chip mini label="Copier" onPress={() => toast('Code copié — partagez-le !')} />
+        </View>
+        {!refUsed ? (
+          <>
+            <Text style={[s.fieldLabel, { marginTop: 12 }]}>CODE D'UN AMI</Text>
+            <View style={[s.row, { gap: 8, marginTop: 6 }]}>
+              <TextInput style={[s.input, { flex: 1, marginBottom: 0 }]} value={refInput} onChangeText={setRefInput}
+                placeholder="BARBR-..." placeholderTextColor="#5A5852" autoCapitalize="characters" />
+              <Chip mini label="Valider" onPress={() => {
+                if (!refInput.trim().toUpperCase().startsWith('BARBR-')) { toast('Code invalide.'); return; }
+                const target = favoriteBarber || 'enzo';
+                setPoints((p) => ({ ...p, [target]: (p[target] || 0) + 10 }));
+                setRefUsed(true); setRefInput('');
+                toast('+10 points fidélité — merci du parrainage !');
+              }} />
+            </View>
+          </>
+        ) : (
+          <Text style={[s.footnoteLeft, { marginTop: 10, color: C.green }]}>Code parrain utilisé — +10 pts crédités.</Text>
+        )}
+      </View>
+
+      <Section>Rappels & notifications</Section>
+      <View style={s.card}>
+        {[
+          ['push', 'Notifications push', 'Rappels via l’application', notifPush, setNotifPush],
+          ['message-square', 'SMS', 'Rappel J-1 et H-1 par SMS', notifSms, setNotifSms],
+          ['mail', 'E-mail', 'Confirmation et rappels par e-mail', notifEmail, setNotifEmail],
+        ].map(([icon, label, sub, val, setter]) => (
+          <View key={icon} style={[s.row, { paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: C.line }]}>
+            <Feather name={icon} size={16} color={C.gold} />
+            <View style={s.grow}>
+              <Text style={[s.bname, { fontSize: 13 }]}>{label}</Text>
+              <Text style={[s.btags, { marginTop: 2 }]}>{sub}</Text>
+            </View>
+            <Toggle on={val} onPress={() => setter(v => !v)} />
+          </View>
+        ))}
+        <View style={{ paddingTop: 14 }}>
+          <Text style={[s.statL, { marginBottom: 6 }]}>
+            {clientPhone ? 'NUMÉRO SMS' : 'AJOUTER UN NUMÉRO SMS (facultatif)'}
+          </Text>
+          {editingPhone ? (
+            <View style={[s.row, { gap: 8 }]}>
+              <TextInput style={[s.input, s.grow, { marginBottom: 0 }]}
+                value={clientPhone} onChangeText={setClientPhone}
+                keyboardType="phone-pad" placeholder="06 12 34 56 78"
+                placeholderTextColor="#5A5852" autoFocus />
+              <TouchableOpacity style={[s.btn, { paddingVertical: 10, paddingHorizontal: 16, marginBottom: 0 }]}
+                onPress={() => setEditingPhone(false)} activeOpacity={0.85}>
+                <Text style={s.btnText}>OK</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity onPress={() => setEditingPhone(true)} hitSlop={8}>
+              <Text style={[s.softText, { color: clientPhone ? C.text : C.gold }]}>
+                {clientPhone || '+ Ajouter un numéro'}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+
+      <Section>Paiement</Section>
+      <View style={[s.card, s.row]}>
+        <Feather name="credit-card" size={18} color={C.gold} />
+        <Text style={[s.softText, s.grow]}>
+          Carte bancaire, Apple Pay, Google Pay ou sur place. Acompte selon la prestation.
+        </Text>
+      </View>
+      <Section>Informations légales</Section>
+      <TouchableOpacity style={[s.card, s.row]} onPress={() => setLegalOpenMe('terms')} activeOpacity={0.8}>
+        <Feather name="file-text" size={18} color={C.gold} />
+        <Text style={[s.softText, s.grow]}>{`Conditions d’utilisation`}</Text>
+        <Feather name="chevron-right" size={16} color={C.muted} />
+      </TouchableOpacity>
+      <TouchableOpacity style={[s.card, s.row, { marginTop: 8 }]} onPress={() => setLegalOpenMe('privacy')} activeOpacity={0.8}>
+        <Feather name="shield" size={18} color={C.gold} />
+        <Text style={[s.softText, s.grow]}>{`Politique de confidentialité`}</Text>
+        <Feather name="chevron-right" size={16} color={C.muted} />
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[s.card, s.row, { marginTop: 8, borderColor: 'rgba(220,50,50,0.3)' }]}
+        onPress={() => Alert.alert(
+          'Supprimer mon compte',
+          'Toutes vos données seront effacées. Cette action est irréversible.',
+          [
+            { text: 'Annuler', style: 'cancel' },
+            { text: 'Supprimer', style: 'destructive', onPress: onLogout },
+          ]
+        )}
+        activeOpacity={0.8}>
+        <Feather name="trash-2" size={18} color="#e05050" />
+        <Text style={[s.softText, s.grow, { color: '#e05050' }]}>Supprimer mon compte</Text>
+        <Feather name="chevron-right" size={16} color="#e05050" />
+      </TouchableOpacity>
+      <Btn ghost icon="log-out" label="SE DÉCONNECTER" onPress={onLogout} />
+    </ScrollView>
+
+    {confirmRedeem && (
+      <View style={s.modalOverlay}>
+        <View style={s.modal}>
+          <Feather name="gift" size={28} color={C.gold} style={{ alignSelf: 'center', marginBottom: 10 }} />
+          <Text style={[s.bname, { fontFamily: SERIF, fontSize: 17, textAlign: 'center', marginBottom: 6 }]}>
+            {confirmRedeem.t.label}
+          </Text>
+          <Text style={[s.softText, { textAlign: 'center', marginBottom: 20 }]}>
+            Cela déduira {confirmRedeem.t.pts} points de votre solde chez {confirmRedeem.b.name.split(' ')[0]}.
+          </Text>
+          <Btn label="OBTENIR LE COUPON" onPress={() => doRedeem(confirmRedeem.b, confirmRedeem.t)} />
+          <Btn ghost label="ANNULER" onPress={() => setConfirmRedeem(null)} />
+        </View>
+      </View>
+    )}
+
+    {voucher && (
+      <View style={s.modalOverlay}>
+        <View style={[s.modal, { padding: 0, overflow: 'hidden' }]}>
+          <View style={{ backgroundColor: C.gold, padding: 20, alignItems: 'center' }}>
+            <Feather name="award" size={30} color="#000" />
+            <Text style={{ color: '#000', fontSize: 11, fontWeight: '800', letterSpacing: 2, marginTop: 8 }}>COUPON FIDÉLITÉ</Text>
+          </View>
+          <View style={{ padding: 24, alignItems: 'center' }}>
+            <Text style={[s.bname, { fontFamily: SERIF, fontSize: 19, textAlign: 'center', marginBottom: 6 }]}>
+              {voucher.label}
+            </Text>
+            <Text style={[s.softText, { marginBottom: 18 }]}>Chez {voucher.barberName}</Text>
+            <View style={{ borderWidth: 1, borderColor: C.lineGold, borderRadius: 10,
+              paddingVertical: 14, paddingHorizontal: 20, alignItems: 'center', width: '100%', marginBottom: 14 }}>
+              <Text style={[s.footnoteLeft, { letterSpacing: 1, marginBottom: 4 }]}>CODE</Text>
+              <Text style={{ fontFamily: SERIF, fontSize: 24, letterSpacing: 4, color: C.gold, fontWeight: '700' }}>
+                {voucher.code}
+              </Text>
+            </View>
+            <Text style={[s.footnoteLeft, { textAlign: 'center', marginBottom: 4 }]}>
+              Présentez ce coupon lors de votre prochain rendez-vous
+            </Text>
+            <Text style={[s.footnoteLeft, { textAlign: 'center', color: C.muted, marginBottom: 20 }]}>
+              Valable 30 jours · {voucher.pts} pts déduits
+            </Text>
+            <Btn label="FERMER" onPress={() => setVoucher(null)} />
+          </View>
+        </View>
+      </View>
+    )}
+    {legalOpenMe && <LegalModal mode={legalOpenMe} onClose={() => setLegalOpenMe(null)} />}
+    </>
+  );
+}
+/* ───────── Espace BARBER (connecté : Enzo Moreau) ───────── */
+const WD_FULL = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+const STEP_CHOICES = [15, 20, 30, 45, 60];
+const SCHEDULE_PRESETS = [
+  { label: '8h – 13h', start: 8, end: 13 },
+  { label: '9h – 18h', start: 9, end: 18 },
+  { label: '10h – 19h', start: 10, end: 19 },
+  { label: '14h – 18h', start: 14, end: 18 },
+  { label: '9h – 22h', start: 9, end: 22 },
+  { label: '8h – 20h', start: 8, end: 20 },
+];
+
+// Base clients de démonstration — dans la version connectée, ce serait une vraie BDD
+const INIT_CLIENTS = [
+  { id: 'c1', firstName: 'Karim', lastName: 'Doukali', phone: '06 11 22 33 44', notes: 'Burst fade court sur les côtés', loyaltyPts: 86, blocked: false },
+  { id: 'c2', firstName: 'Lucas', lastName: 'Bernard', phone: '06 55 66 77 88', notes: 'Coupe classique, pas trop court', loyaltyPts: 42, blocked: false },
+  { id: 'c3', firstName: 'Mehdi', lastName: 'Ait', phone: '06 99 00 11 22', notes: 'Barbe uniquement', loyaltyPts: 15, blocked: false },
+  { id: 'c4', firstName: 'Sacha', lastName: 'Laurent', phone: '07 12 34 56 78', notes: 'Transformation — avant/après photos', loyaltyPts: 210, blocked: false },
+  { id: 'c5', firstName: 'Noah', lastName: 'Petit', phone: '07 98 76 54 32', notes: 'Coupe enfant', loyaltyPts: 0, blocked: false },
+];
+
+function SlotsScreen({ agenda, setAgenda, daycfg, setDaycfg, endHour, setEndHour, homeFee, setHomeFee, closures, setClosures, weekly, setWeekly, clients, setClients, services, dayIdx, setDayIdx, onFreeSlot, toast }) {
+  const day = DAYS[dayIdx];
+  const step = daycfg[day.key] || 30;
+  const slots = agenda.enzo[day.key] || {};
+  const eH = endHour ?? 23;
+  const gridTimes = timesFor(step, eH);
+  // Les réservations prises sur une ancienne grille restent visibles
+  const offGrid = Object.keys(slots).filter((t) => slots[t].status === 'booked' && !gridTimes.includes(t));
+  const allTimes = [...gridTimes, ...offGrid].sort();
+  const nOpen = Object.values(slots).filter((x) => x.status === 'open').length;
+  const nPause = Object.values(slots).filter((x) => x.status === 'pause').length;
+  const nBooked = Object.values(slots).filter((x) => x.status === 'booked').length;
+
+  const update = (fn) => {
+    setAgenda((a) => {
+      const copy = { ...(a.enzo[day.key] || {}) };
+      fn(copy);
+      return { ...a, enzo: { ...a.enzo, [day.key]: copy } };
+    });
+  };
+
+  const cancelBooking = (time) => {
+    const sl = slots[time];
+    if (!sl || sl.status !== 'booked') return;
+    Alert.alert(
+      `Annuler le RDV de ${sl.who} ?`,
+      `${sl.serv} · ${time} · ${fmt(sl.price)}${sl.address ? '\n' + sl.address : ''}`,
+      [
+        { text: 'Garder', style: 'cancel' },
+        {
+          text: 'Annuler le rendez-vous', style: 'destructive',
+          onPress: () => {
+            update((d) => { d[time] = { status: 'open' }; });
+            if (onFreeSlot) onFreeSlot(day.key, time);
+            toast(`RDV ${time} annulé — créneau remis en ouvert.`);
+          },
+        },
+      ]
+    );
+  };
+
+  // Touchez : fermé → ouvert → pause → fermé. Réservations = appui long pour annuler.
+  const cycle = (time) => {
+    const cur = slots[time];
+    if (cur && cur.status === 'booked') {
+      cancelBooking(time);
+      return;
+    }
+    update((d) => {
+      if (!d[time]) d[time] = openMode === 'domicile' ? { status: 'open', home: true } : { status: 'open' };
+      else if (d[time].status === 'open') d[time] = { status: 'pause' };
+      else delete d[time];
+    });
+  };
+
+  // ── Réservation manuelle par le barber ──
+  const [viewMode, setViewMode] = useState('day'); // 'day' | 'month'
+  const [openMode, setOpenMode] = useState('salon'); // type des créneaux ouverts : 'salon' | 'domicile'
+  const [monthOff, setMonthOff] = useState(0);
+  const [multiDay, setMultiDay] = useState(1);
+  const [bookModal, setBookModal] = useState(null); // { time } | null
+  const [clientSearch, setClientSearch] = useState('');
+  const [selectedClient, setSelectedClient] = useState(null);
+  const [selectedService, setSelectedService] = useState(null);
+  const [addingClient, setAddingClient] = useState(false);
+  const [newCFn, setNewCFn] = useState('');
+  const [newCLn, setNewCLn] = useState('');
+  const [newCPh, setNewCPh] = useState('');
+
+  const openBookModal = (time) => {
+    if (slots[time]?.status === 'booked') { cancelBooking(time); return; }
+    if (!slots[time] || slots[time].status === 'closed') {
+      toast('Ouvrez d\'abord ce créneau.'); return;
+    }
+    setBookModal({ time });
+    setClientSearch('');
+    setSelectedClient(null);
+    setSelectedService(null);
+    setAddingClient(false);
+  };
+
+  const confirmManualBook = () => {
+    if (!selectedClient || !selectedService) { toast('Choisissez un client et une prestation.'); return; }
+    const who = `${selectedClient.firstName} ${selectedClient.lastName[0]}.`;
+    update((d) => {
+      d[bookModal.time] = { status: 'booked', who, serv: selectedService.name, price: selectedService.price, done: false };
+    });
+    toast(`${who} · ${selectedService.name} · ${bookModal.time} — réservation posée.`);
+    setBookModal(null);
+  };
+
+  const saveNewClient = () => {
+    if (!newCFn.trim() || !newCLn.trim()) { toast('Prénom et nom requis.'); return; }
+    const c = { id: 'c' + Date.now(), firstName: newCFn.trim(), lastName: newCLn.trim(), phone: newCPh.trim(), notes: '' };
+    setClients((cs) => [...cs, c]);
+    setSelectedClient(c);
+    setAddingClient(false);
+    setNewCFn(''); setNewCLn(''); setNewCPh('');
+    toast(`${c.firstName} ${c.lastName} ajouté à la base clients.`);
+  };
+
+  const filteredClients = (clientSearch.trim()
+    ? clients.filter((c) => `${c.firstName} ${c.lastName} ${c.phone}`.toLowerCase().includes(clientSearch.toLowerCase()))
+    : clients).filter((c) => !c.blocked);
+  const blockedClients = clients.filter((c) => c.blocked);
+
+  // Changement de durée : les réservations sont conservées, les créneaux
+  // ouverts/pauses alignés sur la nouvelle grille aussi.
+  const changeStep = (v) => {
+    setDaycfg((c) => ({ ...c, [day.key]: v }));
+    setAgenda((a) => {
+      const old = a.enzo[day.key] || {};
+      const next = {};
+      Object.entries(old).forEach(([time, sl]) => {
+        const [h, m] = time.split(':').map(Number);
+        const mins = h * 60 + m;
+        if (sl.status === 'booked' || ((mins - 540) % v === 0 && mins + v <= 23 * 60)) next[time] = sl;
+      });
+      return { ...a, enzo: { ...a.enzo, [day.key]: next } };
+    });
+    toast(`Créneaux de ${v} min — ${day.label.toLowerCase()}.`);
+  };
+
+  const bulkMonth = (preset, dowFilter) => {
+    const base = new Date();
+    base.setDate(1);
+    base.setMonth(base.getMonth() + monthOff);
+    const m = base.getMonth();
+    const y = base.getFullYear();
+    let count = 0;
+    setAgenda((a) => {
+      let newEnzo = { ...a.enzo };
+      DAYS.forEach((day) => {
+        const d = day.date;
+        if (d.getMonth() !== m || d.getFullYear() !== y) return;
+        if (dowFilter && !dowFilter.includes(d.getDay())) return;
+        const dStep = daycfg[day.key] || step;
+        const grid = timesFor(dStep);
+        const copy = { ...(newEnzo[day.key] || {}) };
+        grid.forEach((time) => {
+          const h = Number(time.slice(0, 2));
+          if (h < preset.start || h >= preset.end) return;
+          if (copy[time] && copy[time].status === 'booked') return;
+          copy[time] = openMode === 'domicile' ? { status: 'open', home: true } : { status: 'open' };
+        });
+        newEnzo[day.key] = copy;
+        count++;
+      });
+      return { ...a, enzo: newEnzo };
+    });
+    toast(preset.label + ' sur ' + count + ' jours.');
+  };
+
+  const closeMonth = () => {
+    const base = new Date();
+    base.setDate(1);
+    base.setMonth(base.getMonth() + monthOff);
+    const m = base.getMonth();
+    const y = base.getFullYear();
+    setAgenda((a) => {
+      let newEnzo = { ...a.enzo };
+      DAYS.forEach((day) => {
+        const d = day.date;
+        if (d.getMonth() !== m || d.getFullYear() !== y) return;
+        const dStep = daycfg[day.key] || step;
+        const grid = timesFor(dStep);
+        const copy = { ...(newEnzo[day.key] || {}) };
+        grid.forEach((time) => { if (copy[time] && copy[time].status !== 'booked') delete copy[time]; });
+        newEnzo[day.key] = copy;
+      });
+      return { ...a, enzo: newEnzo };
+    });
+    toast('Créneaux libres fermés sur le mois.');
+  };
+
+  const bulk = (label, predicate, mode) => {
+    setAgenda((a) => {
+      let newEnzo = { ...a.enzo };
+      for (let i = 0; i < multiDay; i++) {
+        const dIdx = dayIdx + i;
+        if (dIdx >= DAYS.length) break;
+        const dKey = DAYS[dIdx].key;
+        const dStep = daycfg[dKey] || step;
+        const grid = timesFor(dStep);
+        const copy = { ...(newEnzo[dKey] || {}) };
+        grid.forEach((time) => {
+          if (!predicate(Number(time.slice(0, 2)))) return;
+          if (copy[time] && copy[time].status === 'booked') return;
+          if (mode) copy[time] = mode === 'open' && openMode === 'domicile' ? { status: 'open', home: true } : { status: mode };
+          else delete copy[time];
+        });
+        newEnzo[dKey] = copy;
+      }
+      return { ...a, enzo: newEnzo };
+    });
+    const suffix = multiDay > 1 ? ' (' + multiDay + ' jours)' : '';
+    toast(label + suffix);
+  };
+
+  // ── Absences : periodes libres, reversibles (ne detruisent pas les creneaux) ──
+  const [vacFrom, setVacFrom] = useState(null);
+  const [vacTo, setVacTo] = useState(null);
+
+  const pickVacDay = (idx) => {
+    if (vacFrom == null || (vacFrom != null && vacTo != null)) { setVacFrom(idx); setVacTo(null); return; }
+    if (idx < vacFrom) { setVacFrom(idx); return; }
+    setVacTo(idx);
+  };
+
+  const addClosure = () => {
+    if (vacFrom == null) { toast('Choisissez au moins un jour de debut.'); return; }
+    const to = vacTo != null ? vacTo : vacFrom;
+    let booked = 0;
+    for (let i = vacFrom; i <= to; i++) {
+      Object.values(agenda.enzo[DAYS[i].key] || {}).forEach((sl) => { if (sl.status === 'booked') booked++; });
+    }
+    setClosures((cs) => [...cs, {
+      id: 'cl' + Date.now(), fromIdx: vacFrom, toIdx: to,
+      fromLabel: DAYS[vacFrom].label, toLabel: DAYS[to].label,
+    }]);
+    setVacFrom(null); setVacTo(null);
+    const n = to - vacFrom + 1;
+    toast(booked > 0
+      ? `Absence enregistree (${n} j) — ${booked} RDV deja pris a gerer dans le Planning.`
+      : `Absence enregistree — ${n} jour${n > 1 ? 's' : ''} ferme${n > 1 ? 's' : ''} cote client.`);
+  };
+
+  const removeClosure = (id) => {
+    setClosures((cs) => cs.filter((c) => c.id !== id));
+    toast('Absence annulee — les creneaux redeviennent reservables.');
+  };
+
+  const dayClosure = (closures || []).find((c) => dayIdx >= c.fromIdx && dayIdx <= c.toIdx) || null;
+
+  // ── Semaine type : applique des horaires recurrents sur N semaines ──
+  const [wdSel, setWdSel] = useState(1);
+  const [cStart, setCStart] = useState(9);
+  const [cEnd, setCEnd] = useState(18);
+
+  const applyWeekly = (nWeeks) => {
+    let touched = 0;
+    setAgenda((a) => {
+      const newEnzo = { ...a.enzo };
+      for (let i = 0; i < nWeeks * 7; i++) {
+        const dIdx = dayIdx + i;
+        if (dIdx >= DAYS.length) break;
+        const dayObj = DAYS[dIdx];
+        const rule = weekly[dayObj.date.getDay()];
+        const dStep = daycfg[dayObj.key] || step;
+        const grid = timesFor(dStep, endHour);
+        const copy = {};
+        Object.entries(newEnzo[dayObj.key] || {}).forEach(([t, sl]) => {
+          if (sl.status === 'booked') copy[t] = sl;
+        });
+        if (rule) {
+          grid.forEach((t) => {
+            const h = Number(t.slice(0, 2));
+            if (h < rule.start || h >= rule.end) return;
+            if (copy[t] && copy[t].status === 'booked') return;
+            copy[t] = openMode === 'domicile' ? { status: 'open', home: true } : { status: 'open' };
+          });
+        }
+        newEnzo[dayObj.key] = copy;
+        touched++;
+      }
+      return { ...a, enzo: newEnzo };
+    });
+    toast(`Semaine type appliquee sur ${touched} jours a partir de ${day.label}.`);
+  };
+
+  return (
+    <ScrollView style={s.screen} contentContainerStyle={s.screenPad}>
+      <Kicker>ESPACE BARBER · ENZO MOREAU</Kicker>
+      <Title em="créneaux">Mes </Title>
+
+      <View style={[s.row, { gap: 8, marginBottom: 14 }]}>
+        {[['day', 'Vue jour'], ['month', 'Vue mois']].map(([m, l]) => (
+          <Chip key={m} label={l} on={viewMode === m} onPress={() => setViewMode(m)} />
+        ))}
+      </View>
+
+      {viewMode === 'month' ? (
+        <>
+          <View style={[s.row, { marginBottom: 12 }]}>
+            <TouchableOpacity onPress={() => setMonthOff(Math.max(0, monthOff - 1))} hitSlop={10}
+              style={{ opacity: monthOff === 0 ? 0.3 : 1 }}>
+              <Feather name="chevron-left" size={20} color={C.text} />
+            </TouchableOpacity>
+            <Text style={[s.calMonth, { flex: 1, textAlign: 'center' }]}>
+              {(() => {
+                const b = new Date(); b.setDate(1); b.setMonth(b.getMonth() + monthOff);
+                return MO[b.getMonth()] + ' ' + b.getFullYear();
+              })()}
+            </Text>
+            <TouchableOpacity onPress={() => setMonthOff(Math.min(2, monthOff + 1))} hitSlop={10}
+              style={{ opacity: monthOff >= 2 ? 0.3 : 1 }}>
+              <Feather name="chevron-right" size={20} color={C.text} />
+            </TouchableOpacity>
+          </View>
+
+          <View style={{ flexDirection: 'row', marginBottom: 6 }}>
+            {['L','M','M','J','V','S','D'].map((d, i) => (
+              <Text key={i} style={{ flex: 1, textAlign: 'center', color: C.muted, fontSize: 11, fontWeight: '600' }}>{d}</Text>
+            ))}
+          </View>
+
+          {(() => {
+            const base = new Date(); base.setDate(1); base.setMonth(base.getMonth() + monthOff);
+            const m = base.getMonth(); const y = base.getFullYear();
+            const firstDow = (base.getDay() + 6) % 7;
+            const nDays = new Date(y, m + 1, 0).getDate();
+            const cells = [];
+            for (let i = 0; i < firstDow; i++) cells.push(null);
+            for (let d = 1; d <= nDays; d++) cells.push(new Date(y, m, d));
+            const rows = [];
+            for (let i = 0; i < cells.length; i += 7) rows.push(cells.slice(i, i + 7));
+            return rows.map((row, ri) => (
+              <View key={ri} style={{ flexDirection: 'row', marginBottom: 4 }}>
+                {row.map((date, ci) => {
+                  if (!date) return <View key={ci} style={{ flex: 1 }} />;
+                  const key = date.toDateString();
+                  const dayI = DAY_INDEX[key];
+                  const vals = Object.values(agenda.enzo[key] || {});
+                  const nB = vals.filter((v) => v.status === 'booked').length;
+                  const nO = vals.filter((v) => v.status === 'open').length;
+                  const isPast = dayI == null;
+                  const isToday = date.toDateString() === new Date().toDateString();
+                  return (
+                    <TouchableOpacity key={ci} disabled={isPast} activeOpacity={0.7}
+                      style={{ flex: 1, alignItems: 'center', paddingVertical: 7, borderRadius: 10,
+                        backgroundColor: isToday ? 'rgba(200,169,106,0.12)' : 'transparent',
+                        opacity: isPast ? 0.3 : 1 }}
+                      onPress={() => { if (dayI != null) { setDayIdx(dayI); setViewMode('day'); } }}>
+                      <Text style={{ color: isToday ? C.gold : C.text, fontSize: 13, fontWeight: isToday ? '700' : '400' }}>
+                        {date.getDate()}
+                      </Text>
+                      <View style={{ flexDirection: 'row', gap: 3, marginTop: 3, height: 5 }}>
+                        {nO > 0 && <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: C.gold }} />}
+                        {nB > 0 && <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: C.green }} />}
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            ));
+          })()}
+
+          <View style={[s.row, { marginTop: 8, marginBottom: 16, gap: 14 }]}>
+            <View style={s.row}><View style={[s.dot, { backgroundColor: C.gold }]} /><Text style={s.legend}>Ouvert</Text></View>
+            <View style={s.row}><View style={[s.dot, { backgroundColor: '#8FB4D9' }]} /><Text style={s.legend}>Domicile</Text></View>
+            <View style={s.row}><View style={[s.dot, { backgroundColor: C.green }]} /><Text style={s.legend}>Réservé</Text></View>
+          </View>
+
+          <Text style={s.fieldLabel}>OUVRIR SUR TOUT LE MOIS</Text>
+          <View style={[s.wrap, { marginBottom: 10 }]}>
+            {SCHEDULE_PRESETS.map((p) => (
+              <Chip key={p.label} mini label={p.label} onPress={() => bulkMonth(p)} />
+            ))}
+          </View>
+          <Text style={s.fieldLabel}>FILTRER PAR TYPE DE JOUR</Text>
+          <View style={[s.wrap, { marginBottom: 14 }]}>
+            <Chip mini label="Lun–Ven" onPress={() => bulkMonth(SCHEDULE_PRESETS[1], [1,2,3,4,5])} />
+            <Chip mini label="Week-end" onPress={() => bulkMonth(SCHEDULE_PRESETS[1], [0,6])} />
+          </View>
+          <Btn ghost label="FERMER LES CRÉNEAUX LIBRES DU MOIS" onPress={closeMonth} />
+        </>
+      ) : (
+        <>
+          {/* ── En-tête du jour ── */}
+          <View style={[s.card, { borderColor: C.lineGold, marginBottom: 4 }]}>
+            <Text style={[s.bname, { fontSize: 15, marginBottom: 4 }]}>{DAYS[dayIdx].label}</Text>
+            <View style={[s.row, { gap: 14 }]}>
+              <View style={s.row}><View style={[s.dot, { backgroundColor: C.gold }]} /><Text style={s.legend}>{nOpen} ouvert{nOpen > 1 ? 's' : ''}</Text></View>
+              <View style={s.row}><View style={[s.dot, { backgroundColor: C.orange }]} /><Text style={s.legend}>{nPause} pause{nPause > 1 ? 's' : ''}</Text></View>
+              <View style={s.row}><View style={[s.dot, { backgroundColor: C.green }]} /><Text style={s.legend}>{nBooked} réservé{nBooked > 1 ? 's' : ''}</Text></View>
+            </View>
+          </View>
+
+          {/* ── Réglages du jour ── */}
+          <Section>Réglages</Section>
+          <View style={s.card}>
+            <Text style={s.fieldLabel}>DURÉE D'UN CRÉNEAU</Text>
+            <View style={[s.wrap, { marginBottom: 12 }]}>
+              {STEP_CHOICES.map((v) => (
+                <Chip key={v} mini label={`${v} min`} on={step === v} onPress={() => changeStep(v)} />
+              ))}
+            </View>
+            <Text style={s.fieldLabel}>APPLIQUER LES ACTIONS SUR</Text>
+            <View style={s.wrap}>
+              {[1, 2, 3, 5, 7].map((n) => (
+                <Chip key={n} mini
+                  label={n === 1 ? 'Ce jour' : n + ' jours'}
+                  on={multiDay === n}
+                  onPress={() => setMultiDay(n)} />
+              ))}
+            </View>
+            <View style={[s.row, { marginTop: 14 }]}>
+              <Text style={[s.fieldLabel, { flex: 1, marginTop: 0 }]}>FIN DE JOURNÉE</Text>
+              {[22, 23, 24, 25].map((h) => (
+                <Chip key={h} mini label={h >= 24 ? String(h - 24).padStart(2,'0') + 'h' : h + 'h'}
+                  on={(endHour ?? 23) === h} onPress={() => setEndHour(h)} />
+              ))}
+            </View>
+            <Text style={[s.fieldLabel, { marginTop: 14 }]}>TYPE DE CRÉNEAU À OUVRIR</Text>
+            <View style={s.wrap}>
+              <Chip mini label="En salon" on={openMode === 'salon'} onPress={() => setOpenMode('salon')} />
+              <Chip mini label="À domicile" on={openMode === 'domicile'} onPress={() => setOpenMode('domicile')} />
+            </View>
+            {openMode === 'domicile' && (
+              <>
+                <Text style={[s.fieldLabel, { marginTop: 12 }]}>MAJORATION DOMICILE</Text>
+                <View style={s.wrap}>
+                  {[0, 500, 1000, 1500, 2000].map((v) => (
+                    <Chip key={v} mini label={v === 0 ? 'Aucune' : '+' + v / 100 + ' €'} on={homeFee === v}
+                      onPress={() => setHomeFee(v)} />
+                  ))}
+                </View>
+              </>
+            )}
+          </View>
+
+          {/* ── Plages horaires (action principale) ── */}
+          <Section note="appuyez pour ouvrir ces horaires">Ouvrir une plage</Section>
+          <View style={[s.wrap, { gap: 8 }]}>
+            {SCHEDULE_PRESETS.map((p) => (
+              <TouchableOpacity key={p.label}
+                style={[s.card, { marginBottom: 0, paddingVertical: 12, paddingHorizontal: 16,
+                  borderColor: C.lineGold, flexDirection: 'row', alignItems: 'center', gap: 10 }]}
+                onPress={() => bulk('Ouvert ' + p.label, (h) => h >= p.start && h < p.end, 'open')}
+                activeOpacity={0.8}>
+                <Feather name="clock" size={14} color={C.gold} />
+                <Text style={[s.bname, { fontSize: 13.5 }]}>{p.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <View style={[s.card, { marginTop: 10 }]}>
+            <Text style={s.fieldLabel}>PLAGE PERSONNALISÉE</Text>
+            <View style={[s.row, { gap: 8, marginTop: 8 }]}>
+              <Text style={[s.softText, { width: 26 }]}>De</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View style={[s.wrap, { flexWrap: 'nowrap', gap: 6 }]}>
+                  {[6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20].map((h) => (
+                    <Chip key={h} mini label={h + 'h'} on={cStart === h}
+                      onPress={() => { setCStart(h); if (cEnd <= h) setCEnd(h + 1); }} />
+                  ))}
+                </View>
+              </ScrollView>
+            </View>
+            <View style={[s.row, { gap: 8, marginTop: 8 }]}>
+              <Text style={[s.softText, { width: 26 }]}>À</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View style={[s.wrap, { flexWrap: 'nowrap', gap: 6 }]}>
+                  {[8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23].filter((h) => h > cStart).map((h) => (
+                    <Chip key={h} mini label={h + 'h'} on={cEnd === h} onPress={() => setCEnd(h)} />
+                  ))}
+                </View>
+              </ScrollView>
+            </View>
+            <View style={[s.wrap, { gap: 6, marginTop: 12 }]}>
+              <Chip mini label={'Ouvrir ' + cStart + 'h–' + cEnd + 'h'}
+                onPress={() => bulk('Ouvert ' + cStart + 'h–' + cEnd + 'h', (h) => h >= cStart && h < cEnd, 'open')} />
+              <Chip mini label="Mettre en pause"
+                onPress={() => bulk('Pause ' + cStart + 'h–' + cEnd + 'h', (h) => h >= cStart && h < cEnd, 'pause')} />
+              <Chip mini label="Fermer"
+                onPress={() => bulk('Fermé ' + cStart + 'h–' + cEnd + 'h', (h) => h >= cStart && h < cEnd, null)} />
+            </View>
+          </View>
+
+          {/* ── Actions rapides ── */}
+          <Section>Actions rapides</Section>
+          <View style={[s.wrap, { gap: 8 }]}>
+            {[
+              ['sun', 'Tout ouvrir (9h–22h)', () => bulk('Tout ouvert.', (h) => h >= 9 && h < 22, 'open'), false],
+              ['moon', 'Soirée (20h–22h)', () => bulk('Soirée ouverte.', (h) => h >= 20, 'open'), false],
+              ['coffee', 'Pause déjeuner (12h–14h)', () => bulk('Pause déjeuner.', (h) => h >= 12 && h < 14, 'pause'), false],
+              ['x-circle', 'Tout fermer', () => bulk('Créneaux fermés.', () => true, null), true],
+            ].map(([icon, label, action, danger]) => (
+              <TouchableOpacity key={label}
+                style={[s.card, { marginBottom: 0, paddingVertical: 11, paddingHorizontal: 14,
+                  borderColor: danger ? 'rgba(200,80,80,0.3)' : C.line,
+                  flexDirection: 'row', alignItems: 'center', gap: 10 }]}
+                onPress={action} activeOpacity={0.8}>
+                <Feather name={icon} size={14} color={danger ? '#e05' : C.muted} />
+                <Text style={[s.softText, danger && { color: '#e05' }]}>{label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* ── Absences & vacances (periode libre) ── */}
+          <Section note="choisissez n'importe quelle periode — annulable a tout moment">Absences & vacances</Section>
+          <View style={s.card}>
+            <View style={[s.row, { gap: 8, marginBottom: 10 }]}>
+              <View style={s.grow}>
+                <Text style={s.fieldLabel}>DU</Text>
+                <Text style={[s.bname, { fontSize: 13, marginTop: 3 }]}>
+                  {vacFrom != null ? DAYS[vacFrom].label : '—'}
+                </Text>
+              </View>
+              <View style={s.grow}>
+                <Text style={s.fieldLabel}>AU</Text>
+                <Text style={[s.bname, { fontSize: 13, marginTop: 3 }]}>
+                  {vacTo != null ? DAYS[vacTo].label : (vacFrom != null ? DAYS[vacFrom].label : '—')}
+                </Text>
+              </View>
+              {vacFrom != null && (
+                <TouchableOpacity onPress={() => { setVacFrom(null); setVacTo(null); }} hitSlop={10}>
+                  <Feather name="x" size={16} color={C.muted} />
+                </TouchableOpacity>
+              )}
+            </View>
+            <Calendar sel={-1} onSel={pickVacDay} range={{ from: vacFrom, to: vacTo }} />
+            <View style={[s.wrap, { gap: 6, marginTop: 4 }]}>
+              {[['Ce jour', 0], ['3 jours', 2], ['1 semaine', 6], ['2 semaines', 13]].map(([lb, add]) => (
+                <Chip key={lb} mini label={lb} onPress={() => {
+                  const f = vacFrom != null ? vacFrom : dayIdx;
+                  setVacFrom(f);
+                  setVacTo(Math.min(DAYS.length - 1, f + add));
+                }} />
+              ))}
+            </View>
+            <Btn icon="sun" label="ENREGISTRER L'ABSENCE" onPress={addClosure} />
+          </View>
+
+          {(closures || []).length > 0 && (
+            <>
+              <Text style={s.fieldLabel}>ABSENCES PROGRAMMEES</Text>
+              {closures.map((c) => (
+                <View key={c.id} style={[s.card, s.row, { borderColor: 'rgba(217,160,91,0.35)' }]}>
+                  <Feather name="sun" size={15} color={C.orange} />
+                  <View style={s.grow}>
+                    <Text style={[s.bname, { fontSize: 13 }]}>
+                      {c.fromIdx === c.toIdx ? c.fromLabel : c.fromLabel + '  →  ' + c.toLabel}
+                    </Text>
+                    <Text style={s.btags}>{c.toIdx - c.fromIdx + 1} jour{c.toIdx > c.fromIdx ? 's' : ''} · invisible cote client</Text>
+                  </View>
+                  <TouchableOpacity onPress={() => removeClosure(c.id)} hitSlop={10}>
+                    <Feather name="rotate-ccw" size={16} color={C.gold} />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </>
+          )}
+
+          {/* ── Semaine type ── */}
+          <Section note="horaires recurrents, appliques sur plusieurs semaines">Semaine type</Section>
+          <View style={s.card}>
+            <View style={[s.wrap, { gap: 6 }]}>
+              {[1, 2, 3, 4, 5, 6, 0].map((wd) => {
+                const r = weekly[wd];
+                return (
+                  <Chip key={wd} mini on={wdSel === wd}
+                    label={WD_FULL[wd] + (r ? ' ' + r.start + '-' + r.end : ' fermé')}
+                    onPress={() => setWdSel(wd)} />
+                );
+              })}
+            </View>
+            <View style={[s.row, { gap: 8, marginTop: 12 }]}>
+              <Text style={[s.fieldLabel, { flex: 1, marginTop: 0 }]}>{WD_FULL[wdSel].toUpperCase()}</Text>
+              <Chip mini label="Fermé" on={!weekly[wdSel]}
+                onPress={() => setWeekly((w) => ({ ...w, [wdSel]: null }))} />
+            </View>
+            <Text style={[s.fieldLabel, { marginTop: 10 }]}>DÉBUT</Text>
+            <View style={s.wrap}>
+              {[7, 8, 9, 10, 11, 14].map((h) => (
+                <Chip key={h} mini label={h + 'h'} on={weekly[wdSel]?.start === h}
+                  onPress={() => setWeekly((w) => ({ ...w, [wdSel]: { start: h, end: Math.max(h + 1, w[wdSel]?.end || 19) } }))} />
+              ))}
+            </View>
+            <Text style={[s.fieldLabel, { marginTop: 10 }]}>FIN</Text>
+            <View style={s.wrap}>
+              {[13, 17, 18, 19, 20, 22].map((h) => (
+                <Chip key={h} mini label={h + 'h'} on={weekly[wdSel]?.end === h}
+                  onPress={() => setWeekly((w) => ({ ...w, [wdSel]: { start: Math.min(h - 1, w[wdSel]?.start ?? 9), end: h } }))} />
+              ))}
+            </View>
+            <View style={[s.wrap, { gap: 6, marginTop: 14 }]}>
+              {[1, 2, 4].map((n) => (
+                <Chip key={n} mini label={'Appliquer ' + n + ' sem.'} onPress={() => applyWeekly(n)} />
+              ))}
+            </View>
+          </View>
+
+          {/* ── Grille des créneaux ── */}          {/* ── Grille des créneaux ── */}
+          {dayClosure && (
+            <View style={[s.card, { borderColor: 'rgba(217,160,91,0.5)', flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 4 }]}>
+              <Feather name="sun" size={14} color={C.orange} style={{ marginTop: 2 }} />
+              <Text style={[s.softText, { flex: 1, lineHeight: 18 }]}>
+                Absence en cours ({dayClosure.fromLabel}{dayClosure.fromIdx !== dayClosure.toIdx ? ' → ' + dayClosure.toLabel : ''}) — ce jour n'apparaît pas côté client.
+              </Text>
+              <TouchableOpacity onPress={() => removeClosure(dayClosure.id)} hitSlop={10}>
+                <Feather name="rotate-ccw" size={16} color={C.gold} />
+              </TouchableOpacity>
+            </View>
+          )}
+          {openMode === 'domicile' && (
+            <View style={[s.card, { borderColor: C.lineGold, flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 4 }]}>
+              <Feather name="home" size={14} color={C.gold} style={{ marginTop: 2 }} />
+              <Text style={[s.softText, { flex: 1, lineHeight: 18 }]}>Mode domicile — les créneaux ouverts maintenant seront à domicile{homeFee > 0 ? ' (+' + homeFee / 100 + ' €)' : ''}. Les clients saisiront leur adresse.</Text>
+            </View>
+          )}
+          <Section note="touchez pour ouvrir · fermé · pause">Créneaux du jour</Section>
+          <View style={[s.row, { gap: 12, marginBottom: 10, flexWrap: 'wrap' }]}>
+            <View style={s.row}><View style={[s.dot, { backgroundColor: '#3A3A40' }]} /><Text style={s.legend}>Fermé</Text></View>
+            <View style={s.row}><View style={[s.dot, { backgroundColor: C.gold }]} /><Text style={s.legend}>Ouvert</Text></View>
+            <View style={s.row}><View style={[s.dot, { backgroundColor: C.orange }]} /><Text style={s.legend}>Pause</Text></View>
+            <View style={s.row}><View style={[s.dot, { backgroundColor: C.green }]} /><Text style={s.legend}>Réservé</Text></View>
+          </View>
+
+          <View style={s.slotGrid}>
+            {allTimes.map((time) => {
+              const sl = slots[time];
+              const st = sl ? sl.status : 'closed';
+              return (
+                <TouchableOpacity key={time}
+                  style={[s.slotCell, st === 'open' && s.slotOpen, st === 'open' && sl?.home && { borderColor: 'rgba(143,180,217,0.55)' }, st === 'pause' && s.slotPause, st === 'booked' && s.slotBooked]}
+                  onPress={() => cycle(time)}
+                  onLongPress={() => st === 'open' && openBookModal(time)}
+                  activeOpacity={0.75}>
+                  <Text style={[s.slotCellTime, st === 'closed' && { color: '#5A5852' }, st === 'booked' && { color: C.ink }]}>
+                    {time}
+                  </Text>
+                  {st === 'booked' ? (
+                    <Text style={s.slotCellWho} numberOfLines={1}>{sl.who}</Text>
+                  ) : (
+                    <Text style={[s.slotCellState, st === 'open' && { color: sl?.home ? '#8FB4D9' : C.gold }, st === 'pause' && { color: C.orange }]}>
+                      {st === 'open' ? (sl?.home ? 'domicile' : 'ouvert') : st === 'pause' ? 'pause' : 'fermé'}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          <Text style={[s.footnote, { marginTop: 6 }]}>
+            Appui long sur un créneau ouvert pour réserver manuellement un client.
+          </Text>
+        </>
+      )}
+
+      <Text style={s.footnote}>
+        La durée se règle jour par jour — 20 min pour les coupes rapides, 60 min pour les transformations.
+        Les pauses et les créneaux fermés sont invisibles côté client ; les réservations existantes sont toujours conservées.
+      </Text>
+
+      {/* ── Modale réservation manuelle ── */}
+      {bookModal && (
+        <View style={s.modalOverlay}>
+          <View style={s.modal}>
+            <View style={[s.row, { marginBottom: 16 }]}>
+              <Text style={[s.bname, { fontFamily: SERIF, fontSize: 17, flex: 1 }]}>
+                Réserver · {bookModal.time}
+              </Text>
+              <TouchableOpacity onPress={() => setBookModal(null)} hitSlop={10}>
+                <Feather name="x" size={20} color={C.muted} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Sélection prestation */}
+            <Text style={s.fieldLabel}>PRESTATION</Text>
+            <View style={[s.wrap, { marginBottom: 12 }]}>
+              {services.map((sv) => (
+                <Chip key={sv.id} mini label={sv.name} price={fmt(sv.price)}
+                  on={selectedService?.id === sv.id}
+                  onPress={() => setSelectedService(sv)} />
+              ))}
+            </View>
+
+            {/* Recherche client */}
+            <Text style={s.fieldLabel}>CLIENT</Text>
+            {!addingClient ? (
+              <>
+                <View style={[s.search, { marginBottom: 8 }]}>
+                  <Feather name="search" size={14} color={C.muted} />
+                  <TextInput style={s.searchInput} placeholder="Chercher par nom ou téléphone…"
+                    placeholderTextColor="#5A5852" value={clientSearch} onChangeText={setClientSearch} />
+                </View>
+                <View style={{ maxHeight: 180 }}>
+                  <ScrollView nestedScrollEnabled>
+                    {filteredClients.map((c) => (
+                      <TouchableOpacity key={c.id}
+                        style={[s.clientRow, selectedClient?.id === c.id && s.clientRowOn]}
+                        onPress={() => setSelectedClient(c)} activeOpacity={0.8}>
+                        <View style={s.grow}>
+                          <Text style={[s.bname, { fontSize: 13.5 }]}>{c.firstName} {c.lastName}</Text>
+                          {c.phone ? <Text style={s.btags}>{c.phone}</Text> : null}
+                          {c.notes ? <Text style={[s.btags, { fontStyle: 'italic' }]} numberOfLines={1}>{c.notes}</Text> : null}
+                        </View>
+                        {selectedClient?.id === c.id && <Feather name="check-circle" size={16} color={C.gold} />}
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+                {blockedClients.length > 0 && (
+                  <View style={{ marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: C.line }}>
+                    <Text style={[s.fieldLabel, { color: '#E05252', marginBottom: 6 }]}>CLIENTS BLOQUÉS</Text>
+                    {blockedClients.map((c) => (
+                      <View key={c.id} style={[s.clientRow, { opacity: 0.5 }]}>
+                        <Feather name="slash" size={13} color="#E05252" />
+                        <View style={[s.grow, { marginLeft: 8 }]}>
+                          <Text style={[s.bname, { fontSize: 13 }]}>{c.firstName} {c.lastName}</Text>
+                          {c.blockReason && <Text style={[s.btags, { color: '#E05252', fontSize: 10 }]}>{c.blockReason}</Text>}
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                )}
+                <TouchableOpacity onPress={() => setAddingClient(true)} style={{ marginTop: 8 }} hitSlop={6}>
+                  <Text style={s.authLink}>+ Nouveau client</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <View style={[s.card, { borderColor: C.lineGold, marginBottom: 0 }]}>
+                <Field label="PRÉNOM" placeholder="Prénom" value={newCFn} onChangeText={setNewCFn} />
+                <Field label="NOM" placeholder="Nom" value={newCLn} onChangeText={setNewCLn} />
+                <Field label="TÉLÉPHONE" placeholder="06 …" keyboardType="phone-pad" value={newCPh} onChangeText={setNewCPh} />
+                <Btn label="ENREGISTRER" onPress={saveNewClient} />
+                <Btn ghost label="ANNULER" onPress={() => setAddingClient(false)} />
+              </View>
+            )}
+
+            {!addingClient && (
+              <Btn label="CONFIRMER LA RÉSERVATION" onPress={confirmManualBook} />
+            )}
+          </View>
+        </View>
+      )}
+    </ScrollView>
+  );
+}
+
+const DUR_CHOICES = [30, 45, 60, 90, 120];
+const ICON_FOR_WINDOW = { all: 'tag', day: 'sun', evening: 'sunset', night: 'moon' };
+
+/* Champ prix en euros, libre */
+function PriceField({ cents, onChange }) {
+  const [txt, setTxt] = useState(String(cents / 100).replace('.', ','));
+  return (
+    <View style={s.priceField}>
+      <TextInput
+        style={s.priceInput}
+        keyboardType="numeric"
+        value={txt}
+        onChangeText={(t) => {
+          setTxt(t);
+          const v = parseFloat(t.replace(',', '.'));
+          if (!isNaN(v) && v > 0) onChange(Math.round(v * 100));
+        }}
+      />
+      <Text style={{ color: C.gold, fontFamily: SERIF, fontSize: 15, fontWeight: '700' }}>€</Text>
+    </View>
+  );
+}
+
+function FormulasScreen({ formulas, setFormulas, services, setServices, toast }) {
+  const [creating, setCreating] = React.useState(false);
+  const [name, setName] = React.useState('');
+  const [dur, setDur] = React.useState(45);
+  const [windowSel, setWindowSel] = React.useState('all');
+  const [priceTxt, setPriceTxt] = React.useState('');
+  const [surE, setSurE] = React.useState(false);
+  const [surN, setSurN] = React.useState(false);
+  const [surW, setSurW] = React.useState(false);
+  const [surU, setSurU] = React.useState(false);
+  const [recur, setRecur] = React.useState(false);
+  const [fromHSel, setFromHSel] = React.useState(null);
+  const [addingServ, setAddingServ] = React.useState(false);
+  const [svName, setSvName] = React.useState('');
+  const [svDur, setSvDur] = React.useState(30);
+  const [svPrice, setSvPrice] = React.useState('');
+
+  const SUR_DEFS = [
+    { key: 'surE', label: 'Soirée', detail: '+10 € après 20h' },
+    { key: 'surN', label: 'Nuit', detail: '+25 € après 22h' },
+    { key: 'surW', label: 'Week-end', detail: '+15 % sam./dim.' },
+    { key: 'surU', label: 'Urgence', detail: '+20 % si < 2h' },
+  ];
+
+  const createService = () => {
+    const label = svName.trim();
+    const v = parseFloat(svPrice.replace(',', '.'));
+    if (!label) { toast('Donnez un nom à votre prestation.'); return; }
+    if (isNaN(v) || v <= 0) { toast('Indiquez un prix valide.'); return; }
+    setServices((ss) => [...ss, { id: 'sv' + Date.now(), name: label, dur: svDur, price: Math.round(v * 100) }]);
+    setAddingServ(false); setSvName(''); setSvPrice(''); setSvDur(30);
+    toast('Prestation créée.');
+  };
+
+  const removeService = (sv) => {
+    setServices((ss) => ss.filter((x) => x.id !== sv.id));
+    toast('Prestation supprimée.');
+  };
+
+  const toggleActive = (id) => {
+    setFormulas((fs) => fs.map((f) => {
+      if (f.id !== id) return f;
+      toast(f.active ? 'Formule désactivée.' : 'Formule visible par vos clients.');
+      return { ...f, active: !f.active };
+    }));
+  };
+
+  const toggleSur = (fid, key) =>
+    setFormulas((fs) => fs.map((f) => f.id !== fid ? f : { ...f, [key]: !f[key] }));
+
+  const create = () => {
+    const label = name.trim();
+    if (!label) { toast('Donnez un nom à votre formule.'); return; }
+    const v = parseFloat(priceTxt.replace(',', '.'));
+    if (isNaN(v) || v <= 0) { toast('Indiquez un prix de base valide.'); return; }
+    const price = Math.round(v * 100);
+    const fromH = (windowSel === 'evening' || windowSel === 'night') ? (fromHSel ?? (windowSel === 'evening' ? 18 : 20)) : null;
+    setFormulas((fs) => [...fs, {
+      id: 'f' + (fs.length + 1) + Date.now(), name: label,
+      icon: recur ? 'refresh-cw' : ICON_FOR_WINDOW[windowSel],
+      dur, window: windowSel, price, fromH, surE, surN, surW, surU, recur, active: true,
+      desc: label + ' · ' + dur + ' min',
+    }]);
+    setCreating(false);
+    setName(''); setDur(45); setWindowSel('all'); setPriceTxt(''); setFromHSel(null);
+    setSurE(false); setSurN(false); setSurW(false); setSurU(false); setRecur(false);
+    toast('Formule créée.');
+  };
+
+  return (
+    <ScrollView style={s.screen} contentContainerStyle={s.screenPad} keyboardShouldPersistTaps="handled">
+      <Kicker>ESPACE BARBER · ENZO MOREAU</Kicker>
+      <Title em="formules">Mes </Title>
+      <Lead>
+        Définissez vos tarifs et créez vos formules. Chaque formule a son prix — les majorations sont optionnelles.
+      </Lead>
+
+      <Section note="vos types de coupe et leur tarif">Mes prestations</Section>
+      {services.map((sv) => (
+        <View key={sv.id} style={[s.card, s.row, { gap: 12 }]}>
+          <View style={s.grow}>
+            <Text style={[s.bname, { fontSize: 14 }]}>{sv.name}</Text>
+            <Text style={[s.btags, { marginTop: 2 }]}>{sv.dur} min</Text>
+          </View>
+          <PriceField cents={sv.price} onChange={(v) =>
+            setServices((ss) => ss.map((x) => x.id === sv.id ? { ...x, price: v } : x))
+          } />
+          <TouchableOpacity onPress={() => removeService(sv)} hitSlop={8}>
+            <Feather name="trash-2" size={16} color={C.red} />
+          </TouchableOpacity>
+        </View>
+      ))}
+      {addingServ ? (
+        <View style={[s.card, { borderColor: C.lineGold }]}>
+          <Text style={[s.bname, { marginBottom: 10 }]}>Nouvelle prestation</Text>
+          <Field label="NOM" placeholder="Dégradé américain, Locks…"
+            value={svName} onChangeText={setSvName} />
+          <Text style={s.fieldLabel}>DURÉE</Text>
+          <View style={[s.wrap, { marginBottom: 4 }]}>
+            {[20, 25, ...DUR_CHOICES].map((d) => (
+              <Chip key={d} mini label={d + ' min'} on={svDur === d} onPress={() => setSvDur(d)} />
+            ))}
+          </View>
+          <Field label="PRIX (€)" placeholder="35" keyboardType="numeric"
+            value={svPrice} onChangeText={setSvPrice} />
+          <Btn label="CRÉER LA PRESTATION" onPress={createService} />
+          <Btn ghost label="ANNULER" onPress={() => setAddingServ(false)} />
+        </View>
+      ) : (
+        <Btn ghost icon="plus" label="NOUVELLE PRESTATION" onPress={() => setAddingServ(true)} />
+      )}
+
+      <Section note="types de résa avec tarif et majorations optionnelles">Mes formules</Section>
+      {formulas.map((f) => (
+        <View key={f.id} style={[s.card, !f.active && { opacity: 0.55 }]}>
+          <View style={[s.row, { gap: 12, alignItems: 'flex-start' }]}>
+            <Feather name={f.icon} size={17} color={C.gold} style={{ marginTop: 2 }} />
+            <View style={s.grow}>
+              <Text style={[s.bname, { fontSize: 14.5 }]}>{f.name}</Text>
+              <Text style={[s.btags, { marginTop: 2 }]}>
+                {f.dur} min · {WINDOWS[f.window]}{f.fromH != null ? ' à partir de ' + f.fromH + 'h' : ''}{f.recur ? ' · hebdo' : ''}
+              </Text>
+            </View>
+            <PriceField cents={f.price ?? 0} onChange={(v) =>
+              setFormulas((fs) => fs.map((x) => x.id === f.id ? { ...x, price: v } : x))
+            } />
+            <Toggle on={f.active} onPress={() => toggleActive(f.id)} />
+          </View>
+          <Text style={[s.fieldLabel, { marginTop: 12, marginBottom: 6 }]}>MAJORATIONS OPTIONNELLES</Text>
+          <View style={[s.wrap, { gap: 6 }]}>
+            {SUR_DEFS.map(({ key, label, detail }) => (
+              <TouchableOpacity key={key}
+                style={[s.surChip, f[key] && s.surChipOn]}
+                onPress={() => toggleSur(f.id, key)}
+                activeOpacity={0.75}>
+                <Text style={[s.surChipTxt, f[key] && { color: C.ink }]}>{label}</Text>
+                <Text style={[s.surChipSub, f[key] && { color: C.ink }]}>{detail}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      ))}
+
+      {creating ? (
+        <View style={[s.card, { borderColor: C.lineGold }]}>
+          <Text style={[s.bname, { marginBottom: 12 }]}>Nouvelle formule</Text>
+          <Text style={s.fieldLabel}>NOM</Text>
+          <TextInput style={s.input} placeholder="Ex. Express, Domicile, Soirée VIP…"
+            placeholderTextColor="#5A5852" value={name} onChangeText={setName} />
+          <Text style={s.fieldLabel}>DURÉE</Text>
+          <View style={s.wrap}>
+            {DUR_CHOICES.map((d) => (
+              <Chip key={d} mini label={d + ' min'} on={dur === d} onPress={() => setDur(d)} />
+            ))}
+          </View>
+          <Text style={s.fieldLabel}>FENÊTRE HORAIRE</Text>
+          <View style={s.wrap}>
+            {Object.entries(WINDOWS).map(([k, l]) => (
+              <Chip key={k} mini label={l} on={windowSel === k} onPress={() => setWindowSel(k)} />
+            ))}
+          </View>
+          {(windowSel === 'evening' || windowSel === 'night') && (
+            <>
+              <Text style={s.fieldLabel}>DÉBUTE À</Text>
+              <View style={[s.wrap, { marginBottom: 4 }]}>
+                {[18, 19, 20, 21, 22].map((h) => (
+                  <Chip key={h} mini label={h + 'h'} on={(fromHSel ?? (windowSel === 'evening' ? 18 : 20)) === h}
+                    onPress={() => setFromHSel(h)} />
+                ))}
+              </View>
+            </>
+          )}
+          <Text style={s.fieldLabel}>PRIX DE BASE (€)</Text>
+          <View style={[s.row, { marginBottom: 12, gap: 8 }]}>
+            <TextInput style={[s.input, { flex: 1, marginBottom: 0 }]}
+              keyboardType="numeric" placeholder="Ex. 35"
+              placeholderTextColor="#5A5852" value={priceTxt} onChangeText={setPriceTxt} />
+            <Text style={{ color: C.gold, fontFamily: SERIF, fontSize: 17, fontWeight: '700', alignSelf: 'center' }}>€</Text>
+          </View>
+          <Text style={s.fieldLabel}>MAJORATIONS OPTIONNELLES</Text>
+          <View style={[s.wrap, { gap: 6, marginBottom: 12 }]}>
+            {SUR_DEFS.map(({ key, label, detail }) => {
+              const vals = { surE, surN, surW, surU };
+              const sets = { surE: setSurE, surN: setSurN, surW: setSurW, surU: setSurU };
+              return (
+                <TouchableOpacity key={key}
+                  style={[s.surChip, vals[key] && s.surChipOn]}
+                  onPress={() => sets[key](!vals[key])}
+                  activeOpacity={0.75}>
+                  <Text style={[s.surChipTxt, vals[key] && { color: C.ink }]}>{label}</Text>
+                  <Text style={[s.surChipSub, vals[key] && { color: C.ink }]}>{detail}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          <Text style={s.fieldLabel}>RÉCURRENCE</Text>
+          <View style={[s.wrap, { marginBottom: 12 }]}>
+            <Chip mini label="Ponctuelle" on={!recur} onPress={() => setRecur(false)} />
+            <Chip mini label="Hebdomadaire (-15 %)" on={recur} onPress={() => setRecur(true)} />
+          </View>
+          <Btn label="CRÉER LA FORMULE" onPress={create} />
+          <Btn ghost label="ANNULER" onPress={() => setCreating(false)} />
+        </View>
+      ) : (
+        <Btn ghost icon="plus" label="NOUVELLE FORMULE" onPress={() => setCreating(true)} />
+      )}
+      <Text style={s.footnote}>
+        Cliquez sur une majoration pour l'activer ou la désactiver sur cette formule.
+      </Text>
+    </ScrollView>
+  );
+}
+
+function PlanningScreen({ agenda, setAgenda, dayIdx, setDayIdx, delay, setHistory, setClients, onFreeSlot, toast }) {
+  const day = DAYS[dayIdx];
+  const slots = agenda.enzo[day.key] || {};
+  const rdv = Object.entries(slots)
+    .filter(([, v]) => v.status === 'booked')
+    .map(([time, v]) => ({ time, ...v }))
+    .sort((a, b) => a.time.localeCompare(b.time));
+  const ca = rdv.filter((r) => r.done).reduce((sum, r) => sum + r.price, 0);
+  const todo = rdv.filter((r) => !r.done).length;
+
+  const [finModal, setFinModal] = useState(null); // rdv en cours de clôture
+  const [finPhotos, setFinPhotos] = useState([]);
+
+  const cancel = (time, who) => {
+    setAgenda((a) => ({
+      ...a,
+      enzo: {
+        ...a.enzo,
+        [day.key]: { ...a.enzo[day.key], [time]: { status: 'open' } },
+      },
+    }));
+    if (onFreeSlot) onFreeSlot(day.key, time);
+    toast(`Réservation de ${who} annulée — créneau ${time} réouvert.`);
+  };
+
+  const noShow = (r) => {
+    setAgenda((a) => ({
+      ...a,
+      enzo: {
+        ...a.enzo,
+        [day.key]: { ...a.enzo[day.key], [r.time]: { ...a.enzo[day.key][r.time], done: true, noshow: true } },
+      },
+    }));
+    if (setClients) setClients((cs) => cs.map((c) =>
+      r.who === `${c.firstName} ${c.lastName[0]}.` || r.who === `${c.firstName} ${c.lastName}`
+        ? { ...c, noShows: (c.noShows || 0) + 1 } : c));
+    toast(`${r.who} marqué absent — ${r.time} comptabilisé en no-show.`);
+  };
+
+  const addFinPhoto = async (fromCamera) => {
+    if (finPhotos.length >= 10) { toast('Maximum 10 photos par prestation.'); return; }
+    const perm = fromCamera
+      ? await ImagePicker.requestCameraPermissionsAsync()
+      : await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (perm.status !== 'granted') { toast('Permission refusée.'); return; }
+    const opts = { mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, aspect: [3, 4], quality: 0.85 };
+    const result = fromCamera
+      ? await ImagePicker.launchCameraAsync(opts)
+      : await ImagePicker.launchImageLibraryAsync(opts);
+    if (result.canceled) return;
+    const labels = ['Face', 'Profil gauche', 'Profil droit', 'Arrière'];
+    setFinPhotos((ps) => [...ps, {
+      id: 'fp' + Date.now(),
+      label: labels[ps.length] || `Photo ${ps.length + 1}`,
+      tex: ps.length % 4,
+      uri: result.assets[0].uri,
+    }]);
+  };
+
+  const confirmFinish = () => {
+    const r = finModal;
+    setAgenda((a) => ({
+      ...a,
+      enzo: {
+        ...a.enzo,
+        [day.key]: { ...a.enzo[day.key], [r.time]: { ...a.enzo[day.key][r.time], done: true } },
+      },
+    }));
+    const d = day.date;
+    setHistory((hs) => [{
+      id: 'h' + Date.now(),
+      date: `${d.getDate()} ${MO[d.getMonth()]} ${d.getFullYear()}`,
+      barber: 'Enzo Moreau', barberId: 'enzo',
+      servs: r.serv, price: r.price,
+      photos: finPhotos, rating: null,
+    }, ...hs]);
+    setFinModal(null);
+    setFinPhotos([]);
+    toast(finPhotos.length > 0
+      ? `Coupe terminée — ${finPhotos.length} photo${finPhotos.length > 1 ? 's' : ''} envoyée${finPhotos.length > 1 ? 's' : ''} dans l’historique du client.`
+      : 'Coupe terminée — le client peut maintenant laisser un avis.');
+  };
+
+  return (
+    <View style={{ flex: 1 }}>
+      <ScrollView style={s.screen} contentContainerStyle={s.screenPad}>
+        <Kicker>ESPACE BARBER · ENZO MOREAU</Kicker>
+        <Title>Planning</Title>
+        <View style={[s.row, { gap: 14, marginBottom: 16 }]}>
+          <Badge status={delay} />
+          <Text style={s.btags}>{todo} à venir{ca > 0 ? ` · ${fmt(ca)} encaissés` : ''}</Text>
+        </View>
+        <Calendar sel={dayIdx} onSel={setDayIdx} markFor={(key) => {
+          const vals = Object.values(agenda.enzo[key] || {});
+          return vals.some((v) => v.status === 'booked') ? 'booked' : null;
+        }} />
+        <Text style={[s.btags, { marginVertical: 12 }]}>{DAYS[dayIdx].label}</Text>
+        {rdv.length === 0 ? (
+          <Text style={s.footnote}>
+            Aucune réservation ce jour.{'\n'}Ouvrez des créneaux dans l’onglet Créneaux pour recevoir des clients.
+          </Text>
+        ) : (
+          rdv.map((r) => (
+            <View key={r.time} style={[s.card, s.row, r.done && { opacity: 0.45 }]}>
+              <Text style={s.slotTime}>{r.time}</Text>
+              <View style={s.grow}>
+                <Text style={[s.bname, { fontSize: 14 }]}>{r.who}</Text>
+                <Text style={[s.btags, { marginTop: 2 }]}>{r.serv}</Text>
+              </View>
+              {r.done ? (
+                <Feather name={r.noshow ? 'user-x' : 'check'} size={17} color={r.noshow ? C.orange : C.green} />
+              ) : (
+                <View style={[s.row, { gap: 12 }]}>
+                  <Text style={[s.price, { fontSize: 15 }]}>{fmt(r.price)}</Text>
+                  <TouchableOpacity onPress={() => { setFinModal(r); setFinPhotos([]); }} hitSlop={10}>
+                    <Feather name="check-circle" size={20} color={C.green} />
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => noShow(r)} hitSlop={10}>
+                    <Feather name="user-x" size={20} color={C.orange} />
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => cancel(r.time, r.who)} hitSlop={10}>
+                    <Feather name="x-circle" size={20} color={C.red} />
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          ))
+        )}
+        <Text style={s.footnote}>
+          ✓ pour terminer une coupe — silhouette barrée pour marquer le client absent (no-show) — ✕ pour annuler.
+        </Text>
+      </ScrollView>
+
+      {/* ── Fin de coupe : photos du résultat ── */}
+      {finModal && (
+        <View style={s.modalOverlay}>
+          <TouchableOpacity style={s.grow} activeOpacity={1} onPress={() => setFinModal(null)} />
+          <View style={s.modal}>
+            <Text style={[s.bname, { fontSize: 16 }]}>Terminer la coupe</Text>
+            <Text style={[s.btags, { marginTop: 3, marginBottom: 14 }]}>
+              {finModal.time} · {finModal.who} · {finModal.serv} · {fmt(finModal.price)}
+            </Text>
+            <Text style={[s.fieldLabel]}>PHOTOS DU RÉSULTAT (FACULTATIF — VISIBLES PAR LE CLIENT)</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}
+              style={{ overflow: 'visible' }}
+              contentContainerStyle={{ paddingTop: 10, paddingBottom: 6 }}>
+              {finPhotos.map((ph) => (
+                <View key={ph.id} style={{ position: 'relative', marginRight: 12 }}>
+                  <Photo label={ph.label} tex={ph.tex} uri={ph.uri} />
+                  <TouchableOpacity style={s.photoRemove}
+                    onPress={() => setFinPhotos((ps) => ps.filter((p) => p.id !== ph.id))} hitSlop={8}>
+                    <Feather name="x" size={12} color="#fff" />
+                  </TouchableOpacity>
+                </View>
+              ))}
+              <TouchableOpacity style={[s.photoAdd, { marginRight: 9 }]} onPress={() => addFinPhoto(true)} activeOpacity={0.8}>
+                <Feather name="camera" size={22} color={C.gold} />
+                <Text style={[s.btags, { marginTop: 6, textAlign: 'center' }]}>Appareil{'\n'}photo</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.photoAdd} onPress={() => addFinPhoto(false)} activeOpacity={0.8}>
+                <Feather name="image" size={22} color={C.gold} />
+                <Text style={[s.btags, { marginTop: 6, textAlign: 'center' }]}>Galerie</Text>
+              </TouchableOpacity>
+            </ScrollView>
+            <Btn label={finPhotos.length > 0
+              ? `TERMINER — ENVOYER ${finPhotos.length} PHOTO${finPhotos.length > 1 ? 'S' : ''}`
+              : 'TERMINER SANS PHOTO'} onPress={confirmFinish} />
+            <Btn ghost label="ANNULER" onPress={() => setFinModal(null)} />
+          </View>
+        </View>
+      )}
+    </View>
+  );
+}
+
+function StatusScreen({ agenda, delay, setDelay, toast }) {
+  const todayBooked = Object.values(agenda.enzo[DAYS[0].key] || {})
+    .filter((v) => v.status === 'booked' && !v.done).length;
+  return (
+    <ScrollView style={s.screen} contentContainerStyle={s.screenPad}>
+      <Kicker>ESPACE BARBER</Kicker>
+      <Title em="statut">Mon </Title>
+      <Lead>Vos clients du jour sont prévenus automatiquement à chaque changement.</Lead>
+      {Object.entries(DELAY).map(([k, v]) => {
+        const on = delay === k;
+        return (
+          <TouchableOpacity
+            key={k}
+            style={[s.opt, on && s.optOn]}
+            activeOpacity={0.8}
+            onPress={() => {
+              setDelay(k);
+              toast(`${todayBooked} client${todayBooked > 1 ? 's' : ''} notifié${todayBooked > 1 ? 's' : ''} — « Enzo · ${v.label} »`);
+            }}
+          >
+            <View style={[s.dotLg, { backgroundColor: v.dot }]} />
+            <Text style={[s.optText, s.grow]}>{v.label}</Text>
+            {on && <Text style={s.optActive}>ACTIF</Text>}
+          </TouchableOpacity>
+        );
+      })}
+      <Text style={s.footnote}>
+        Votre statut est visible en direct sur le profil que voient les clients.
+      </Text>
+    </ScrollView>
+  );
+}
+
+function ActivityScreen({ agenda }) {
+  const todaySlots = Object.values(agenda.enzo[DAYS[0].key] || {});
+  const booked = todaySlots.filter((v) => v.status === 'booked');
+  const open = todaySlots.filter((v) => v.status === 'open').length;
+  const ca = booked.filter((r) => r.done).reduce((sum, r) => sum + r.price, 0);
+  const fill = booked.length + open > 0 ? Math.round((booked.length / (booked.length + open)) * 100) : 0;
+  const sumDays = (n) => {
+    let t = 0;
+    for (let i = 0; i < n && i < DAYS.length; i++) {
+      Object.values(agenda.enzo[DAYS[i].key] || {}).forEach((v) => {
+        if (v.status === 'booked' && !v.noshow) t += v.price || 0;
+      });
+    }
+    return t;
+  };
+  const top = [['Burst Fade', 38], ['Coupe + Barbe', 27], ['Transformation', 21], ['Barbe seule', 14]];
+  return (
+    <ScrollView style={s.screen} contentContainerStyle={s.screenPad}>
+      <Kicker>ESPACE BARBER</Kicker>
+      <Title>Activité</Title>
+      <Lead>Vos chiffres, en un coup d’œil.</Lead>
+      <View style={s.kpis}>
+        {[
+          [fmt(ca), 'CA DU JOUR'], [fmt(sumDays(7)), 'PRÉVU 7 JOURS'], [fmt(sumDays(30)), 'PRÉVU 30 JOURS'],
+          [fill + ' %', 'REMPLISSAGE'], [String(booked.length), 'RDV AUJOURD’HUI'], ['★ 4,9', 'NOTE MOYENNE'],
+        ].map(([v, l]) => (
+          <View key={l} style={s.kpi}>
+            <Text style={s.kpiV}>{v}</Text>
+            <Text style={s.kpiL}>{l}</Text>
+          </View>
+        ))}
+      </View>
+      <Section>Prestations demandées</Section>
+      <View style={s.card}>
+        {top.map(([name, pct]) => (
+          <View key={name} style={{ paddingVertical: 8 }}>
+            <View style={[s.row, { marginBottom: 7 }]}>
+              <Text style={[s.softText, s.grow, { color: C.text }]}>{name}</Text>
+              <Text style={s.rate}>{pct} %</Text>
+            </View>
+            <View style={s.barBg}>
+              <View style={[s.barFill, { width: `${pct}%` }]} />
+            </View>
+          </View>
+        ))}
+      </View>
+    </ScrollView>
+  );
+}
+
+/* ───────── Gestion de la fiche barber ───────── */
+const BLOCK_REASONS = [
+  'Retards répétés',
+  'Annulations de dernière minute',
+  'Comportement inapproprié',
+  'Impayé',
+  'Autre',
+];
+
+function FicheScreen({ barbers, setBarbers, products, setProducts, clients, setClients, setNotifs, onPreview, toast }) {
+  const enzo = barbers.find((b) => b.id === 'enzo');
+
+  const [bio, setBio] = useState(enzo.bio);
+  const [address, setAddress] = useState(enzo.address);
+  const [salon, setSalon] = useState(enzo.salon);
+  const [ini, setIni] = useState(enzo.ini);
+  const [zone, setZone] = useState(enzo.address);
+  const [tagInput, setTagInput] = useState('');
+  const [stClients, setStClients] = useState(String(enzo.clients));
+  const [stCuts, setStCuts] = useState(String(enzo.prestations));
+  const [stYears, setStYears] = useState(String(enzo.years));
+  const [stPonct, setStPonct] = useState(String(enzo.ponct));
+  const [addingProduct, setAddingProduct] = useState(false);
+  const [pName, setPName] = useState('');
+  const [loyaltyRateInput, setLoyaltyRateInput] = useState(String(enzo.loyaltyRate || 1));
+  const [igLink, setIgLink] = useState(enzo.instagram || '');
+  const [ttLink, setTtLink] = useState(enzo.tiktok || '');
+  const [fbLink, setFbLink] = useState(enzo.facebook || '');
+  const [depositPct, setDepositPct] = useState(String(enzo.depositPct ?? 0));
+  const [noticeHours, setNoticeHours] = useState(String(enzo.noticeHours ?? 2));
+  const [cancelHours, setCancelHours] = useState(String(enzo.cancelHours ?? 24));
+  const [planningNote, setPlanningNote] = useState(enzo.planningNote || '');
+  const [msgTitle, setMsgTitle] = useState('');
+  const [msgBody, setMsgBody] = useState('');
+  const [blockingClient, setBlockingClient] = useState(null); // { id, firstName, lastName } | null
+  const [ptSearch, setPtSearch] = useState('');
+  const [ficheTab, setFicheTab] = React.useState(null);
+  const [noteEdit, setNoteEdit] = React.useState(null); // { id, text }
+  const [addingTier, setAddingTier] = useState(false);
+  const [tierPts, setTierPts] = useState('');
+  const [tierLabel, setTierLabel] = useState('');
+  const [pCat, setPCat] = useState('CIRE');
+  const [pPrice, setPPrice] = useState('');
+  const [pStock, setPStock] = useState('');
+
+  const updateEnzo = (fn) =>
+    setBarbers((bs) => bs.map((b) => (b.id === 'enzo' ? { ...b, ...fn(b) } : b)));
+
+  const addTag = () => {
+    const t = tagInput.trim();
+    if (!t || enzo.tags.includes(t)) return;
+    updateEnzo((b) => ({ tags: [...b.tags, t] }));
+    setTagInput('');
+    toast(`Spécialité « ${t} » ajoutée.`);
+  };
+
+  const pickCover = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') { toast('Permission refusée — accès à la galerie requis.'); return; }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true, aspect: [16, 9], quality: 0.85,
+    });
+    if (result.canceled) return;
+    updateEnzo(() => ({ coverImage: result.assets[0].uri }));
+    toast('Image de couverture mise à jour.');
+  };
+
+  const addPhoto = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') { toast('Permission refusée — accès à la galerie requis.'); return; }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true, aspect: [3, 4], quality: 0.85,
+    });
+    if (result.canceled) return;
+    const id = 'ph' + Date.now();
+    const count = (enzo.photos || []).length;
+    updateEnzo((b) => ({
+      photos: [...(b.photos || []), { id, label: 'Prestation ' + (count + 1), tex: count % 4, uri: result.assets[0].uri }],
+    }));
+    toast('Photo ajoutée.');
+  };
+
+  const addSalonPhoto = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') { toast('Permission refusée — accès à la galerie requis.'); return; }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true, aspect: [3, 4], quality: 0.85,
+    });
+    if (result.canceled) return;
+    const id = 'sp' + Date.now();
+    const count = (enzo.salonPhotos || []).length;
+    updateEnzo((b) => ({
+      salonPhotos: [...(b.salonPhotos || []), { id, label: 'Salon ' + (count + 1), tex: (count + 2) % 4, uri: result.assets[0].uri }],
+    }));
+    toast('Photo du salon ajoutée.');
+  };
+
+  const renamePhoto = (key, pid, label) =>
+    updateEnzo((b) => ({ [key]: (b[key] || []).map((p) => (p.id === pid ? { ...p, label } : p)) }));
+
+  const saveStats = () => {
+    const years = parseInt(stYears, 10);
+    const ponct = parseInt(stPonct, 10);
+    updateEnzo(() => ({
+      clients: stClients.trim() || '0',
+      prestations: stCuts.trim() || '0',
+      years: isNaN(years) ? enzo.years : years,
+      ponct: isNaN(ponct) ? enzo.ponct : Math.min(100, Math.max(0, ponct)),
+    }));
+    toast('Chiffres mis à jour.');
+  };
+
+  const updateProductLocal = (pid, changes) =>
+    setProducts((ps) => ps.map((p) => (p.id === pid ? { ...p, ...changes } : p)));
+
+  const saveProduct = () => {
+    const price = Math.round(parseFloat(pPrice.replace(',', '.')) * 100);
+    const stock = parseInt(pStock, 10);
+    if (!pName.trim() || isNaN(price) || price <= 0 || isNaN(stock) || stock < 0) {
+      toast('Renseignez tous les champs — prix et stock requis.');
+      return;
+    }
+    setProducts((ps) => [
+      ...ps,
+      { id: 'p' + Date.now(), name: pName.trim(), cat: pCat, price, stock, ic: 'box', tex: ps.length % 4 },
+    ]);
+    setPName(''); setPPrice(''); setPStock('');
+    setAddingProduct(false);
+    toast(`« ${pName.trim()} » ajouté à la boutique.`);
+  };
+
+  const curCover = enzo.coverColor || TEX[enzo.tex];
+
+  const FICHE_SECTIONS = [
+    { key: 'profil', icon: 'edit-3', title: 'Profil', desc: 'Fiche, photos, spécialités, réseaux' },
+    { key: 'planning', icon: 'calendar', title: 'Planning', desc: 'Règles, dépôt, délais' },
+    { key: 'clients', icon: 'users', title: 'Clients', desc: 'Fidélité, messages, blocages' },
+    { key: 'boutique', icon: 'shopping-bag', title: 'Boutique', desc: 'Produits et mode de vente' },
+  ];
+
+  return (
+    <>
+    {ficheTab === null ? (
+      <ScrollView style={s.screen} contentContainerStyle={s.screenPad}>
+        <Kicker>ESPACE BARBER</Kicker>
+        <Title>Paramètres</Title>
+        <Lead>Tout régler depuis un seul endroit.</Lead>
+        {FICHE_SECTIONS.map((sec) => (
+          <TouchableOpacity key={sec.key} style={s.card}
+            onPress={() => setFicheTab(sec.key)} activeOpacity={0.85}>
+            <View style={s.row}>
+              <View style={{ width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: C.lineGold, backgroundColor: 'rgba(200,169,106,0.08)', marginRight: 14, alignItems: 'center', justifyContent: 'center' }}>
+                <Feather name={sec.icon} size={18} color={C.gold} />
+              </View>
+              <View style={s.grow}>
+                <Text style={s.bname}>{sec.title}</Text>
+                <Text style={s.btags}>{sec.desc}</Text>
+              </View>
+              <Feather name="chevron-right" size={18} color={C.muted} />
+            </View>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    ) : (
+      <ScrollView style={s.screen} contentContainerStyle={s.screenPad} keyboardShouldPersistTaps="handled">
+        <TouchableOpacity onPress={() => setFicheTab(null)}
+          style={[s.row, { gap: 6, marginBottom: 18 }]} activeOpacity={0.7}>
+          <Feather name="chevron-left" size={16} color={C.gold} />
+          <Text style={[s.authLink, { fontSize: 13 }]}>Paramètres</Text>
+        </TouchableOpacity>
+
+        {ficheTab === 'profil' && (
+          <>
+            <Kicker>ESPACE BARBER · ENZO MOREAU</Kicker>
+            <Title em="fiche">Ma </Title>
+            <Lead>Modifiez votre fiche — les clients voient les changements en temps réel.</Lead>
+            <Btn icon="eye" label="APERÇU — VUE CLIENT" onPress={onPreview} />
+      {/* ── Photo de couverture ── */}
+      <Section>Photo de couverture</Section>
+      {/* mini-hero preview */}
+      <View style={[s.coverPreview, { backgroundColor: curCover }]}>
+        {enzo.coverImage
+          ? <Image source={{ uri: enzo.coverImage }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+          : null}
+        <Text style={[s.coverPreviewIni, enzo.coverImage && { opacity: 0 }]}>{enzo.ini}</Text>
+        <View style={s.coverPreviewBadge}>
+          <Text style={s.bigVenueText}>{VENUES[enzo.venue] || 'En salon'}</Text>
+        </View>
+      </View>
+      <Btn icon="image" label="CHOISIR UNE PHOTO DE COUVERTURE" onPress={pickCover} />
+      {enzo.coverImage && (
+        <Btn ghost icon="trash-2" label="SUPPRIMER L’IMAGE DE COUVERTURE" onPress={() => { updateEnzo(() => ({ coverImage: null })); toast('Image de couverture supprimée.'); }} />
+      )}
+      <Text style={s.fieldLabel}>COULEUR DE FOND</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+        <View style={[s.row, { gap: 9 }]}>
+          {COVER_COLORS.map((col) => (
+            <TouchableOpacity key={col}
+              style={[s.swatch, { backgroundColor: col }, curCover === col && s.swatchOn]}
+              onPress={() => { updateEnzo(() => ({ coverColor: col })); toast('Couleur de couverture mise à jour.'); }}>
+              {curCover === col && <Feather name="check" size={14} color={C.gold} />}
+            </TouchableOpacity>
+          ))}
+        </View>
+      </ScrollView>
+      <Field label="INITIALES (2-3 lettres)" placeholder="EM" value={ini} onChangeText={(t) => setIni(t.toUpperCase().slice(0, 3))} />
+      <Btn ghost label="ENREGISTRER LES INITIALES" onPress={() => {
+        if (!ini.trim()) return;
+        updateEnzo(() => ({ ini: ini.trim() }));
+        toast('Initiales mises à jour.');
+      }} />
+
+      {/* ── Lieu de coupe ── */}
+      <Section>Lieu de coupe</Section>
+      <View style={s.wrap}>
+        {[['salon', 'En salon', 'scissors'], ['studio', 'Studio privé', 'star'], ['domicile', 'À domicile', 'home']].map(([key, label, icon]) => (
+          <TouchableOpacity key={key}
+            style={[s.opt, enzo.venue === key && s.optOn, { flexDirection: 'row', gap: 8, paddingVertical: 12, paddingHorizontal: 14, marginBottom: 8 }]}
+            onPress={() => { updateEnzo(() => ({ venue: key })); toast(`Lieu : ${label}.`); }}
+            activeOpacity={0.8}>
+            <Feather name={icon} size={16} color={enzo.venue === key ? C.gold : C.muted} />
+            <Text style={[s.optText, { fontSize: 13 }]}>{label}</Text>
+            {enzo.venue === key && <Text style={[s.optActive, s.grow, { textAlign: 'right' }]}>ACTIF</Text>}
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* ── Nom du salon / Zone ── */}
+      {enzo.venue !== 'domicile' ? (
+        <>
+          <Section>Nom du {enzo.venue === 'studio' ? 'studio' : 'salon'}</Section>
+          <TextInput style={s.input} value={salon} onChangeText={setSalon}
+            placeholder="Nom du lieu" placeholderTextColor="#5A5852" />
+          <Btn ghost label="ENREGISTRER LE NOM" onPress={() => { updateEnzo(() => ({ salon: salon.trim() })); toast('Nom mis à jour.'); }} />
+          <Section>Adresse</Section>
+          <TextInput style={s.input} value={address} onChangeText={setAddress}
+            placeholder="Adresse complète" placeholderTextColor="#5A5852" />
+          <Btn ghost label="ENREGISTRER L’ADRESSE" onPress={() => { updateEnzo(() => ({ address: address.trim() })); toast('Adresse mise à jour.'); }} />
+        </>
+      ) : (
+        <>
+          <Section>Zone de déplacement</Section>
+          <TextInput style={s.input} value={zone} onChangeText={setZone}
+            placeholder="Ex. Lille, La Madeleine, Lambersart…" placeholderTextColor="#5A5852" />
+          <Btn ghost label="ENREGISTRER LA ZONE" onPress={() => { updateEnzo(() => ({ address: zone.trim() })); toast('Zone de déplacement mise à jour.'); }} />
+        </>
+      )}
+
+      {/* ── Description ── */}
+      <Section>Description</Section>
+      <TextInput style={[s.input, { height: 90, textAlignVertical: 'top', paddingTop: 10 }]}
+        multiline value={bio} onChangeText={setBio}
+        placeholder="Votre bio courte…" placeholderTextColor="#5A5852" />
+      <Btn ghost label="ENREGISTRER LA BIO" onPress={() => { updateEnzo(() => ({ bio: bio.trim() })); toast('Bio mise à jour.'); }} />
+
+      {/* ── Réseaux sociaux ── */}
+      <Section>Réseaux sociaux</Section>
+      <View style={[s.row, { gap: 8, marginBottom: 8, alignItems: 'center' }]}>
+        <Feather name="instagram" size={16} color={C.gold} style={{ width: 20 }} />
+        <TextInput style={[s.input, s.grow, { marginBottom: 0 }]}
+          value={igLink} onChangeText={setIgLink}
+          placeholder="https://instagram.com/votre_compte" placeholderTextColor="#5A5852"
+          autoCapitalize="none" keyboardType="url" />
+      </View>
+      <View style={[s.row, { gap: 8, marginBottom: 8, alignItems: 'center' }]}>
+        <Feather name="music" size={16} color={C.gold} style={{ width: 20 }} />
+        <TextInput style={[s.input, s.grow, { marginBottom: 0 }]}
+          value={ttLink} onChangeText={setTtLink}
+          placeholder="https://tiktok.com/@votre_compte" placeholderTextColor="#5A5852"
+          autoCapitalize="none" keyboardType="url" />
+      </View>
+      <View style={[s.row, { gap: 8, marginBottom: 8, alignItems: 'center' }]}>
+        <Feather name="facebook" size={16} color={C.gold} style={{ width: 20 }} />
+        <TextInput style={[s.input, s.grow, { marginBottom: 0 }]}
+          value={fbLink} onChangeText={setFbLink}
+          placeholder="https://facebook.com/votre_page" placeholderTextColor="#5A5852"
+          autoCapitalize="none" keyboardType="url" />
+      </View>
+      <Btn ghost label="ENREGISTRER LES LIENS" onPress={() => {
+        updateEnzo(() => ({
+          instagram: igLink.trim() || null,
+          tiktok: ttLink.trim() || null,
+          facebook: fbLink.trim() || null,
+        }));
+        toast('Réseaux sociaux mis à jour.');
+      }} />
+
+      {/* ── Spécialités ── */}
+      <Section>Spécialités</Section>
+      <View style={[s.wrap, { gap: 6, marginBottom: 10 }]}>
+        {enzo.tags.map((t) => (
+          <TouchableOpacity key={t} style={[s.tag, s.row, { gap: 5 }]}
+            onPress={() => { updateEnzo((b) => ({ tags: b.tags.filter((x) => x !== t) })); toast(`« ${t} » retiré.`); }}
+            activeOpacity={0.7}>
+            <Text style={s.tagText}>{t}</Text>
+            <Feather name="x" size={10} color={C.gold} />
+          </TouchableOpacity>
+        ))}
+      </View>
+      <View style={[s.row, { gap: 9 }]}>
+        <TextInput style={[s.input, { flex: 1 }]} placeholder="Ex. Taper, Coloration…"
+          placeholderTextColor="#5A5852" value={tagInput} onChangeText={setTagInput}
+          onSubmitEditing={addTag} returnKeyType="done" />
+        <TouchableOpacity style={s.iconBtn} onPress={addTag} hitSlop={6}>
+          <Feather name="plus" size={18} color={C.gold} />
+        </TouchableOpacity>
+      </View>
+
+      {/* ── Photos de prestations ── */}
+      <Section note="résultats de coupes — titre modifiable sous chaque photo">Photos de prestations</Section>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}
+        style={{ marginBottom: 6, overflow: 'visible' }}
+        contentContainerStyle={{ paddingTop: 10, paddingBottom: 4 }}>
+        {(enzo.photos || []).map((ph) => (
+          <View key={ph.id} style={{ position: 'relative', marginRight: 12 }}>
+            <Photo tex={ph.tex} uri={ph.uri} />
+            <TextInput style={s.photoTitleInput} value={ph.label} placeholder="Titre"
+              placeholderTextColor="#5A5852"
+              onChangeText={(t) => renamePhoto('photos', ph.id, t)} />
+            <TouchableOpacity style={s.photoRemove}
+              onPress={() => { updateEnzo((b) => ({ photos: b.photos.filter((p) => p.id !== ph.id) })); toast('Photo supprimée.'); }}
+              hitSlop={8}>
+              <Feather name="x" size={12} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        ))}
+        <TouchableOpacity style={s.photoAdd} onPress={addPhoto} activeOpacity={0.8}>
+          <Feather name="plus" size={22} color={C.gold} />
+          <Text style={[s.btags, { marginTop: 6, textAlign: 'center' }]}>Ajouter</Text>
+        </TouchableOpacity>
+      </ScrollView>
+
+      {/* ── Photos du salon ── */}
+      <Section note="votre lieu de coupe vu par les clients">Photos du salon</Section>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}
+        style={{ marginBottom: 6, overflow: 'visible' }}
+        contentContainerStyle={{ paddingTop: 10, paddingBottom: 4 }}>
+        {(enzo.salonPhotos || []).map((ph) => (
+          <View key={ph.id} style={{ position: 'relative', marginRight: 12 }}>
+            <Photo tex={ph.tex} uri={ph.uri} />
+            <TextInput style={s.photoTitleInput} value={ph.label} placeholder="Titre"
+              placeholderTextColor="#5A5852"
+              onChangeText={(t) => renamePhoto('salonPhotos', ph.id, t)} />
+            <TouchableOpacity style={s.photoRemove}
+              onPress={() => { updateEnzo((b) => ({ salonPhotos: b.salonPhotos.filter((p) => p.id !== ph.id) })); toast('Photo du salon supprimée.'); }}
+              hitSlop={8}>
+              <Feather name="x" size={12} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        ))}
+        <TouchableOpacity style={s.photoAdd} onPress={addSalonPhoto} activeOpacity={0.8}>
+          <Feather name="plus" size={22} color={C.gold} />
+          <Text style={[s.btags, { marginTop: 6, textAlign: 'center' }]}>Ajouter</Text>
+        </TouchableOpacity>
+      </ScrollView>
+
+      {/* ── En chiffres ── */}
+      <Section note="affichés en bas de votre fiche client">En chiffres</Section>
+      <View style={[s.row, { gap: 10 }]}>
+        <View style={s.grow}>
+          <Field label="CLIENTS" value={stClients} onChangeText={setStClients} keyboardType="numeric" placeholder="1 240" />
+        </View>
+        <View style={s.grow}>
+          <Field label="COUPES" value={stCuts} onChangeText={setStCuts} keyboardType="numeric" placeholder="3 680" />
+        </View>
+      </View>
+      <View style={[s.row, { gap: 10 }]}>
+        <View style={s.grow}>
+          <Field label="ANNÉES DE MÉTIER" value={stYears} onChangeText={setStYears} keyboardType="numeric" placeholder="8" />
+        </View>
+        <View style={s.grow}>
+          <Field label="PONCTUALITÉ (%)" value={stPonct} onChangeText={setStPonct} keyboardType="numeric" placeholder="97" />
+        </View>
+      </View>
+      <Btn ghost label="ENREGISTRER LES CHIFFRES" onPress={saveStats} />
+          </>
+        )}
+
+        {ficheTab === 'planning' && (
+          <>
+            <Kicker>PLANNING</Kicker>
+            <Title>Règles</Title>
+            <Lead>Ces règles s’appliquent à toutes les réservations.</Lead>
+      {/* ── Règles de planning ── */}
+      <Section note="s'appliquent à toutes les réservations">Règles du planning</Section>
+      <View style={s.card}>
+        <View style={[s.row, { marginBottom: 14, gap: 12 }]}>
+          <View style={{ flex: 1 }}>
+            <Text style={[s.statL, { marginBottom: 6 }]}>ACOMPTE (%)</Text>
+            <TextInput style={[s.input, { marginBottom: 0 }]}
+              value={depositPct} onChangeText={setDepositPct}
+              keyboardType="numeric" placeholderTextColor="#5A5852" placeholder="0" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[s.statL, { marginBottom: 6 }]}>DÉLAI MIN. (h)</Text>
+            <TextInput style={[s.input, { marginBottom: 0 }]}
+              value={noticeHours} onChangeText={setNoticeHours}
+              keyboardType="numeric" placeholderTextColor="#5A5852" placeholder="2" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[s.statL, { marginBottom: 6 }]}>ANNUL. GRATU. (h)</Text>
+            <TextInput style={[s.input, { marginBottom: 0 }]}
+              value={cancelHours} onChangeText={setCancelHours}
+              keyboardType="numeric" placeholderTextColor="#5A5852" placeholder="24" />
+          </View>
+        </View>
+        <Text style={[s.statL, { marginBottom: 6 }]}>NOTE VISIBLE PAR LES CLIENTS (facultatif)</Text>
+        <TextInput style={[s.input, { height: 70, textAlignVertical: 'top', paddingTop: 10 }]}
+          multiline value={planningNote} onChangeText={setPlanningNote}
+          placeholderTextColor="#5A5852"
+          placeholder="Ex. Pas de coupe le lundi. Majoration +10 le dimanche. RDV uniquement via barbr." />
+        <Btn ghost label="ENREGISTRER LES RÈGLES" onPress={() => {
+          const dep = parseInt(depositPct, 10);
+          const not = parseInt(noticeHours, 10);
+          const can = parseInt(cancelHours, 10);
+          updateEnzo(() => ({
+            depositPct: isNaN(dep) ? 0 : Math.min(dep, 100),
+            noticeHours: isNaN(not) ? 2 : not,
+            cancelHours: isNaN(can) ? 24 : can,
+            planningNote: planningNote.trim() || null,
+          }));
+          toast('Règles de planning enregistrées.');
+        }} />
+      </View>
+          </>
+        )}
+
+        {ficheTab === 'clients' && (
+          <>
+            <Kicker>CLIENTS</Kicker>
+            <Title>Clients</Title>
+            <Lead>Gérez la fidélité, les messages et les blocages.</Lead>
+      {/* ── Message groupé ── */}
+      <Section note="envoyez une notification à tous vos clients">Message groupé</Section>
+      <View style={s.card}>
+        <TextInput style={[s.input, { marginBottom: 10 }]}
+          value={msgTitle} onChangeText={setMsgTitle}
+          placeholder="Objet · ex. Nouveaux créneaux disponibles"
+          placeholderTextColor="#5A5852" />
+        <TextInput style={[s.input, { height: 90, textAlignVertical: 'top', paddingTop: 10 }]}
+          multiline value={msgBody} onChangeText={setMsgBody}
+          placeholder="Votre message personnalisé pour tous vos clients..."
+          placeholderTextColor="#5A5852" />
+        <Text style={[s.footnoteLeft, { marginTop: 10, marginBottom: 12 }]}>
+          {`Sera reçu par ${clients.filter((c) => !c.blocked).length} client${clients.filter((c) => !c.blocked).length > 1 ? 's' : ''} (clients non bloqués)`}
+        </Text>
+        <Btn label="ENVOYER À TOUS LES CLIENTS" onPress={() => {
+          const t = msgTitle.trim();
+          const b = msgBody.trim();
+          if (!t || !b) { toast('Renseignez un objet et un message.'); return; }
+          const barberName = enzo.name ? enzo.name.split(' ')[0] : 'Votre barber';
+          const newNotif = {
+            id: 'msg_' + Date.now(),
+            icon: 'message-square',
+            color: '#C8A96A',
+            unread: true,
+            title: t,
+            msg: `${barberName} : ${b}`,
+            time: "À l'instant",
+          };
+          if (setNotifs) setNotifs((ns) => [newNotif, ...ns]);
+          setMsgTitle('');
+          setMsgBody('');
+          const n = clients.filter((c) => !c.blocked).length;
+          toast(`Message envoyé à ${n} client${n > 1 ? 's' : ''}.`);
+        }} />
+      </View>
+
+      {/* ── Fidélité ── */}
+      <Section note="gérez les règles et les points de vos clients">Fidélité</Section>
+      <View style={[s.card, s.row, { gap: 10 }]}>
+        <View style={s.grow}>
+          <Text style={[s.bname, { fontSize: 13.5 }]}>Programme activé</Text>
+          <Text style={[s.btags, { marginTop: 2 }]}>
+            {enzo.loyalty
+              ? 'Vos clients cumulent des points à chaque prestation.'
+              : 'Programme désactivé — vos clients ne cumulent pas de points.'}
+          </Text>
+        </View>
+        <Toggle on={!!enzo.loyalty} onPress={() => {
+          updateEnzo((b) => ({ loyalty: !b.loyalty }));
+          toast(enzo.loyalty ? 'Programme désactivé.' : 'Programme de fidélité activé.');
+        }} />
+      </View>
+      {!!enzo.loyalty && (
+        <>
+          <View style={s.card}>
+            <Text style={[s.bname, { fontSize: 13, marginBottom: 12 }]}>Règle de conversion</Text>
+            <View style={[s.row, { gap: 10, alignItems: 'center' }]}>
+              <Text style={s.softText}>1 € dépensé =</Text>
+              <TextInput style={[s.input, { width: 60, textAlign: 'center', paddingVertical: 8 }]}
+                value={loyaltyRateInput} onChangeText={setLoyaltyRateInput}
+                keyboardType="numeric" placeholderTextColor="#5A5852" />
+              <Text style={s.softText}>point(s)</Text>
+              <TouchableOpacity style={[s.btn, { flex: 1, paddingVertical: 10, marginBottom: 0 }]}
+                onPress={() => {
+                  const v = parseFloat(loyaltyRateInput.replace(',', '.'));
+                  if (!isNaN(v) && v > 0) { updateEnzo(() => ({ loyaltyRate: v })); toast(`Règle : 1 € = ${v} point(s).`); }
+                  else toast('Valeur invalide.');
+                }} activeOpacity={0.85}>
+                <Text style={s.btnText}>OK</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+          <View style={s.card}>
+            <Text style={[s.bname, { fontSize: 13, marginBottom: 10 }]}>Paliers de récompense</Text>
+            {(enzo.loyaltyTiers || []).map((tier) => (
+              <View key={tier.id} style={[s.row, { paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: C.line }]}>
+                <View style={s.tierBadge}><Text style={s.tierBadgeText}>{tier.pts} pts</Text></View>
+                <Text style={[s.softText, s.grow]}>{tier.label}</Text>
+                <TouchableOpacity hitSlop={8} onPress={() => {
+                  updateEnzo((b) => ({ loyaltyTiers: b.loyaltyTiers.filter((t) => t.id !== tier.id) }));
+                  toast('Palier supprimé.');
+                }}><Feather name="x" size={14} color={C.muted} /></TouchableOpacity>
+              </View>
+            ))}
+            {addingTier ? (
+              <View style={{ marginTop: 10, gap: 8 }}>
+                <View style={[s.row, { gap: 8 }]}>
+                  <View style={{ width: 80 }}><Field label="POINTS" placeholder="100" keyboardType="numeric" value={tierPts} onChangeText={setTierPts} /></View>
+                  <View style={s.grow}><Field label="RÉCOMPENSE" placeholder="10 € de réduction" value={tierLabel} onChangeText={setTierLabel} /></View>
+                </View>
+                <View style={[s.row, { gap: 8 }]}>
+                  <View style={s.grow}><Btn label="AJOUTER" onPress={() => {
+                    const pts = parseInt(tierPts, 10);
+                    if (!pts || !tierLabel.trim()) { toast('Renseignez les deux champs.'); return; }
+                    updateEnzo((b) => ({ loyaltyTiers: [...(b.loyaltyTiers || []), { id: 't' + Date.now(), pts, label: tierLabel.trim() }] }));
+                    setTierPts(''); setTierLabel(''); setAddingTier(false); toast('Palier ajouté.');
+                  }} /></View>
+                  <View style={s.grow}><Btn ghost label="ANNULER" onPress={() => { setAddingTier(false); setTierPts(''); setTierLabel(''); }} /></View>
+                </View>
+              </View>
+            ) : (
+              <TouchableOpacity style={[s.row, { marginTop: 10, gap: 8 }]} onPress={() => setAddingTier(true)} hitSlop={6}>
+                <Feather name="plus" size={14} color={C.gold} />
+                <Text style={s.authLink}>Nouveau palier</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          <View style={s.card}>
+            <View style={[s.row, { marginBottom: 12 }]}>
+              <Text style={[s.bname, { fontSize: 13, flex: 1 }]}>Points par client</Text>
+              <Text style={s.btags}>{clients.length} client{clients.length > 1 ? 's' : ''}</Text>
+            </View>
+            <View style={[s.search, { marginBottom: 12 }]}>
+              <Feather name="search" size={14} color={C.muted} />
+              <TextInput style={s.searchInput} placeholder="Rechercher un client..." placeholderTextColor="#5A5852"
+                value={ptSearch} onChangeText={setPtSearch} />
+              {ptSearch.length > 0 && (
+                <TouchableOpacity onPress={() => setPtSearch('')} hitSlop={8}>
+                  <Feather name="x" size={14} color={C.muted} />
+                </TouchableOpacity>
+              )}
+            </View>
+            {clients.filter((cl) => !ptSearch || `${cl.firstName} ${cl.lastName}`.toLowerCase().includes(ptSearch.toLowerCase())).map((cl) => {
+              const pts = cl.loyaltyPts || 0;
+              const nxt = (enzo.loyaltyTiers || []).filter((t) => t.pts > pts).sort((a, b) => a.pts - b.pts)[0];
+              return (
+                <View key={cl.id} style={{ borderBottomWidth: 1, borderBottomColor: C.line }}>
+                <View style={[s.row, { paddingVertical: 10, gap: 10, opacity: cl.blocked ? 0.55 : 1 }]}>
+                  <View style={s.grow}>
+                    <View style={[s.row, { gap: 6 }]}>
+                      {cl.blocked && <Feather name="slash" size={12} color={C.red || '#E05252'} />}
+                      <Text style={[s.bname, { fontSize: 12.5 }]}>{cl.firstName} {cl.lastName}</Text>
+                    </View>
+                    {cl.blocked
+                      ? <Text style={[s.btags, { color: C.red || '#E05252' }]}>BLOQUÉ{cl.blockReason ? ' · ' + cl.blockReason : ''}</Text>
+                      : <Text style={s.btags}>{pts} pts{nxt ? ` · encore ${nxt.pts - pts} pts pour « ${nxt.label} »` : ''}</Text>
+                    }
+                    {!cl.blocked && cl.notes ? <Text style={[s.btags, { fontStyle: 'italic', marginTop: 1 }]} numberOfLines={1}>{cl.notes}</Text> : null}
+                    {(cl.noShows || 0) > 0 && <Text style={[s.btags, { color: C.orange, marginTop: 1 }]}>{cl.noShows} absence{cl.noShows > 1 ? 's' : ''}</Text>}
+                  </View>
+                  {!cl.blocked ? (
+                    <>
+                      <TouchableOpacity style={s.stockBtn} hitSlop={8}
+                        onPress={() => setClients((cs) => cs.map((x) => x.id === cl.id ? { ...x, loyaltyPts: Math.max(0, pts - 10) } : x))}>
+                        <Feather name="minus" size={13} color={C.gold} />
+                      </TouchableOpacity>
+                      <Text style={[s.stockNum, { minWidth: 34, textAlign: 'center' }]}>{pts}</Text>
+                      <TouchableOpacity style={s.stockBtn} hitSlop={8}
+                        onPress={() => setClients((cs) => cs.map((x) => x.id === cl.id ? { ...x, loyaltyPts: pts + 10 } : x))}>
+                        <Feather name="plus" size={13} color={C.gold} />
+                      </TouchableOpacity>
+                    </>
+                  ) : null}
+                  <TouchableOpacity style={s.stockBtn} hitSlop={8}
+                    onPress={() => setNoteEdit(noteEdit?.id === cl.id ? null : { id: cl.id, text: cl.notes || '' })}>
+                    <Feather name="edit-2" size={12} color={C.gold} />
+                  </TouchableOpacity>
+                  <TouchableOpacity hitSlop={8}
+                    style={[s.stockBtn, { borderColor: cl.blocked ? C.gold : (C.red || '#E05252'), paddingHorizontal: 8 }]}
+                    onPress={() => {
+                      if (cl.blocked) {
+                        setClients((cs) => cs.map((x) => x.id === cl.id ? { ...x, blocked: false, blockReason: null } : x));
+                        toast(`${cl.firstName} ${cl.lastName} débloqué.`);
+                      } else {
+                        setBlockingClient(cl);
+                      }
+                    }}>
+                    <Feather name={cl.blocked ? 'unlock' : 'slash'} size={12} color={cl.blocked ? C.gold : (C.red || '#E05252')} />
+                  </TouchableOpacity>
+                </View>
+                {noteEdit?.id === cl.id && (
+                  <View style={[s.row, { gap: 8, paddingBottom: 10 }]}>
+                    <TextInput style={[s.input, { flex: 1, marginBottom: 0 }]} value={noteEdit.text}
+                      onChangeText={(v) => setNoteEdit({ id: cl.id, text: v })}
+                      placeholder="Note privée (sabot, style, préférences...)" placeholderTextColor="#5A5852" />
+                    <Chip mini label="OK" onPress={() => {
+                      setClients((cs) => cs.map((x) => x.id === cl.id ? { ...x, notes: noteEdit.text.trim() } : x));
+                      setNoteEdit(null);
+                      toast('Note enregistrée.');
+                    }} />
+                  </View>
+                )}
+                </View>
+              );
+            })}
+          </View>
+        </>
+      )}
+          </>
+        )}
+
+        {ficheTab === 'boutique' && (
+          <>
+            <Kicker>BOUTIQUE</Kicker>
+            <Title>Boutique</Title>
+            <Lead>Gérez vos produits et votre mode de vente.</Lead>
+      {/* ── Boutique ── */}
+      <Section note="désactivez-la si vous ne vendez pas de produits">Boutique — mes produits</Section>
+      <View style={[s.card, s.row, { gap: 10 }]}>
+        <View style={s.grow}>
+          <Text style={[s.bname, { fontSize: 13.5 }]}>Boutique activée</Text>
+          <Text style={[s.btags, { marginTop: 2 }]}>
+            {enzo.shopEnabled !== false
+              ? 'Vos produits sont visibles dans l’onglet Boutique des clients.'
+              : 'L’onglet Boutique est masqué pour vos clients.'}
+          </Text>
+        </View>
+        <Toggle on={enzo.shopEnabled !== false} onPress={() => {
+          const next = !(enzo.shopEnabled !== false);
+          updateEnzo(() => ({ shopEnabled: next }));
+          toast(next ? 'Boutique activée — visible par vos clients.' : 'Boutique désactivée.');
+        }} />
+      </View>
+      {enzo.shopEnabled !== false && (
+      <>
+      {/* Mode vitrine / e-commerce */}
+      <View style={s.card}>
+        <Text style={[s.bname, { fontSize: 13, marginBottom: 10 }]}>Mode de la boutique</Text>
+        <View style={[s.row, { gap: 8 }]}>
+          <TouchableOpacity
+            style={[s.modeBtn, enzo.shopMode !== 'ecommerce' && s.modeBtnOn]}
+            onPress={() => { updateEnzo(() => ({ shopMode: 'vitrine' })); toast('Mode Vitrine activé.'); }}
+            activeOpacity={0.85}>
+            <Feather name="eye" size={14} color={enzo.shopMode !== 'ecommerce' ? C.ink : C.gold} />
+            <Text style={[s.modeBtnText, enzo.shopMode !== 'ecommerce' && { color: C.ink }]}>Vitrine</Text>
+            <Text style={[s.modeBtnSub, enzo.shopMode !== 'ecommerce' && { color: 'rgba(14,13,11,0.6)' }]}>Affichage seul</Text>
+          </TouchableOpacity>
+          <View style={[s.modeBtn, { opacity: 0.45 }]}>
+            <Feather name="shopping-cart" size={14} color={C.muted} />
+            <Text style={s.modeBtnText}>E-commerce</Text>
+            <Text style={s.modeBtnSub}>Bientôt disponible</Text>
+          </View>
+        </View>
+        <Text style={[s.footnoteLeft, { marginTop: 8 }]}>
+          {enzo.shopMode !== 'ecommerce'
+            ? 'Les clients consultent vos produits sans commander en ligne.'
+            : 'Les clients commandent directement depuis l’app.'}
+        </Text>
+      </View>
+      {/* Produits avec gestion de stock */}
+      {products.map((p) => (
+        <View key={p.id} style={[s.card, s.row, { gap: 10, alignItems: 'center' }]}>
+          <View style={[s.pimg, { width: 40, height: 40, borderRadius: 10, flexShrink: 0 }]}>
+            <Feather name={p.ic} size={16} color="rgba(200,169,106,0.5)" />
+          </View>
+          <View style={s.grow}>
+            <Text style={[s.bname, { fontSize: 12 }]} numberOfLines={1}>{p.name}</Text>
+            <Text style={s.btags}>{CATS.find(([k]) => k === p.cat)?.[1] || p.cat}</Text>
+          </View>
+          <PriceField cents={p.price} onChange={(v) => { updateProductLocal(p.id, { price: v }); toast('Prix mis à jour.'); }} />
+          <View style={[s.row, { gap: 6 }]}>
+            <TouchableOpacity style={s.stockBtn} onPress={() => updateProductLocal(p.id, { stock: Math.max(0, p.stock - 1) })} hitSlop={8}>
+              <Feather name="minus" size={13} color={C.gold} />
+            </TouchableOpacity>
+            <Text style={[s.stockNum, { minWidth: 22 }]}>{p.stock}</Text>
+            <TouchableOpacity style={s.stockBtn} onPress={() => updateProductLocal(p.id, { stock: p.stock + 1 })} hitSlop={8}>
+              <Feather name="plus" size={13} color={C.gold} />
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity onPress={() => { setProducts((ps) => ps.filter((x) => x.id !== p.id)); toast(`« ${p.name} » retiré.`); }} hitSlop={8}>
+            <Feather name="trash-2" size={15} color={C.red} />
+          </TouchableOpacity>
+        </View>
+      ))}
+      {addingProduct ? (
+        <View style={[s.card, { borderColor: C.lineGold }]}>
+          <Text style={[s.bname, { marginBottom: 10 }]}>Nouveau produit</Text>
+          <Field label="NOM" placeholder="Ex. Baume après-rasage" value={pName} onChangeText={setPName} />
+          <Text style={s.fieldLabel}>CATÉGORIE</Text>
+          <View style={s.wrap}>
+            {CATS.filter(([k]) => k !== 'ALL').map(([k, l]) => (
+              <Chip key={k} mini label={l} on={pCat === k} onPress={() => setPCat(k)} />
+            ))}
+          </View>
+          <View style={[s.row, { gap: 11, alignItems: 'flex-start' }]}>
+            <View style={s.grow}>
+              <Field label="PRIX (€)" placeholder="19,90" keyboardType="numeric" value={pPrice} onChangeText={setPPrice} />
+            </View>
+            <View style={s.grow}>
+              <Field label="STOCK" placeholder="25" keyboardType="numeric" value={pStock} onChangeText={setPStock} />
+            </View>
+          </View>
+          <Btn label="AJOUTER À LA BOUTIQUE" onPress={saveProduct} />
+          <Btn ghost label="ANNULER" onPress={() => { setAddingProduct(false); setPName(''); setPPrice(''); setPStock(''); }} />
+        </View>
+      ) : (
+        <Btn ghost icon="plus" label="NOUVEAU PRODUIT" onPress={() => setAddingProduct(true)} />
+      )}
+      </>
+      )}
+
+      <Text style={s.footnote}>Modifications visibles immédiatement côté client.</Text>
+          </>
+        )}
+
+        <Text style={s.footnote}>Modifications visibles immédiatement côté client.</Text>
+      </ScrollView>
+    )}
+
+    {/* ── Modale blocage client ── */}
+    {blockingClient && (
+      <View style={s.modalOverlay}>
+        <View style={s.modal}>
+          <View style={[s.row, { marginBottom: 14 }]}>
+            <Text style={[s.bname, { fontFamily: SERIF, fontSize: 16, flex: 1 }]}>
+              Bloquer {blockingClient.firstName} {blockingClient.lastName}
+            </Text>
+            <TouchableOpacity onPress={() => setBlockingClient(null)} hitSlop={10}>
+              <Feather name="x" size={20} color={C.muted} />
+            </TouchableOpacity>
+          </View>
+          <Text style={[s.fieldLabel, { marginBottom: 10 }]}>MOTIF DU BLOCAGE</Text>
+          <View style={[s.wrap, { gap: 8, marginBottom: 16 }]}>
+            {BLOCK_REASONS.map((reason) => (
+              <TouchableOpacity key={reason}
+                style={[s.chip, { borderColor: '#E05252' }]}
+                onPress={() => {
+                  setClients((cs) => cs.map((x) => x.id === blockingClient.id
+                    ? { ...x, blocked: true, blockReason: reason } : x));
+                  toast(`${blockingClient.firstName} ${blockingClient.lastName} bloqué · ${reason}.`);
+                  setBlockingClient(null);
+                }}>
+                <Text style={[s.chipText, { color: '#E05252' }]}>{reason}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <Text style={[s.footnoteLeft, { marginBottom: 12 }]}>
+            Le client ne pourra plus être sélectionné lors des réservations manuelles.
+          </Text>
+          <Btn ghost label="ANNULER" onPress={() => setBlockingClient(null)} />
+        </View>
+      </View>
+    )}
+    </>
+  );
+}
+
+/* ───────── Racine ───────── */
+const CLIENT_TABS = [
+  ['explore', 'search', 'Explorer'],
+  ['book', 'calendar', 'Réserver'],
+  ['cuts', 'image', 'Mes coupes'],
+  ['me', 'user', 'Profil'],
+];
+const BARBER_TABS = [
+  ['slots', 'unlock', 'Créneaux'],
+  ['formulas', 'layers', 'Formules'],
+  ['planning', 'calendar', 'Planning'],
+  ['status', 'clock', 'Statut'],
+  ['activity', 'bar-chart-2', 'Activité'],
+  ['fiche', 'edit-3', 'Ma fiche'],
+];
+
+export default function App() {
+  return (
+    <SafeAreaProvider>
+      <Main />
+    </SafeAreaProvider>
+  );
+}
+
+function Main() {
+  const insets = useSafeAreaInsets();
+  const [splashDone, setSplashDone] = useState(false);
+  const [role, setRole] = useState(null); // null | 'client' | 'barber'
+  const [user, setUser] = useState(null); // { firstName, lastName, email, role, plan }
+  const [authStep, setAuthStep] = useState(null); // null | { role } — flow connexion/inscription
+  const [authSubStep, setAuthSubStep] = useState(null); // null | 'plan' | 'pay' — abonnement barber
+  const [tab, setTab] = useState('explore');
+  const [barberDetail, setBarberDetail] = useState(null);
+  const [agenda, setAgenda] = useState(initAgenda);
+  const [daycfg, setDaycfg] = useState({});
+  const [endHour, setEndHour] = useState(23);
+  const [homeFee, setHomeFee] = useState(1000); // durée des créneaux par jour (Enzo)
+  const [formulas, setFormulas] = useState(initFormulas);
+  const [services, setServices] = useState(() => [...SERVICES]);
+  const [booking, setBooking] = useState({ barber: 'any', formula: null, service: null, done: null, pendingSlot: null, address: '' });
+  const [clientDay, setClientDay] = useState(0);
+  const [barberDay, setBarberDay] = useState(0);
+  const [cat, setCat] = useState('ALL');
+  const [cart, setCart] = useState(0);
+  const [points, setPoints] = useState({ enzo: 86 }); // points fidélité par barber
+  const [favoriteBarber, setFavoriteBarber] = useState(null); // id du barber principal
+  const [upcoming, setUpcoming] = useState([]);
+  const [waitlist, setWaitlist] = useState([]); // { id, dayKey, dayLabel, formulaName }
+  const [closures, setClosures] = useState([]); // absences : { id, fromIdx, toIdx, fromLabel, toLabel }
+  const [weekly, setWeekly] = useState({ 0: null, 1: { start: 9, end: 19 }, 2: { start: 9, end: 19 },
+    3: { start: 9, end: 19 }, 4: { start: 9, end: 19 }, 5: { start: 9, end: 19 }, 6: { start: 10, end: 17 } });
+  const [enzoDelay, setEnzoDelay] = useState('ON_TIME');
+  const [toastMsg, setToastMsg] = useState(null);
+  const toastAnim = useRef(new Animated.Value(0)).current;
+  const toastTimer = useRef(null);
+
+  const [barbers, setBarbers] = useState(() => [...BARBERS]);
+  const [products, setProducts] = useState(() => [...PRODUCTS]);
+  const [barberPreview, setBarberPreview] = useState(false);
+  const [clients, setClients] = useState(() => [...INIT_CLIENTS]);
+  const [history, setHistory] = useState(() => [...HISTORY]);
+  const [notifs, setNotifs] = useState(() => [...DEMO_NOTIFS]);
+  const [notifOpen, setNotifOpen] = useState(false);
+
+  const barbersLive = barbers.map((b) => (b.id === 'enzo' ? { ...b, delay: enzoDelay } : b));
+  const notifUnread = notifs.filter((n) => n.unread).length;
+  if (!splashDone) return <IntroScreen onDone={() => setSplashDone(true)} />;
+
+  const toast = (msg) => {
+    setToastMsg(msg);
+    Animated.timing(toastAnim, { toValue: 1, duration: 220, useNativeDriver: true }).start();
+    clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => {
+      Animated.timing(toastAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start();
+    }, 3200);
+  };
+
+  const choose = (r) => setAuthStep({ role: r });
+
+  const finalizeLogin = (u) => {
+    setUser(u);
+    setRole(u.role);
+    setTab(u.role === 'client' ? 'explore' : 'slots');
+    setAuthStep(null);
+    setAuthSubStep(null);
+    setBarberDetail(null);
+    toast(u.role === 'barber'
+      ? `Bienvenue ${u.firstName} — votre espace barber est prêt.`
+      : `Bienvenue ${u.firstName} !`);
+  };
+
+  const onAuthSuccess = (u, { isNew }) => {
+    if (u.role === 'barber' && isNew) {
+      setUser(u); // en attente du choix d’abonnement
+      setAuthSubStep('plan');
+    } else {
+      finalizeLogin(u);
+    }
+  };
+
+  const logout = () => {
+    setRole(null);
+    setUser(null);
+    setAuthStep(null);
+    setAuthSubStep(null);
+    setBarberDetail(null);
+  };
+
+  const confirmBooking = (formula, service, slot, quote, address) => {
+    const day = DAYS[clientDay];
+    const servLabel = formula.name;    setAgenda((a) => ({
+      ...a,
+      [slot.barber.id]: {
+        ...a[slot.barber.id],
+        [day.key]: {
+          ...a[slot.barber.id][day.key],
+          [slot.time]: { status: 'booked', who: user ? `${user.firstName} ${user.lastName[0]}.` : 'Client', serv: servLabel, price: quote.price, done: false, address: address || null },
+        },
+      },
+    }));
+    const hasLoyalty = !!barbers.find((b) => b.id === slot.barber.id)?.loyalty;
+    setBooking({
+      ...booking,
+      done: {
+        serv: servLabel, time: slot.time, day: day.label, barber: slot.barber.name,
+        price: quote.price, rules: quote.rules, recur: formula.recur, loyalty: hasLoyalty, address: address || null,
+      },
+    });
+    if (hasLoyalty) {
+      setPoints((p) => ({ ...p, [slot.barber.id]: (p[slot.barber.id] || 0) + Math.floor(quote.price / 100) }));
+    }
+    setUpcoming((u) => [...u, {
+      id: 'u' + Date.now(), serv: servLabel, time: slot.time, day: day.label, barber: slot.barber.name,
+      barberId: slot.barber.id, dayKey: day.key,
+      price: quote.price, recur: formula.recur,
+    }]);
+    toast(`Réservation confirmée — ${day.label} ${slot.time} avec ${slot.barber.name.split(' ')[0]} · ${fmt(quote.price)}`);
+  };
+
+  // ── Liste d'attente : notifie le client quand un créneau se libère ──
+  const notifyWaitlist = (dayKey, time, barberName) => {
+    if (!waitlist.some((e) => e.dayKey === dayKey)) return;
+    const dLabel = DAYS[DAY_INDEX[dayKey]]?.label || '';
+    setNotifs((ns) => [{
+      id: 'wl' + Date.now(), icon: 'bell', color: '#C8A96A', unread: true,
+      title: "Un créneau s'est libéré",
+      msg: `${barberName} — ${dLabel} à ${time}. Réservez vite depuis l'onglet Réserver !`,
+      time: "À l'instant",
+    }, ...ns]);
+    setWaitlist((w) => w.filter((e) => e.dayKey !== dayKey));
+  };
+
+  const joinWaitlist = (dIdx, formula) => {
+    const d = DAYS[dIdx];
+    if (waitlist.some((e) => e.dayKey === d.key)) {
+      toast("Vous êtes déjà sur la liste d'attente pour ce jour.");
+      return;
+    }
+    setWaitlist((w) => [...w, { id: 'w' + Date.now(), dayKey: d.key, dayLabel: d.label, formulaName: formula.name }]);
+    toast(`Liste d'attente — ${d.label} : vous serez notifié si un créneau se libère.`);
+  };
+
+  // ── Annulation / déplacement d'un RDV par le client ──
+  const canCancel = (u) => {
+    const dIdx = DAY_INDEX[u.dayKey];
+    if (dIdx == null) return false;
+    const slotDate = timeToDate(DAYS[dIdx], u.time);
+    const hours = barbers.find((b) => b.id === u.barberId)?.cancelHours ?? 24;
+    return slotDate - new Date() > hours * 3600000;
+  };
+
+  const cancelUpcoming = (u, silent) => {
+    setAgenda((a) => {
+      const dayA = a[u.barberId]?.[u.dayKey];
+      if (!dayA || !dayA[u.time] || dayA[u.time].status !== 'booked') return a;
+      return { ...a, [u.barberId]: { ...a[u.barberId], [u.dayKey]: { ...dayA, [u.time]: { status: 'open' } } } };
+    });
+    setUpcoming((us) => us.filter((x) => x.id !== u.id));
+    notifyWaitlist(u.dayKey, u.time, u.barber);
+    if (!silent) toast(`RDV du ${u.day} à ${u.time} annulé — créneau libéré.`);
+  };
+
+  const moveUpcoming = (u) => {
+    cancelUpcoming(u, true);
+    setBooking({ barber: u.barberId, formula: null, service: null, done: null, pendingSlot: null, address: '' });
+    setTab('book');
+    toast('Ancien créneau libéré — choisissez le nouveau.');
+  };
+
+  const addCart = (p) => {
+    setCart((n) => {
+      toast(`${p.name} — ajouté au panier (${n + 1})`);
+      return n + 1;
+    });
+  };
+
+  // La boutique du salon n’apparaît côté client que si le barber l’a activée
+  const shopOn = barbers.find((b) => b.id === 'enzo')?.shopEnabled !== false;
+
+  let content = null;
+  if (role === 'client') {
+    if (barberDetail) {
+      content = (
+        <BarberDetailScreen
+          barber={barbersLive.find((b) => b.id === barberDetail.id)}
+          products={products}
+          services={services}
+          favoriteBarber={favoriteBarber}
+          onToggleFav={(id) => {
+            const wasFav = favoriteBarber === id;
+            setFavoriteBarber(wasFav ? null : id);
+            const name = barbersLive.find((b) => b.id === id)?.name.split(' ')[0] || 'Barber';
+            toast(wasFav ? `${name} retiré de vos favoris.` : `${name} défini comme votre barber principal.`);
+          }}
+          toast={toast}
+          onBack={() => setBarberDetail(null)}
+          onBook={(id) => {
+            setBooking({ barber: id, formula: null, service: null, done: null });
+            setBarberDetail(null);
+            setTab('book');
+          }}
+        />
+      );
+    } else if (tab === 'explore') content = <ExploreScreen barbers={barbersLive} user={user} openBarber={setBarberDetail} favoriteBarber={favoriteBarber} onProCTA={logout} toast={toast} />;
+    else if (tab === 'book') content = (
+      <BookScreen agenda={agenda} formulas={formulas} services={services} booking={booking} setBooking={setBooking}
+        dayIdx={clientDay} setDayIdx={setClientDay} onConfirm={confirmBooking}
+        barbers={barbersLive} favoriteBarber={favoriteBarber} homeFee={homeFee} closures={closures}
+        waitlist={waitlist} onWaitlist={joinWaitlist} toast={toast} />
+    );
+    else if (tab === 'cuts') content = <CutsScreen history={history} setHistory={setHistory} setBarbers={setBarbers} user={user} onRebook={(bid) => { setBooking({ barber: bid, formula: null, service: null, done: null, pendingSlot: null, address: '' }); setTab('book'); toast('Choisissez votre nouveau créneau.'); }} toast={toast} />;
+    else if (tab === 'shop' && shopOn) content = <ShopScreen products={products} cat={cat} setCat={setCat} cart={cart} addCart={addCart} shopMode={barbers.find((b) => b.id === 'enzo')?.shopMode || 'vitrine'} toast={toast} />;
+    else content = <MeScreen user={user} points={points} setPoints={setPoints} barbers={barbers} upcoming={upcoming} waitlist={waitlist} onCancelRdv={cancelUpcoming} onMoveRdv={moveUpcoming} canCancel={canCancel} onRemoveWaitlist={(id) => setWaitlist((w) => w.filter((e) => e.id !== id))} favoriteBarber={favoriteBarber} onLogout={logout} toast={toast} />;
+  } else if (role === 'barber') {
+    if (tab === 'slots') content = (
+      <SlotsScreen agenda={agenda} setAgenda={setAgenda} daycfg={daycfg} setDaycfg={setDaycfg} endHour={endHour} setEndHour={setEndHour} homeFee={homeFee} setHomeFee={setHomeFee}
+        closures={closures} setClosures={setClosures} weekly={weekly} setWeekly={setWeekly}
+        clients={clients} setClients={setClients} onFreeSlot={(dk, t) => notifyWaitlist(dk, t, 'Enzo Moreau')}
+        services={services}
+        dayIdx={barberDay} setDayIdx={setBarberDay} toast={toast} />
+    );
+    else if (tab === 'formulas') content = (
+      <FormulasScreen formulas={formulas} setFormulas={setFormulas} services={services} setServices={setServices} toast={toast} />
+    );
+    else if (tab === 'planning') content = (
+      <PlanningScreen agenda={agenda} setAgenda={setAgenda} dayIdx={barberDay} setDayIdx={setBarberDay} delay={enzoDelay} setHistory={setHistory} setClients={setClients} onFreeSlot={(dk, t) => notifyWaitlist(dk, t, 'Enzo Moreau')} toast={toast} />
+    );
+    else if (tab === 'status') content = (
+      <StatusScreen agenda={agenda} delay={enzoDelay} setDelay={setEnzoDelay} toast={toast} />
+    );
+    else if (tab === 'fiche') content = (
+      <FicheScreen barbers={barbers} setBarbers={setBarbers} products={products} setProducts={setProducts}
+        clients={clients} setClients={setClients} setNotifs={setNotifs}
+        onPreview={() => setBarberPreview(true)} toast={toast} />
+    );
+    else content = <ActivityScreen agenda={agenda} />;
+    // Preview de la fiche : s’affiche par-dessus n’importe quel onglet barber
+    if (barberPreview) content = (
+      <BarberDetailScreen
+        barber={barbersLive.find((b) => b.id === 'enzo')}
+        products={products}
+        services={services}
+        toast={toast}
+        onBack={() => setBarberPreview(false)}
+        onBook={() => { setBarberPreview(false); toast('Aperçu — réservation désactivée.'); }}
+      />
+    );
+  }
+
+  const tabs = role === 'client'
+    ? CLIENT_TABS
+    : BARBER_TABS;
+
+  return (
+    <View style={[s.root, { paddingTop: insets.top || (Platform.OS === 'android' ? StatusBar.currentHeight || 24 : 0) }]}>
+      <StatusBar barStyle="light-content" backgroundColor={C.bg} />
+      {role === null && authStep === null ? (
+        <WelcomeScreen choose={choose} />
+      ) : authStep !== null ? (
+        authSubStep === 'plan' ? (
+          <PlanScreen
+            onChoose={(plan) => { setUser((u) => ({ ...u, plan })); setAuthSubStep('pay'); }}
+            onBack={() => setAuthSubStep(null)}
+          />
+        ) : authSubStep === 'pay' ? (
+          <PayScreen user={user} plan={user.plan}
+            onConfirm={() => finalizeLogin(user)}
+            onBack={() => setAuthSubStep('plan')}
+          />
+        ) : (
+          <AuthScreen role={authStep.role} onSuccess={onAuthSuccess}
+            onBack={() => setAuthStep(null)} />
+        )
+      ) : (
+        <>
+          <View style={s.header}>
+            {role === 'client' ? (
+              <TouchableOpacity
+                style={[s.switchBtn, notifUnread > 0 && { borderColor: C.lineGold, backgroundColor: 'rgba(200,169,106,0.10)' }]}
+                onPress={() => setNotifOpen(true)} hitSlop={10}>
+                <Feather name="bell" size={16} color={notifUnread > 0 ? C.gold : C.muted} />
+                {notifUnread > 0 && (
+                  <View style={s.bellBadge}>
+                    <Text style={s.bellBadgeText}>{notifUnread}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            ) : (
+              <View style={{ width: 34 }} />
+            )}
+            <Logo size={20} />
+            <TouchableOpacity style={s.switchBtn} onPress={logout} hitSlop={10}>
+              <Feather name="repeat" size={15} color={C.muted} />
+            </TouchableOpacity>
+          </View>
+          {content}
+          {notifOpen && role === 'client' && (
+            <NotifPanel notifs={notifs} setNotifs={setNotifs} onClose={() => setNotifOpen(false)} />
+          )}
+          <View style={[s.tabbar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
+            {tabs.map(([k, ic, l]) => {
+              const on = tab === k && !barberDetail;
+              return (
+                <TouchableOpacity key={k} style={s.tabBtn}
+                  onPress={() => { setTab(k); setBarberDetail(null); }} activeOpacity={0.7}>
+                  <Feather name={ic} size={17} color={on ? C.gold2 : '#6E6B65'} />
+                  <Text style={[s.tabLabel, on && { color: C.gold2 }]} numberOfLines={1}>{l}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </>
+      )}
+      {toastMsg && (
+        <Animated.View style={[s.toast, { opacity: toastAnim }]} pointerEvents="none">
+          <Text style={s.toastText}>{toastMsg}</Text>
+        </Animated.View>
+      )}
+    </View>
+  );
+}
+
+/* ───────── Styles ───────── */
+const s = StyleSheet.create({
+
+  introWrap: { flex: 1, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center', gap: 0 },
+  introInner: { alignItems: 'center' },
+  introTag: { fontFamily: 'serif', fontStyle: 'italic', color: C.soft, fontSize: 14, marginTop: 4 },
+  introDots: { flexDirection: 'row', gap: 8, position: 'absolute', bottom: 48 },
+  introDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: C.line },
+
+  root: { flex: 1, backgroundColor: C.bg },
+  header: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: PAD, paddingTop: 8, paddingBottom: 6,
+  },
+  wordmark: { fontFamily: SERIF, fontSize: 22, fontWeight: '600', color: C.text, letterSpacing: 1 },
+  switchBtn: {
+    width: 34, height: 34, borderRadius: 17, borderWidth: 1, borderColor: C.line,
+    alignItems: 'center', justifyContent: 'center',
+  },
+
+  welcome: { flex: 1, justifyContent: 'center', padding: 26 },
+  welcomeMark: { fontFamily: SERIF, fontSize: SMALL ? 38 : 44, fontWeight: '600', color: C.text, letterSpacing: 1 },
+  welcomeRule: { width: 54, height: 1, backgroundColor: C.gold, marginVertical: 16, opacity: 0.7 },
+  welcomeTag: { fontFamily: SERIF, fontStyle: 'italic', color: C.soft, fontSize: 15 },
+  welcomeCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 16,
+    backgroundColor: C.surface, borderWidth: 1, borderColor: C.line,
+    borderRadius: 22, padding: 20, marginBottom: 14,
+  },
+  welcomeIcon: {
+    width: 50, height: 50, borderRadius: 25, backgroundColor: C.surface2,
+    borderWidth: 1, borderColor: C.lineGold, alignItems: 'center', justifyContent: 'center',
+  },
+  welcomeCardTitle: { fontFamily: SERIF, fontSize: 19, fontWeight: '600', color: C.text, marginBottom: 4 },
+  welcomeCardSub: { color: C.muted, fontSize: 11.5, lineHeight: 17 },
+  welcomeFoot: { color: '#56534E', fontSize: 10, letterSpacing: 2, textAlign: 'center', marginTop: 22 },
+
+  screen: { flex: 1 },
+  screenPad: { padding: PAD, paddingBottom: 40 },
+
+  kicker: { color: C.gold, fontSize: 10, letterSpacing: 3, marginBottom: 8, fontWeight: '500' },
+  title: { fontFamily: SERIF, fontSize: SMALL ? 28 : 32, fontWeight: '600', color: C.text, marginBottom: 6, lineHeight: SMALL ? 32 : 36 },
+  titleEm: { fontStyle: 'italic', color: C.gold2, fontWeight: '500' },
+  lead: { color: C.muted, fontSize: 13, lineHeight: 20, marginBottom: 20 },
+
+  secRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 24, marginBottom: 12 },
+  secText: { fontFamily: SERIF, fontSize: 19, fontWeight: '600', color: C.text },
+  secNote: { color: C.muted, fontSize: 11 },
+  secLine: { flex: 1, height: 1, backgroundColor: C.line },
+
+  search: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: C.surface, borderWidth: 1, borderColor: C.line,
+    borderRadius: 16, paddingHorizontal: 15, paddingVertical: Platform.OS === 'ios' ? 13 : 4,
+    marginBottom: 12,
+  },
+  searchInput: { flex: 1, color: C.text, fontSize: 13.5, padding: 0 },
+
+  locRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: -2, marginBottom: 18 },
+  locEditBox: {
+    flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: -2, marginBottom: 18,
+    backgroundColor: C.surface, borderWidth: 1, borderColor: C.lineGold,
+    borderRadius: 12, paddingHorizontal: 12, paddingVertical: Platform.OS === 'ios' ? 9 : 5,
+  },
+  locText: { color: C.soft, fontSize: 12.5, flex: 1 },
+  locEdit: { color: C.gold, fontSize: 11.5, fontWeight: '600' },
+  locInput: { flex: 1, color: C.text, fontSize: 12.5, padding: 0 },
+
+  /* Cartes carrousel (Explorer) */
+  bigCard: { width: Math.floor(Math.min(SCREEN_W, 500) * 0.74), marginRight: 12 },
+  bigArt: {
+    height: 270, borderRadius: 20, borderWidth: 1, borderColor: C.line,
+    alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+  },
+  bigIni: { fontFamily: SERIF, fontSize: 52, fontWeight: '600', color: 'rgba(230,207,160,0.5)', marginTop: -44 },
+  bigVenue: {
+    position: 'absolute', top: 10, left: 10, backgroundColor: 'rgba(10,10,11,0.75)',
+    borderWidth: 1, borderColor: C.lineGold, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 4,
+  },
+  bigVenueText: { color: C.gold2, fontSize: 9, letterSpacing: 0.8 },
+  bigShade: {
+    position: 'absolute', left: 0, right: 0, bottom: 0, height: 110,
+    backgroundColor: 'rgba(8,8,9,0.65)',
+  },
+  bigInfo: { position: 'absolute', left: 12, right: 12, bottom: 11 },
+
+  /* Fiche barber */
+  heroArt: { height: 210, alignItems: 'center', justifyContent: 'center' },
+  heroIni: { fontFamily: SERIF, fontSize: 84, fontWeight: '600', color: 'rgba(230,207,160,0.4)' },
+  heroTop: {
+    position: 'absolute', top: 12, left: PAD - 6, right: PAD - 6,
+    flexDirection: 'row', alignItems: 'center', gap: 9,
+  },
+  circleBtn: {
+    width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(10,10,11,0.7)',
+    borderWidth: 1, borderColor: C.line, alignItems: 'center', justifyContent: 'center',
+  },
+  dtabs: {
+    flexDirection: 'row', marginTop: 20, marginHorizontal: PAD,
+    borderBottomWidth: 1, borderBottomColor: C.line,
+  },
+  dtab: { flex: 1, alignItems: 'center', paddingBottom: 11 },
+  dtabOn: { borderBottomWidth: 2, borderBottomColor: C.gold, marginBottom: -1 },
+  dtabText: { color: C.muted, fontSize: 13, letterSpacing: 0.3 },
+  moreLink: { color: C.gold, fontSize: 12, fontStyle: 'italic', fontFamily: SERIF },
+  place: {
+    height: 140, borderRadius: 18, borderWidth: 1, borderColor: C.line,
+    alignItems: 'center', justifyContent: 'center', marginBottom: 10, gap: 8,
+  },
+  placeLabel: { color: C.soft, fontSize: 11, letterSpacing: 1 },
+  cta: {
+    position: 'absolute', left: 0, right: 0, bottom: 0,
+    paddingHorizontal: PAD, paddingBottom: 12, paddingTop: 24,
+    backgroundColor: 'rgba(10,10,11,0.0)',
+  },
+
+  card: {
+    backgroundColor: C.surface, borderWidth: 1, borderColor: C.line,
+    borderRadius: 20, padding: 16, marginBottom: 11,
+  },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 13 },
+  grow: { flex: 1, minWidth: 0 },
+  wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+
+  ava: {
+    width: 54, height: 54, borderRadius: 27, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: C.lineGold,
+  },
+  avaLg: { width: 84, height: 84, borderRadius: 42 },
+  avaText: { fontFamily: SERIF, fontSize: 20, fontWeight: '600', color: C.gold2 },
+
+  bname: { color: C.text, fontSize: 15, fontWeight: '500' },
+  btags: { color: C.muted, fontSize: 11.5 },
+  bio: { fontFamily: SERIF, fontStyle: 'italic', fontSize: 15.5, lineHeight: 23, color: '#B9B5AC', marginBottom: 16 },
+
+  badge: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  dot: { width: 6, height: 6, borderRadius: 3 },
+  dotLg: { width: 9, height: 9, borderRadius: 4.5 },
+  badgeText: { color: '#CFCCC4', fontSize: 11 },
+  rate: { color: C.gold, fontSize: 12, letterSpacing: 0.5 },
+  legend: { color: C.soft, fontSize: 11 },
+
+  tag: {
+    borderWidth: 1, borderColor: C.lineGold, borderRadius: 999,
+    paddingHorizontal: 9, paddingVertical: 3.5,
+  },
+  tagText: { color: C.gold, fontSize: 10, letterSpacing: 0.4 },
+
+  chip: {
+    backgroundColor: C.surface, borderWidth: 1, borderColor: C.line,
+    borderRadius: 999, paddingHorizontal: 15, paddingVertical: 9,
+  },
+  chipMini: { paddingHorizontal: 13, paddingVertical: 7 },
+  chipOn: { backgroundColor: C.gold, borderColor: C.gold },
+  chipText: { color: '#CFCCC4', fontSize: 12 },
+  chipTextOn: { color: C.ink, fontWeight: '600' },
+  chipPrice: { color: C.gold },
+
+  slotTime: { fontFamily: SERIF, fontSize: 19, fontWeight: '600', color: C.gold2, width: 56 },
+  price: { fontFamily: SERIF, fontSize: 17, fontWeight: '700', color: C.gold },
+  ruleText: { color: C.orange, fontSize: 10.5, marginTop: 2 },
+  softText: { color: C.soft, fontSize: 12.5, lineHeight: 18 },
+  footnote: { color: C.muted, fontSize: 12, textAlign: 'center', paddingVertical: 18, lineHeight: 19 },
+  footnoteLeft: { color: C.muted, fontSize: 11.5, lineHeight: 18 },
+  formulaMeta: { color: C.gold, fontSize: 10.5, letterSpacing: 0.3 },
+
+  fieldLabel: { color: C.muted, fontSize: 9, letterSpacing: 1.8, marginTop: 14, marginBottom: 8 },
+  input: {
+    backgroundColor: C.surface2, borderWidth: 1, borderColor: C.line, borderRadius: 12,
+    color: C.text, fontSize: 13.5, paddingHorizontal: 14, paddingVertical: Platform.OS === 'ios' ? 12 : 9,
+  },
+
+  sw: {
+    width: 44, height: 25, borderRadius: 999, backgroundColor: '#2A2A2E',
+    borderWidth: 1, borderColor: C.line, justifyContent: 'center', paddingHorizontal: 3,
+  },
+  swOn: { backgroundColor: 'rgba(200,169,106,0.25)', borderColor: C.lineGold },
+  swKnob: { width: 17, height: 17, borderRadius: 9, backgroundColor: '#8E8B86' },
+  swKnobOn: { alignSelf: 'flex-end', backgroundColor: C.gold },
+
+  slotGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  slotCell: {
+    width: SLOT_W, borderRadius: 13, paddingVertical: 10, alignItems: 'center',
+    backgroundColor: C.surface, borderWidth: 1, borderColor: C.line,
+  },
+  slotOpen: { borderColor: C.gold, backgroundColor: 'rgba(200,169,106,0.07)' },
+  slotPause: { borderColor: 'rgba(217,160,91,0.45)', backgroundColor: 'rgba(217,160,91,0.07)' },
+  slotBooked: { backgroundColor: C.gold, borderColor: C.gold },
+  slotCellTime: { fontFamily: SERIF, fontSize: 15, fontWeight: '600', color: C.text },
+  slotCellState: { fontSize: 9, letterSpacing: 1, color: '#5A5852', marginTop: 3, textTransform: 'uppercase' },
+  slotCellWho: { fontSize: 9, color: C.ink, marginTop: 3, fontWeight: '600', maxWidth: SLOT_W - 12 },
+
+  btn: {
+    flexDirection: 'row', backgroundColor: C.gold, borderRadius: 16, padding: 15,
+    alignItems: 'center', justifyContent: 'center', marginTop: 14,
+  },
+  btnGhost: { backgroundColor: 'transparent', borderWidth: 1, borderColor: C.lineGold },
+  btnText: { color: C.ink, fontSize: 12, fontWeight: '700', letterSpacing: 2 },
+  back: { color: C.muted, fontSize: 12, letterSpacing: 2 },
+
+  photo: {
+    width: 150, height: 190, borderRadius: 16, marginRight: 10,
+    borderWidth: 1, borderColor: C.line, alignItems: 'center', justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  photoLabel: { position: 'absolute', bottom: 7, color: '#D8D5CE', fontSize: 9, letterSpacing: 1.5 },
+  photoTitleInput: {
+    width: 150, marginTop: 6, paddingVertical: 5, paddingHorizontal: 8,
+    backgroundColor: C.surface2, borderWidth: 1, borderColor: C.line, borderRadius: 8,
+    color: C.text, fontSize: 10.5, textAlign: 'center',
+  },
+
+  stats: {
+    flexDirection: 'row', backgroundColor: C.surface, borderWidth: 1, borderColor: C.line,
+    borderRadius: 20, paddingVertical: 16,
+  },
+  stat: { flex: 1, alignItems: 'center', paddingHorizontal: 2 },
+  statV: { fontFamily: SERIF, color: C.gold2, fontWeight: '700', fontSize: SMALL ? 15 : 17 },
+  statL: { color: C.muted, fontSize: 8, letterSpacing: 1.4, marginTop: 5 },
+
+  review: { paddingVertical: 12 },
+  reviewTxt: { fontFamily: SERIF, fontStyle: 'italic', color: '#A5A29B', fontSize: 14, lineHeight: 21, marginTop: 4 },
+
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 11 },
+  pcard: {
+    width: PCARD_W, backgroundColor: C.surface, borderWidth: 1, borderColor: C.line,
+    borderRadius: 18, padding: 11,
+  },
+  pimg: {
+    height: 100, borderRadius: 12, marginBottom: 10, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: C.line,
+  },
+  pname: { color: C.text, fontSize: 12.5, fontWeight: '500', marginBottom: 3, minHeight: 32 },
+  pprice: { fontFamily: SERIF, fontSize: 16, fontWeight: '700', color: C.gold },
+  pstock: { color: C.muted, fontSize: 10.5, marginTop: 2 },
+  add: {
+    marginTop: 10, borderWidth: 1, borderColor: C.lineGold, borderRadius: 10,
+    paddingVertical: 8, alignItems: 'center',
+  },
+  addText: { color: C.gold, fontSize: 10, fontWeight: '600', letterSpacing: 1.5 },
+
+  points: { fontFamily: SERIF, fontSize: 32, fontWeight: '700', color: C.gold2, marginTop: 4 },
+  divider: { height: 1, backgroundColor: C.line, marginVertical: 13 },
+
+  opt: {
+    flexDirection: 'row', alignItems: 'center', gap: 13,
+    backgroundColor: C.surface, borderWidth: 1, borderColor: C.line,
+    borderRadius: 16, paddingVertical: 15, paddingHorizontal: 17, marginBottom: 9,
+  },
+  optOn: { borderColor: C.lineGold, backgroundColor: C.surface2 },
+  optText: { color: C.text, fontSize: 14 },
+  optActive: { color: C.gold, fontSize: 10, letterSpacing: 2, fontWeight: '600' },
+
+  kpis: { flexDirection: 'row', flexWrap: 'wrap', gap: 11 },
+  kpi: {
+    width: PCARD_W, backgroundColor: C.surface, borderWidth: 1, borderColor: C.line,
+    borderRadius: 18, padding: 15,
+  },
+  kpiV: { fontFamily: SERIF, color: C.gold2, fontSize: 21, fontWeight: '700' },
+  kpiL: { color: C.muted, fontSize: 8.5, letterSpacing: 1.5, marginTop: 6 },
+
+  barBg: { height: 3, backgroundColor: C.surface2, borderRadius: 2 },
+  barFill: { height: 3, backgroundColor: C.gold, borderRadius: 2 },
+
+  tabbar: {
+    flexDirection: 'row', backgroundColor: '#0E0E10', borderTopWidth: 1, borderTopColor: C.line,
+    paddingTop: 9,
+  },
+  tabBtn: { flex: 1, alignItems: 'center', gap: 3, paddingVertical: 2 },
+  tabLabel: { color: '#6E6B65', fontSize: 8, letterSpacing: 0 },
+
+  toast: {
+    position: 'absolute', bottom: 92, left: PAD, right: PAD,
+    backgroundColor: '#17161A', borderWidth: 1, borderColor: C.lineGold,
+    borderRadius: 14, paddingVertical: 13, paddingHorizontal: 18,
+  },
+  toastText: { color: C.text, fontSize: 12.5, textAlign: 'center' },
+
+  /* Calendrier mensuel */
+  cal: {
+    backgroundColor: C.surface, borderWidth: 1, borderColor: C.line,
+    borderRadius: 20, padding: 16, marginBottom: 16,
+  },
+  calHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  calMonth: { fontFamily: SERIF, fontSize: 15, fontWeight: '600', color: C.text, letterSpacing: 0.5 },
+  calGrid: { flexDirection: 'row', flexWrap: 'wrap' },
+  calCell: { width: '14.2857%', alignItems: 'center', paddingVertical: 3 },
+  calNumWrap: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  calNumOn: { backgroundColor: C.gold },
+  calNum: { fontSize: 12.5, color: C.text },
+  calWd: { fontSize: 10, color: C.muted, fontWeight: '500' },
+  calDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: 'transparent', marginTop: 2 },
+
+  /* Champ prix libre */
+  priceField: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: C.surface2, borderWidth: 1, borderColor: C.lineGold,
+    borderRadius: 12, paddingHorizontal: 12, paddingVertical: Platform.OS === 'ios' ? 10 : 7,
+    minWidth: 90,
+  },
+  priceInput: { color: C.text, fontSize: 14, padding: 0, minWidth: 50, textAlign: 'right' },
+  surChip: {
+    paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+    alignItems: 'center', minWidth: 80,
+  },
+  surChipOn: { backgroundColor: C.gold, borderColor: C.gold },
+  surChipTxt: { color: C.muted, fontSize: 11, fontWeight: '600' },
+  surChipSub: { color: C.gray, fontSize: 9, marginTop: 1 },
+
+
+  /* Authentification & abonnement */
+  authError: { color: C.red, fontSize: 12, marginTop: 12, lineHeight: 17 },
+  authLink: { color: C.gold, fontSize: 12.5, textDecorationLine: 'underline' },
+  planCard: {
+    backgroundColor: C.surface, borderWidth: 1, borderColor: C.line,
+    borderRadius: 20, padding: 18, marginBottom: 12,
+  },
+  planCardOn: { borderColor: C.gold, backgroundColor: 'rgba(200,169,106,0.06)' },
+  planBadge: {
+    backgroundColor: C.gold, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 3.5,
+  },
+  planBadgeText: { color: C.ink, fontSize: 9, fontWeight: '700', letterSpacing: 1.2 },
+  planPrice: { fontFamily: SERIF, fontSize: 26, fontWeight: '700', color: C.gold, marginTop: 6 },
+  planFeature: { flexDirection: 'row', alignItems: 'center', gap: 9, paddingVertical: 4 },
+
+  /* Gestion fiche barber */
+  iconBtn: {
+    width: 44, height: 44, borderRadius: 12,
+    backgroundColor: C.surface2, borderWidth: 1, borderColor: C.lineGold,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  photoRemove: {
+    position: 'absolute', top: -6, right: 3,
+    width: 22, height: 22, borderRadius: 11,
+    backgroundColor: C.red, alignItems: 'center', justifyContent: 'center',
+    zIndex: 10,
+  },
+  photoAdd: {
+    width: 150, height: 190, borderRadius: 16,
+    borderWidth: 1, borderColor: C.lineGold,
+    alignItems: 'center', justifyContent: 'center',
+  },
+
+  /* Cover picker */
+  coverPreview: {
+    height: 120, borderRadius: 18, borderWidth: 1, borderColor: C.line,
+    alignItems: 'center', justifyContent: 'center', marginBottom: 14, overflow: 'hidden',
+  },
+  coverPreviewIni: { fontFamily: SERIF, fontSize: 52, fontWeight: '600', color: 'rgba(230,207,160,0.4)' },
+  coverPreviewBadge: {
+    position: 'absolute', top: 10, left: 10,
+    backgroundColor: 'rgba(10,10,11,0.75)', borderWidth: 1, borderColor: C.lineGold,
+    borderRadius: 999, paddingHorizontal: 9, paddingVertical: 4,
+  },
+  swatch: {
+    width: 36, height: 36, borderRadius: 18,
+    borderWidth: 2, borderColor: 'transparent',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  swatchOn: { borderColor: C.gold },
+
+  /* Modal réservation manuelle (Créneaux) */
+  modalOverlay: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.72)', zIndex: 100,
+    justifyContent: 'flex-end',
+  },
+  modal: {
+    backgroundColor: C.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    padding: 20, paddingBottom: 36, maxHeight: '80%',
+  },
+  clientRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingVertical: 10, paddingHorizontal: 12,
+    borderRadius: 12, borderWidth: 1, borderColor: C.line,
+    marginBottom: 6,
+  },
+  clientRowOn: { borderColor: C.gold, backgroundColor: 'rgba(200,169,106,0.07)' },
+
+
+  /* Mode vitrine / e-commerce */
+  modeBtn: {
+    flex: 1, borderWidth: 1, borderColor: C.line, borderRadius: 14,
+    padding: 13, gap: 4, alignItems: "center",
+  },
+  modeBtnOn: { backgroundColor: C.gold, borderColor: C.gold },
+  modeBtnText: { color: C.text, fontSize: 13, fontWeight: "600" },
+  modeBtnSub: { color: C.muted, fontSize: 10 },
+  stockBtn: {
+    width: 30, height: 30, borderRadius: 8,
+    backgroundColor: C.surface2, borderWidth: 1, borderColor: C.lineGold,
+    alignItems: "center", justifyContent: "center",
+  },
+  stockNum: { fontSize: 15, fontWeight: "600", color: C.text, minWidth: 24, textAlign: "center" },
+  tierBadge: { backgroundColor: "rgba(200,169,106,0.14)", borderRadius: 8, paddingHorizontal: 9, paddingVertical: 4, marginRight: 6 },
+  tierBadgeText: { color: C.gold, fontSize: 11, fontWeight: "600" },
+  vitrineTag: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, borderWidth: 1, borderColor: C.lineGold, borderRadius: 8, paddingVertical: 7, marginTop: 10 },
+  vitrineTagText: { color: C.gold, fontSize: 9, letterSpacing: 1, fontWeight: "600" },
+
+  /* Connexion sociale */
+
+  socialRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 18 },
+  socialLine: { flex: 1, height: 1, backgroundColor: 'rgba(255,255,255,0.08)' },
+  socialOr: { color: '#5A5852', fontSize: 11, letterSpacing: 1 },
+  socialBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: '#1B1B20', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 14, paddingVertical: 13,
+  },
+  socialBtnText: { color: '#D0CEC9', fontSize: 13, fontWeight: '500' },
+
+  /* Cloche notifications */
+  bellBadge: {
+    position: 'absolute', top: -4, right: -4,
+    backgroundColor: C.red, borderRadius: 8, minWidth: 16, height: 16,
+    alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3,
+    borderWidth: 1.5, borderColor: C.bg,
+  },
+  bellBadgeText: { color: '#fff', fontSize: 9, fontWeight: '700' },
+
+  /* Panel notifications */
+  notifPanel: {
+    backgroundColor: C.surface, borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    padding: 22, paddingBottom: 36,
+  },
+  notifRow: {
+    flexDirection: 'row', gap: 13, paddingVertical: 13,
+    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)',
+  },
+  notifRowUnread: { backgroundColor: 'rgba(200,169,106,0.04)', marginHorizontal: -22, paddingHorizontal: 22 },
+  notifIcon: {
+    width: 40, height: 40, borderRadius: 20, borderWidth: 1,
+    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+  },
+  notifDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: C.gold, marginTop: 2 },
+
+  /* Avis 5 étoiles (fin de coupe) */
+  rateBox: {
+    marginTop: 13, paddingTop: 12,
+    borderTopWidth: 1, borderTopColor: C.line,
+  },
+  rateStarBig: { fontSize: 28, color: C.muted, opacity: 0.45 },
+
+  /* Visionneuse photo plein écran */
+  viewerBox: {
+    width: '100%', aspectRatio: 3 / 4, maxHeight: '68%',
+    borderRadius: 22, overflow: 'hidden',
+    borderWidth: 1, borderColor: C.lineGold,
+  },
+  viewerLabel: {
+    fontFamily: SERIF, color: C.text, fontSize: 16, textAlign: 'center',
+    marginTop: 16, letterSpacing: 0.5,
+  },
+  viewerDl: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    alignSelf: 'center', marginTop: 14,
+    backgroundColor: C.gold, borderRadius: 999,
+    paddingHorizontal: 20, paddingVertical: 11,
+  },
+  viewerDlText: { color: C.ink, fontSize: 11, fontWeight: '700', letterSpacing: 1.5 },
+  viewerClose: {
+    position: 'absolute', top: 56, right: 24,
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: 'rgba(20,20,22,0.85)', borderWidth: 1, borderColor: C.lineGold,
+    alignItems: 'center', justifyContent: 'center',
+  },
+});
