@@ -404,7 +404,14 @@ const Chip = ({ label, price, on, onPress, mini }) => (
 );
 
 /* Calendrier mensuel — sélection d’une date sur 2 mois, points de statut par jour */
-function Calendar({ sel, onSel, markFor, onlyMarked }) {
+// Absences : une periode fermee masque les creneaux cote client, sans les detruire
+const isClosedOn = (closures, dayKey) => {
+  const idx = DAY_INDEX[dayKey];
+  if (idx == null) return false;
+  return (closures || []).some((c) => idx >= c.fromIdx && idx <= c.toIdx);
+};
+
+function Calendar({ sel, onSel, markFor, onlyMarked, range }) {
   const now = new Date();
   const [mOff, setMOff] = useState(0);
   const base = new Date(now.getFullYear(), now.getMonth() + mOff, 1);
@@ -442,10 +449,12 @@ function Calendar({ sel, onSel, markFor, onlyMarked }) {
           const enabled = idx != null && (!onlyMarked || !!(markFor && markFor(key)));
           const on = enabled && sel === idx;
           const mark = enabled && markFor ? markFor(key) : null;
+          const inRange = range && range.from != null && idx != null
+            && idx >= range.from && idx <= (range.to != null ? range.to : range.from);
           return (
             <TouchableOpacity key={key} style={s.calCell} disabled={!enabled}
               onPress={() => onSel(idx)} activeOpacity={0.7}>
-              <View style={[s.calNumWrap, on && s.calNumOn]}>
+              <View style={[s.calNumWrap, inRange && { backgroundColor: 'rgba(217,160,91,0.22)', borderRadius: 14 }, on && s.calNumOn]}>
                 <Text style={[s.calNum, !enabled && { color: '#3E3C38' }, on && { color: C.ink, fontWeight: '700' }]}>
                   {d}
                 </Text>
@@ -1585,13 +1594,15 @@ function BarberDetailScreen({ barber, services, products, favoriteBarber, onTogg
 
 /* Créneaux ouverts, filtrés par fenêtre horaire de la formule.
    On lit directement l’agenda : chaque barber peut avoir sa propre grille. */
-function openSlotsFor(agenda, dayIdx, barberId, window, fromH) {
+function openSlotsFor(agenda, dayIdx, barberId, window, fromH, closures) {
   const day = DAYS[dayIdx];
   const now = new Date();
+  const closed = isClosedOn(closures, day.key);
   const list = barberId === 'any' ? BARBERS : BARBERS.filter((b) => b.id === barberId);
   const seen = {};
   const out = [];
   for (const b of list) {
+    if (closed && b.id === 'enzo') continue;
     const slots = agenda[b.id]?.[day.key] || {};
     for (const [time, sl] of Object.entries(slots)) {
       if (sl.status !== 'open' || !inWindow(time, window, fromH) || seen[time]) continue;
@@ -1725,7 +1736,7 @@ function BookBarberPicker({ bList, favoriteBarber, booking, setBooking }) {
 }
 
 
-function BookScreen({ agenda, formulas, services, booking, setBooking, dayIdx, setDayIdx, onConfirm, barbers: allBarbers, favoriteBarber, homeFee, waitlist, onWaitlist, toast }) {
+function BookScreen({ agenda, formulas, services, booking, setBooking, dayIdx, setDayIdx, onConfirm, barbers: allBarbers, favoriteBarber, homeFee, closures, waitlist, onWaitlist, toast }) {
   if (booking.done) {
     const d = booking.done;
     return (
@@ -1823,7 +1834,7 @@ function BookScreen({ agenda, formulas, services, booking, setBooking, dayIdx, s
   const formula = available.find((f) => f.id === booking.formula) || null;
   const service = services.find((x) => x.id === booking.service);
   const ready = !!formula;
-  const slots = ready ? openSlotsFor(agenda, dayIdx, booking.barber, formula.window, formula.fromH) : [];
+  const slots = ready ? openSlotsFor(agenda, dayIdx, booking.barber, formula.window, formula.fromH, closures) : [];
   const now = new Date();
   const waitlisted = (waitlist || []).some((e) => e.dayKey === DAYS[dayIdx].key);
 
@@ -1874,7 +1885,9 @@ function BookScreen({ agenda, formulas, services, booking, setBooking, dayIdx, s
           <Calendar sel={dayIdx} onSel={setDayIdx} onlyMarked
             markFor={(key) => {
             const list = booking.barber === 'any' ? BARBERS : BARBERS.filter((b) => b.id === booking.barber);
+            const shut = isClosedOn(closures, key);
             for (const b of list) {
+              if (shut && b.id === 'enzo') continue;
               const d = agenda[b.id]?.[key] || {};
               for (const [time, sl] of Object.entries(d)) {
                 if (sl.status === 'open' && inWindow(time, formula.window)) return 'open';
@@ -2410,6 +2423,7 @@ function MeScreen({ user, points, setPoints, barbers, upcoming, waitlist, onCanc
   );
 }
 /* ───────── Espace BARBER (connecté : Enzo Moreau) ───────── */
+const WD_FULL = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
 const STEP_CHOICES = [15, 20, 30, 45, 60];
 const SCHEDULE_PRESETS = [
   { label: '8h – 13h', start: 8, end: 13 },
@@ -2429,7 +2443,7 @@ const INIT_CLIENTS = [
   { id: 'c5', firstName: 'Noah', lastName: 'Petit', phone: '07 98 76 54 32', notes: 'Coupe enfant', loyaltyPts: 0, blocked: false },
 ];
 
-function SlotsScreen({ agenda, setAgenda, daycfg, setDaycfg, endHour, setEndHour, homeFee, setHomeFee, clients, setClients, services, dayIdx, setDayIdx, onFreeSlot, toast }) {
+function SlotsScreen({ agenda, setAgenda, daycfg, setDaycfg, endHour, setEndHour, homeFee, setHomeFee, closures, setClosures, weekly, setWeekly, clients, setClients, services, dayIdx, setDayIdx, onFreeSlot, toast }) {
   const day = DAYS[dayIdx];
   const step = daycfg[day.key] || 30;
   const slots = agenda.enzo[day.key] || {};
@@ -2628,44 +2642,75 @@ function SlotsScreen({ agenda, setAgenda, daycfg, setDaycfg, endHour, setEndHour
     toast(label + suffix);
   };
 
-  // ── Vacances : ferme tout à partir du jour sélectionné, garde les RDV ──
-  const vacation = (n) => {
-    let kept = 0;
-    for (let i = 0; i < n; i++) {
-      const dIdx = dayIdx + i;
-      if (dIdx >= DAYS.length) break;
-      Object.values(agenda.enzo[DAYS[dIdx].key] || {}).forEach((sl) => {
-        if (sl.status === 'booked') kept++;
-      });
+  // ── Absences : periodes libres, reversibles (ne detruisent pas les creneaux) ──
+  const [vacFrom, setVacFrom] = useState(null);
+  const [vacTo, setVacTo] = useState(null);
+
+  const pickVacDay = (idx) => {
+    if (vacFrom == null || (vacFrom != null && vacTo != null)) { setVacFrom(idx); setVacTo(null); return; }
+    if (idx < vacFrom) { setVacFrom(idx); return; }
+    setVacTo(idx);
+  };
+
+  const addClosure = () => {
+    if (vacFrom == null) { toast('Choisissez au moins un jour de debut.'); return; }
+    const to = vacTo != null ? vacTo : vacFrom;
+    let booked = 0;
+    for (let i = vacFrom; i <= to; i++) {
+      Object.values(agenda.enzo[DAYS[i].key] || {}).forEach((sl) => { if (sl.status === 'booked') booked++; });
     }
+    setClosures((cs) => [...cs, {
+      id: 'cl' + Date.now(), fromIdx: vacFrom, toIdx: to,
+      fromLabel: DAYS[vacFrom].label, toLabel: DAYS[to].label,
+    }]);
+    setVacFrom(null); setVacTo(null);
+    const n = to - vacFrom + 1;
+    toast(booked > 0
+      ? `Absence enregistree (${n} j) — ${booked} RDV deja pris a gerer dans le Planning.`
+      : `Absence enregistree — ${n} jour${n > 1 ? 's' : ''} ferme${n > 1 ? 's' : ''} cote client.`);
+  };
+
+  const removeClosure = (id) => {
+    setClosures((cs) => cs.filter((c) => c.id !== id));
+    toast('Absence annulee — les creneaux redeviennent reservables.');
+  };
+
+  const dayClosure = (closures || []).find((c) => dayIdx >= c.fromIdx && dayIdx <= c.toIdx) || null;
+
+  // ── Semaine type : applique des horaires recurrents sur N semaines ──
+  const [wdSel, setWdSel] = useState(1);
+  const [cStart, setCStart] = useState(9);
+  const [cEnd, setCEnd] = useState(18);
+
+  const applyWeekly = (nWeeks) => {
+    let touched = 0;
     setAgenda((a) => {
       const newEnzo = { ...a.enzo };
-      for (let i = 0; i < n; i++) {
+      for (let i = 0; i < nWeeks * 7; i++) {
         const dIdx = dayIdx + i;
         if (dIdx >= DAYS.length) break;
-        const dKey = DAYS[dIdx].key;
+        const dayObj = DAYS[dIdx];
+        const rule = weekly[dayObj.date.getDay()];
+        const dStep = daycfg[dayObj.key] || step;
+        const grid = timesFor(dStep, endHour);
         const copy = {};
-        Object.entries(newEnzo[dKey] || {}).forEach(([t, sl]) => {
+        Object.entries(newEnzo[dayObj.key] || {}).forEach(([t, sl]) => {
           if (sl.status === 'booked') copy[t] = sl;
         });
-        newEnzo[dKey] = copy;
+        if (rule) {
+          grid.forEach((t) => {
+            const h = Number(t.slice(0, 2));
+            if (h < rule.start || h >= rule.end) return;
+            if (copy[t] && copy[t].status === 'booked') return;
+            copy[t] = openMode === 'domicile' ? { status: 'open', home: true } : { status: 'open' };
+          });
+        }
+        newEnzo[dayObj.key] = copy;
+        touched++;
       }
       return { ...a, enzo: newEnzo };
     });
-    toast(kept > 0
-      ? `Vacances — ${n} jours fermés. ${kept} RDV conservé(s) : gérez-les depuis le Planning.`
-      : `Vacances — ${n} jours fermés à partir de ${day.label}.`);
-  };
-
-  const askVacation = (n) => {
-    Alert.alert(
-      `Fermer ${n} jours ?`,
-      `Tous les créneaux ouverts à partir de ${day.label} seront fermés pendant ${n} jours. Les RDV déjà pris sont conservés.`,
-      [
-        { text: 'Garder', style: 'cancel' },
-        { text: 'Fermer', style: 'destructive', onPress: () => vacation(n) },
-      ]
-    );
+    toast(`Semaine type appliquee sur ${touched} jours a partir de ${day.label}.`);
   };
 
   return (
@@ -2834,6 +2879,39 @@ function SlotsScreen({ agenda, setAgenda, daycfg, setDaycfg, endHour, setEndHour
             ))}
           </View>
 
+          <View style={[s.card, { marginTop: 10 }]}>
+            <Text style={s.fieldLabel}>PLAGE PERSONNALISÉE</Text>
+            <View style={[s.row, { gap: 8, marginTop: 8 }]}>
+              <Text style={[s.softText, { width: 26 }]}>De</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View style={[s.wrap, { flexWrap: 'nowrap', gap: 6 }]}>
+                  {[6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20].map((h) => (
+                    <Chip key={h} mini label={h + 'h'} on={cStart === h}
+                      onPress={() => { setCStart(h); if (cEnd <= h) setCEnd(h + 1); }} />
+                  ))}
+                </View>
+              </ScrollView>
+            </View>
+            <View style={[s.row, { gap: 8, marginTop: 8 }]}>
+              <Text style={[s.softText, { width: 26 }]}>À</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View style={[s.wrap, { flexWrap: 'nowrap', gap: 6 }]}>
+                  {[8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23].filter((h) => h > cStart).map((h) => (
+                    <Chip key={h} mini label={h + 'h'} on={cEnd === h} onPress={() => setCEnd(h)} />
+                  ))}
+                </View>
+              </ScrollView>
+            </View>
+            <View style={[s.wrap, { gap: 6, marginTop: 12 }]}>
+              <Chip mini label={'Ouvrir ' + cStart + 'h–' + cEnd + 'h'}
+                onPress={() => bulk('Ouvert ' + cStart + 'h–' + cEnd + 'h', (h) => h >= cStart && h < cEnd, 'open')} />
+              <Chip mini label="Mettre en pause"
+                onPress={() => bulk('Pause ' + cStart + 'h–' + cEnd + 'h', (h) => h >= cStart && h < cEnd, 'pause')} />
+              <Chip mini label="Fermer"
+                onPress={() => bulk('Fermé ' + cStart + 'h–' + cEnd + 'h', (h) => h >= cStart && h < cEnd, null)} />
+            </View>
+          </View>
+
           {/* ── Actions rapides ── */}
           <Section>Actions rapides</Section>
           <View style={[s.wrap, { gap: 8 }]}>
@@ -2854,21 +2932,112 @@ function SlotsScreen({ agenda, setAgenda, daycfg, setDaycfg, endHour, setEndHour
             ))}
           </View>
 
-          {/* ── Vacances ── */}
-          <Section note="ferme tout à partir du jour sélectionné — les RDV existants sont conservés">Vacances</Section>
-          <View style={[s.wrap, { gap: 8 }]}>
-            {[7, 14, 30].map((n) => (
-              <TouchableOpacity key={n}
-                style={[s.card, { marginBottom: 0, paddingVertical: 12, paddingHorizontal: 16,
-                  flexDirection: 'row', alignItems: 'center', gap: 10 }]}
-                onPress={() => askVacation(n)} activeOpacity={0.8}>
-                <Feather name="sun" size={14} color={C.orange} />
-                <Text style={[s.bname, { fontSize: 13.5 }]}>{n} jours</Text>
-              </TouchableOpacity>
-            ))}
+          {/* ── Absences & vacances (periode libre) ── */}
+          <Section note="choisissez n'importe quelle periode — annulable a tout moment">Absences & vacances</Section>
+          <View style={s.card}>
+            <View style={[s.row, { gap: 8, marginBottom: 10 }]}>
+              <View style={s.grow}>
+                <Text style={s.fieldLabel}>DU</Text>
+                <Text style={[s.bname, { fontSize: 13, marginTop: 3 }]}>
+                  {vacFrom != null ? DAYS[vacFrom].label : '—'}
+                </Text>
+              </View>
+              <View style={s.grow}>
+                <Text style={s.fieldLabel}>AU</Text>
+                <Text style={[s.bname, { fontSize: 13, marginTop: 3 }]}>
+                  {vacTo != null ? DAYS[vacTo].label : (vacFrom != null ? DAYS[vacFrom].label : '—')}
+                </Text>
+              </View>
+              {vacFrom != null && (
+                <TouchableOpacity onPress={() => { setVacFrom(null); setVacTo(null); }} hitSlop={10}>
+                  <Feather name="x" size={16} color={C.muted} />
+                </TouchableOpacity>
+              )}
+            </View>
+            <Calendar sel={-1} onSel={pickVacDay} range={{ from: vacFrom, to: vacTo }} />
+            <View style={[s.wrap, { gap: 6, marginTop: 4 }]}>
+              {[['Ce jour', 0], ['3 jours', 2], ['1 semaine', 6], ['2 semaines', 13]].map(([lb, add]) => (
+                <Chip key={lb} mini label={lb} onPress={() => {
+                  const f = vacFrom != null ? vacFrom : dayIdx;
+                  setVacFrom(f);
+                  setVacTo(Math.min(DAYS.length - 1, f + add));
+                }} />
+              ))}
+            </View>
+            <Btn icon="sun" label="ENREGISTRER L'ABSENCE" onPress={addClosure} />
           </View>
 
-          {/* ── Grille des créneaux ── */}
+          {(closures || []).length > 0 && (
+            <>
+              <Text style={s.fieldLabel}>ABSENCES PROGRAMMEES</Text>
+              {closures.map((c) => (
+                <View key={c.id} style={[s.card, s.row, { borderColor: 'rgba(217,160,91,0.35)' }]}>
+                  <Feather name="sun" size={15} color={C.orange} />
+                  <View style={s.grow}>
+                    <Text style={[s.bname, { fontSize: 13 }]}>
+                      {c.fromIdx === c.toIdx ? c.fromLabel : c.fromLabel + '  →  ' + c.toLabel}
+                    </Text>
+                    <Text style={s.btags}>{c.toIdx - c.fromIdx + 1} jour{c.toIdx > c.fromIdx ? 's' : ''} · invisible cote client</Text>
+                  </View>
+                  <TouchableOpacity onPress={() => removeClosure(c.id)} hitSlop={10}>
+                    <Feather name="rotate-ccw" size={16} color={C.gold} />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </>
+          )}
+
+          {/* ── Semaine type ── */}
+          <Section note="horaires recurrents, appliques sur plusieurs semaines">Semaine type</Section>
+          <View style={s.card}>
+            <View style={[s.wrap, { gap: 6 }]}>
+              {[1, 2, 3, 4, 5, 6, 0].map((wd) => {
+                const r = weekly[wd];
+                return (
+                  <Chip key={wd} mini on={wdSel === wd}
+                    label={WD_FULL[wd] + (r ? ' ' + r.start + '-' + r.end : ' fermé')}
+                    onPress={() => setWdSel(wd)} />
+                );
+              })}
+            </View>
+            <View style={[s.row, { gap: 8, marginTop: 12 }]}>
+              <Text style={[s.fieldLabel, { flex: 1, marginTop: 0 }]}>{WD_FULL[wdSel].toUpperCase()}</Text>
+              <Chip mini label="Fermé" on={!weekly[wdSel]}
+                onPress={() => setWeekly((w) => ({ ...w, [wdSel]: null }))} />
+            </View>
+            <Text style={[s.fieldLabel, { marginTop: 10 }]}>DÉBUT</Text>
+            <View style={s.wrap}>
+              {[7, 8, 9, 10, 11, 14].map((h) => (
+                <Chip key={h} mini label={h + 'h'} on={weekly[wdSel]?.start === h}
+                  onPress={() => setWeekly((w) => ({ ...w, [wdSel]: { start: h, end: Math.max(h + 1, w[wdSel]?.end || 19) } }))} />
+              ))}
+            </View>
+            <Text style={[s.fieldLabel, { marginTop: 10 }]}>FIN</Text>
+            <View style={s.wrap}>
+              {[13, 17, 18, 19, 20, 22].map((h) => (
+                <Chip key={h} mini label={h + 'h'} on={weekly[wdSel]?.end === h}
+                  onPress={() => setWeekly((w) => ({ ...w, [wdSel]: { start: Math.min(h - 1, w[wdSel]?.start ?? 9), end: h } }))} />
+              ))}
+            </View>
+            <View style={[s.wrap, { gap: 6, marginTop: 14 }]}>
+              {[1, 2, 4].map((n) => (
+                <Chip key={n} mini label={'Appliquer ' + n + ' sem.'} onPress={() => applyWeekly(n)} />
+              ))}
+            </View>
+          </View>
+
+          {/* ── Grille des créneaux ── */}          {/* ── Grille des créneaux ── */}
+          {dayClosure && (
+            <View style={[s.card, { borderColor: 'rgba(217,160,91,0.5)', flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 4 }]}>
+              <Feather name="sun" size={14} color={C.orange} style={{ marginTop: 2 }} />
+              <Text style={[s.softText, { flex: 1, lineHeight: 18 }]}>
+                Absence en cours ({dayClosure.fromLabel}{dayClosure.fromIdx !== dayClosure.toIdx ? ' → ' + dayClosure.toLabel : ''}) — ce jour n'apparaît pas côté client.
+              </Text>
+              <TouchableOpacity onPress={() => removeClosure(dayClosure.id)} hitSlop={10}>
+                <Feather name="rotate-ccw" size={16} color={C.gold} />
+              </TouchableOpacity>
+            </View>
+          )}
           {openMode === 'domicile' && (
             <View style={[s.card, { borderColor: C.lineGold, flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 4 }]}>
               <Feather name="home" size={14} color={C.gold} style={{ marginTop: 2 }} />
@@ -4318,6 +4487,9 @@ function Main() {
   const [favoriteBarber, setFavoriteBarber] = useState(null); // id du barber principal
   const [upcoming, setUpcoming] = useState([]);
   const [waitlist, setWaitlist] = useState([]); // { id, dayKey, dayLabel, formulaName }
+  const [closures, setClosures] = useState([]); // absences : { id, fromIdx, toIdx, fromLabel, toLabel }
+  const [weekly, setWeekly] = useState({ 0: null, 1: { start: 9, end: 19 }, 2: { start: 9, end: 19 },
+    3: { start: 9, end: 19 }, 4: { start: 9, end: 19 }, 5: { start: 9, end: 19 }, 6: { start: 10, end: 17 } });
   const [enzoDelay, setEnzoDelay] = useState('ON_TIME');
   const [toastMsg, setToastMsg] = useState(null);
   const toastAnim = useRef(new Animated.Value(0)).current;
@@ -4494,7 +4666,7 @@ function Main() {
     else if (tab === 'book') content = (
       <BookScreen agenda={agenda} formulas={formulas} services={services} booking={booking} setBooking={setBooking}
         dayIdx={clientDay} setDayIdx={setClientDay} onConfirm={confirmBooking}
-        barbers={barbersLive} favoriteBarber={favoriteBarber} homeFee={homeFee}
+        barbers={barbersLive} favoriteBarber={favoriteBarber} homeFee={homeFee} closures={closures}
         waitlist={waitlist} onWaitlist={joinWaitlist} toast={toast} />
     );
     else if (tab === 'cuts') content = <CutsScreen history={history} setHistory={setHistory} setBarbers={setBarbers} user={user} onRebook={(bid) => { setBooking({ barber: bid, formula: null, service: null, done: null, pendingSlot: null, address: '' }); setTab('book'); toast('Choisissez votre nouveau créneau.'); }} toast={toast} />;
@@ -4503,6 +4675,7 @@ function Main() {
   } else if (role === 'barber') {
     if (tab === 'slots') content = (
       <SlotsScreen agenda={agenda} setAgenda={setAgenda} daycfg={daycfg} setDaycfg={setDaycfg} endHour={endHour} setEndHour={setEndHour} homeFee={homeFee} setHomeFee={setHomeFee}
+        closures={closures} setClosures={setClosures} weekly={weekly} setWeekly={setWeekly}
         clients={clients} setClients={setClients} onFreeSlot={(dk, t) => notifyWaitlist(dk, t, 'Enzo Moreau')}
         services={services}
         dayIdx={barberDay} setDayIdx={setBarberDay} toast={toast} />
