@@ -17,7 +17,8 @@
     "db:reset": "bash scripts/db/reset-local.sh",
     "db:types": "supabase gen types typescript --db-url \"${DATABASE_URL:-postgres://postgres:postgres@127.0.0.1:5432/miaamm_test}\" --schema public > src/types/database.ts && prettier --write src/types/database.ts",
     "test:db": "vitest run --config vitest.db.config.mts",
-    "supabase:lite": "node scripts/dev/supabase-lite.mjs"
+    "supabase:lite": "node scripts/dev/supabase-lite.mjs",
+    "preview:build": "node scripts/preview/build.mjs"
   },
   "dependencies": {
     "@date-fns/tz": "^1.5.0",
@@ -53,6 +54,7 @@
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react": "^6.1.1",
     "autoprefixer": "^10.6.1",
+    "esbuild": "^0.28.2",
     "eslint": "^8.57.1",
     "eslint-config-next": "^14.2.35",
     "eslint-plugin-jsx-a11y": "^6.10.2",
