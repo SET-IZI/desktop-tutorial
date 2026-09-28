@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { useId, useRef } from 'react';
+import { useRef } from 'react';
 import { spring } from '@/lib/motion';
 import { cn } from '@/lib/utils';
 
@@ -21,7 +21,6 @@ export function Segmented<T extends string>({
   onChange,
   className,
 }: SegmentedProps<T>) {
-  const id = useId();
   const refs = useRef<(HTMLButtonElement | null)[]>([]);
 
   // Flèches gauche/droite : sélection et focus sur l'option voisine (motif radio ARIA).
@@ -39,8 +38,25 @@ export function Segmented<T extends string>({
     <div
       role="radiogroup"
       aria-label={label}
-      className={cn('flex rounded-full bg-fg/[0.06] p-1', className)}
+      className={cn('relative flex rounded-full bg-fg/[0.06] p-1', className)}
     >
+      {/* Pastille à largeur fixe qui glisse (translation seule) : pas de déformation,
+          contrairement à une animation de layout dans une sheet déjà animée. */}
+      <motion.span
+        aria-hidden
+        className="absolute bottom-1 left-1 top-1 rounded-full bg-surface shadow-soft"
+        style={{ width: `calc((100% - 0.5rem) / ${options.length})` }}
+        initial={false}
+        animate={{
+          x: `${
+            Math.max(
+              0,
+              options.findIndex((o) => o.value === value),
+            ) * 100
+          }%`,
+        }}
+        transition={spring}
+      />
       {options.map((o, index) => {
         const active = o.value === value;
         return (
@@ -56,17 +72,10 @@ export function Segmented<T extends string>({
             onKeyDown={(e) => onKeyDown(e, index)}
             onClick={() => onChange(o.value)}
             className={cn(
-              'relative flex min-h-touch flex-1 items-center justify-center gap-2 rounded-full px-4 text-[15px] font-semibold transition-colors',
+              'relative flex min-h-touch flex-1 basis-0 items-center justify-center gap-2 rounded-full px-4 text-[15px] font-semibold transition-colors',
               active ? 'text-fg' : 'text-fg-muted hover:text-fg',
             )}
           >
-            {active ? (
-              <motion.span
-                layoutId={`segmented-${id}`}
-                transition={spring}
-                className="absolute inset-0 rounded-full bg-surface shadow-soft"
-              />
-            ) : null}
             <span className="relative flex items-center gap-2">
               {o.icon}
               {o.label}

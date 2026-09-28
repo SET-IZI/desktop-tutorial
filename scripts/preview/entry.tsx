@@ -1,5 +1,6 @@
 /** Point d'entrée de l'aperçu statique de la boutique (sans serveur). */
 import { MotionConfig } from 'framer-motion';
+import { ChevronDown } from 'lucide-react';
 import { IntlProvider } from 'next-intl';
 import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -73,17 +74,22 @@ function FontPicker() {
       // stockage indisponible : le choix vaut pour la session
     }
   }, [font]);
+  // Pastille discrète en haut à droite (défile avec la page, ne gêne pas la barre collante).
   return (
-    <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 bg-fg px-4 py-2 text-[14px] text-bg">
-      <span className="font-semibold">Aperçu Miaamm</span>
-      <label htmlFor="preview-font" className="opacity-80">
-        Police
-      </label>
+    <div className="glass absolute right-4 top-[max(1rem,env(safe-area-inset-top))] z-40 flex h-11 items-center gap-2 rounded-full pl-3.5 pr-3 text-[14px] font-semibold text-fg shadow-float">
+      <span aria-hidden className="font-bold">
+        Aa
+      </span>
+      <span aria-hidden className="max-w-[9rem] truncate font-medium">
+        {font}
+      </span>
+      <ChevronDown className="size-4 text-fg-muted" aria-hidden />
+      {/* Sélecteur natif transparent par-dessus : menu système sur mobile, accessible au clavier. */}
       <select
-        id="preview-font"
+        aria-label="Police de l'aperçu"
         value={font}
         onChange={(e) => setFont(e.target.value)}
-        className="max-w-full rounded-full bg-bg px-3 py-1.5 text-[14px] font-medium text-fg"
+        className="absolute inset-0 cursor-pointer rounded-full opacity-0"
       >
         {FONTS.map((f) => (
           <option key={f.family} value={f.family}>

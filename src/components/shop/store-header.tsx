@@ -38,7 +38,7 @@ export function StoreHeader({ storefront }: { storefront: Storefront }) {
   }, [location]);
 
   return (
-    <header className="relative overflow-hidden px-4 pb-8 pt-10 sm:px-6 sm:pt-16">
+    <header className="relative overflow-hidden px-4 pb-10 pt-16 sm:px-6 sm:pt-24">
       <motion.div
         aria-hidden
         className="absolute inset-0"

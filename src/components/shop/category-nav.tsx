@@ -25,6 +25,7 @@ export function CategoryNav({ categories }: { categories: MenuCategory[] }) {
   const t = useTranslations('shop');
   const reduceMotion = useReducedMotion();
   const [active, setActive] = useState(categories[0]?.id);
+  const [overflow, setOverflow] = useState({ left: false, right: false });
   const listRef = useRef<HTMLUListElement>(null);
   const lockUntil = useRef(0);
 
@@ -61,6 +62,25 @@ export function CategoryNav({ categories }: { categories: MenuCategory[] }) {
     };
   }, [computeActive]);
 
+  // Fondu sur les bords seulement quand il reste des catégories à faire défiler.
+  useEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    const update = () =>
+      setOverflow({
+        left: list.scrollLeft > 4,
+        right: list.scrollLeft + list.clientWidth < list.scrollWidth - 4,
+      });
+    update();
+    list.addEventListener('scroll', update, { passive: true });
+    const observer = new ResizeObserver(update);
+    observer.observe(list);
+    return () => {
+      list.removeEventListener('scroll', update);
+      observer.disconnect();
+    };
+  }, [categories]);
+
   // Centre la pastille active dans la barre, sans toucher au défilement de la page.
   useEffect(() => {
     const list = listRef.current;
@@ -86,29 +106,45 @@ export function CategoryNav({ categories }: { categories: MenuCategory[] }) {
 
   if (categories.length < 2) return null;
 
+  const fade = `linear-gradient(to right, ${overflow.left ? 'transparent, black 44px' : 'black'}, ${
+    overflow.right ? 'black calc(100% - 44px), transparent' : 'black'
+  })`;
+
   return (
-    <nav aria-label={t('categories')} className="sticky top-3 z-30 mx-3 sm:mx-auto sm:max-w-3xl">
-      <ul
-        ref={listRef}
-        className="glass flex gap-1 overflow-x-auto rounded-full p-1.5 shadow-float [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-      >
-        {categories.map((c) => (
-          <li key={c.id} data-cat={c.id} className="shrink-0">
-            <a
-              href={`#${categoryAnchor(c.id)}`}
-              aria-current={active === c.id ? 'true' : undefined}
-              onClick={(e) => goTo(e, c.id)}
-              className={cn(
-                'flex min-h-touch items-center gap-1.5 whitespace-nowrap rounded-full px-4 text-[15px] font-semibold transition-colors duration-300',
-                active === c.id ? 'bg-fg text-bg' : 'text-fg hover:bg-fg/[0.06]',
-              )}
-            >
-              {c.emoji ? <span aria-hidden>{c.emoji}</span> : null}
-              {c.name}
-            </a>
-          </li>
-        ))}
-      </ul>
+    <nav
+      aria-label={t('categories')}
+      className="sticky top-[max(1rem,env(safe-area-inset-top))] z-30 -mt-7 flex justify-center px-4"
+    >
+      {/* Largeur du contenu (centrée) ; défilement horizontal si ça ne tient pas.
+          Le fondu est sur la liste interne pour ne pas rogner l'ombre de la pastille. */}
+      <div className="glass w-fit max-w-full overflow-hidden rounded-full p-1 shadow-float">
+        <ul
+          ref={listRef}
+          style={{ maskImage: fade, WebkitMaskImage: fade }}
+          className="flex gap-0.5 overflow-x-auto rounded-full [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          {categories.map((c) => (
+            <li key={c.id} data-cat={c.id} className="shrink-0">
+              <a
+                href={`#${categoryAnchor(c.id)}`}
+                aria-current={active === c.id ? 'true' : undefined}
+                onClick={(e) => goTo(e, c.id)}
+                className={cn(
+                  'flex min-h-touch items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 text-[15px] font-semibold transition-colors duration-300',
+                  active === c.id ? 'bg-fg text-bg' : 'text-fg hover:bg-fg/[0.06]',
+                )}
+              >
+                {c.emoji ? (
+                  <span aria-hidden className="text-[16px]">
+                    {c.emoji}
+                  </span>
+                ) : null}
+                {c.name}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </div>
     </nav>
   );
 }
