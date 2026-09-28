@@ -44,6 +44,57 @@ window.fetch = async (input, init) => {
   return realFetch(input, init);
 };
 
+/** Polices candidates (Google Fonts), essayables en direct dans l'aperçu. */
+const FONTS = [
+  { family: 'Plus Jakarta Sans', label: 'Plus Jakarta Sans · moderne, chaleureuse' },
+  { family: 'Figtree', label: 'Figtree · ronde, amicale' },
+  { family: 'DM Sans', label: 'DM Sans · douce, géométrique' },
+  { family: 'Nunito', label: 'Nunito · très arrondie, gourmande' },
+  { family: 'Outfit', label: 'Outfit · géométrique, affirmée' },
+  { family: 'Inter', label: 'Inter · la police actuelle' },
+];
+const FONT_KEY = 'miaamm:preview:font';
+
+function readFont(): string {
+  try {
+    return localStorage.getItem(FONT_KEY) ?? FONTS[0]!.family;
+  } catch {
+    return FONTS[0]!.family;
+  }
+}
+
+function FontPicker() {
+  const [font, setFont] = useState(readFont);
+  useEffect(() => {
+    document.documentElement.style.setProperty('--font-sans', `'${font}'`);
+    try {
+      localStorage.setItem(FONT_KEY, font);
+    } catch {
+      // stockage indisponible : le choix vaut pour la session
+    }
+  }, [font]);
+  return (
+    <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 bg-fg px-4 py-2 text-[14px] text-bg">
+      <span className="font-semibold">Aperçu Miaamm</span>
+      <label htmlFor="preview-font" className="opacity-80">
+        Police
+      </label>
+      <select
+        id="preview-font"
+        value={font}
+        onChange={(e) => setFont(e.target.value)}
+        className="max-w-full rounded-full bg-bg px-3 py-1.5 text-[14px] font-medium text-fg"
+      >
+        {FONTS.map((f) => (
+          <option key={f.family} value={f.family}>
+            {f.label}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 function PreviewNotice() {
   const [message, setMessage] = useState<string | null>(null);
   useEffect(() => {
@@ -70,6 +121,7 @@ function PreviewNotice() {
 createRoot(document.getElementById('miaamm-root')!).render(
   <IntlProvider locale="fr" messages={messages} timeZone="Europe/Paris">
     <MotionConfig reducedMotion="user">
+      <FontPicker />
       <Storefront storefront={storefront} />
       <PreviewNotice />
     </MotionConfig>

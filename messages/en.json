@@ -107,6 +107,9 @@
     "notFoundTitle": "This restaurant doesn't exist (yet)",
     "notFoundHint": "Check the link or ask the restaurant for it.",
     "checkoutSoon": "Payment is coming very soon.",
-    "backToMenu": "Back to menu"
+    "backToMenu": "Back to menu",
+    "quickAdd": "Add {name} to cart",
+    "chooseOptions": "Choose options for {name}",
+    "added": "{name} added to cart"
   }
 }

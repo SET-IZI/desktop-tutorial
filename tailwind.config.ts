@@ -31,8 +31,9 @@ const config: Config = {
         red: token('red'),
       },
       fontFamily: {
+        // Police principale : une seule variable (--font-sans, globals.css) pour en changer.
         sans: [
-          '"Inter Variable"',
+          'var(--font-sans)',
           '-apple-system',
           'BlinkMacSystemFont',
           'system-ui',

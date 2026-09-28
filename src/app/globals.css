@@ -12,6 +12,7 @@
    --accent : surchargé par restaurant (style inline sur le conteneur boutique). */
 @layer base {
   :root {
+    --font-sans: 'Inter Variable';
     --bg: 245 245 247;
     --surface: 255 255 255;
     --surface-2: 242 242 247;

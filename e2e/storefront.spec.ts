@@ -47,10 +47,10 @@ test.describe('Boutique · carte', () => {
   test('la recherche ignore accents et ligatures', async ({ page }) => {
     await gotoHydrated(page, SHOP);
     await page.getByLabel('Rechercher un plat').fill('boeuf');
-    await expect(page.getByRole('button', { name: /^Le / })).toHaveText([
-      /Le Classique/,
-      /Le Piquant/,
-    ]);
+    const results = page.getByRole('button', { name: /^Le / });
+    await expect(results).toHaveCount(2);
+    await expect(results.nth(0)).toHaveAccessibleName(/^Le Classique/);
+    await expect(results.nth(1)).toHaveAccessibleName(/^Le Piquant/);
     await page.getByLabel('Rechercher un plat').fill('zzz');
     await expect(page.getByText('Rien ne correspond')).toBeVisible();
     await page.getByRole('button', { name: 'Effacer les filtres' }).click();
@@ -75,6 +75,47 @@ test.describe('Boutique · carte', () => {
     await expect(page.getByRole('button', { name: 'Allergènes (1)' })).toBeVisible();
     await expect(page.getByRole('button', { name: /^Le Classique/ })).toHaveCount(0);
     await expect(page.getByRole('button', { name: /^Risotto/ })).toBeVisible();
+  });
+});
+
+test.describe('Boutique · navigation et ajout rapide', () => {
+  test('la barre de catégories amène sur la bonne section, dans les deux sens', async ({
+    page,
+  }) => {
+    await gotoHydrated(page, SHOP);
+    const nav = page.getByRole('navigation', { name: 'Catégories de la carte' });
+    for (const name of ['Burgers', 'Desserts', 'Burgers', 'Plats', 'Entrées']) {
+      await nav.getByRole('link', { name: new RegExp(name) }).click();
+      await expect(nav.getByRole('link', { name: new RegExp(name) })).toHaveAttribute(
+        'aria-current',
+        'true',
+      );
+      const heading = page.getByRole('heading', { level: 2, name: new RegExp(name) });
+      await expect
+        .poll(async () => Math.round((await heading.boundingBox())!.y), { timeout: 4000 })
+        .toBeLessThan(160);
+    }
+  });
+
+  test('le + ajoute directement un plat sans choix obligatoire', async ({ page }) => {
+    await gotoHydrated(page, SHOP);
+    await page.getByRole('button', { name: 'Ajouter Tiramisu maison au panier' }).click();
+    await expect(cartBar(page)).toContainText('6,50');
+    await page.getByRole('button', { name: 'Ajouter Tiramisu maison au panier' }).click();
+    await expect(cartBar(page)).toContainText('13,00');
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+  });
+
+  test('le + ouvre la fiche quand un choix est obligatoire', async ({ page }) => {
+    await gotoHydrated(page, SHOP);
+    await page.getByRole('button', { name: 'Choisir les options de Le Classique' }).click();
+    await expect(page.getByRole('dialog', { name: 'Le Classique' })).toBeVisible();
+  });
+
+  test('la recherche affiche le nombre de résultats', async ({ page }) => {
+    await gotoHydrated(page, SHOP);
+    await page.getByLabel('Rechercher un plat').fill('burger');
+    await expect(page.getByRole('status').filter({ hasText: /plats?$/ })).toHaveText('3 plats');
   });
 });
 

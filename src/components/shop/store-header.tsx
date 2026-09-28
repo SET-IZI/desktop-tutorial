@@ -1,5 +1,6 @@
 'use client';
 
+import { motion, useReducedMotion, useScroll, useTransform } from 'framer-motion';
 import { MapPin } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
@@ -11,6 +12,13 @@ import { cn } from '@/lib/utils';
 export function StoreHeader({ storefront }: { storefront: Storefront }) {
   const t = useTranslations('shop');
   const { restaurant, location } = storefront;
+  // Parallaxe douce : le contenu glisse et s'estompe, le dégradé s'agrandit.
+  const reduce = useReducedMotion();
+  const { scrollY } = useScroll();
+  const contentY = useTransform(scrollY, [0, 320], [0, 70]);
+  const contentOpacity = useTransform(scrollY, [0, 260], [1, 0.25]);
+  const meshScale = useTransform(scrollY, [0, 320], [1, 1.18]);
+
   // Dépend de l'heure du client : calculé après le montage (pas d'écart SSR).
   const [open, setOpen] = useState<boolean | null>(null);
 
@@ -31,8 +39,17 @@ export function StoreHeader({ storefront }: { storefront: Storefront }) {
 
   return (
     <header className="relative overflow-hidden px-4 pb-8 pt-10 sm:px-6 sm:pt-16">
-      <MeshGradient colors={['orange', 'pink', 'violet']} />
-      <div className="relative mx-auto max-w-3xl">
+      <motion.div
+        aria-hidden
+        className="absolute inset-0"
+        style={reduce ? undefined : { scale: meshScale }}
+      >
+        <MeshGradient colors={['orange', 'pink', 'violet']} />
+      </motion.div>
+      <motion.div
+        className="relative mx-auto max-w-3xl"
+        style={reduce ? undefined : { y: contentY, opacity: contentOpacity }}
+      >
         <div className="flex items-center gap-4">
           {restaurant.logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element -- logo de petite taille, déjà optimisé à l'upload
@@ -71,7 +88,7 @@ export function StoreHeader({ storefront }: { storefront: Storefront }) {
           <MapPin className="size-4 shrink-0" aria-hidden />
           {location.addressLine}, {location.postalCode} {location.city}
         </p>
-      </div>
+      </motion.div>
     </header>
   );
 }

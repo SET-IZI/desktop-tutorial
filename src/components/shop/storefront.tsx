@@ -3,6 +3,7 @@
 import { useTranslations } from 'next-intl';
 import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Reveal } from '@/components/ui/reveal';
 import { CartProvider, useCartMeta } from '@/lib/cart/store';
 import { readableTextOn, toRgbChannels } from '@/lib/color';
 import { EMPTY_FILTERS, filterMenu, hasActiveFilters, type MenuFilters } from '@/lib/menu/filters';
@@ -70,7 +71,12 @@ function StorefrontBody({
 
       <main className="mx-auto max-w-3xl px-4 pt-6 sm:px-6">
         <MenuToolbar filters={filters} onChange={setFilters} categories={categories} />
-        <p role="status" className="sr-only">
+        {/* Visible : sur mobile, le clavier cache souvent la carte filtrée. */}
+        <p
+          role="status"
+          aria-live="polite"
+          className="mt-3 min-h-[1.5em] px-1 text-[15px] font-medium text-fg"
+        >
           {hasActiveFilters(filters) ? t('results', { count }) : ''}
         </p>
 
@@ -89,38 +95,41 @@ function StorefrontBody({
             </Button>
           </div>
         ) : (
-          <div className="mt-6 space-y-10">
+          <div className="mt-3 space-y-10">
             {visible.map((category) => (
               <section
                 key={category.id}
                 id={categoryAnchor(category.id)}
                 aria-labelledby={`${categoryAnchor(category.id)}-title`}
-                className="scroll-mt-24"
+                tabIndex={-1}
+                className="scroll-mt-24 focus:outline-none"
               >
-                <h2
-                  id={`${categoryAnchor(category.id)}-title`}
-                  className="text-[28px] font-bold tracking-display"
-                >
-                  {category.emoji ? (
-                    <span aria-hidden className="mr-2">
-                      {category.emoji}
-                    </span>
+                <Reveal>
+                  <h2
+                    id={`${categoryAnchor(category.id)}-title`}
+                    className="text-[28px] font-bold tracking-display"
+                  >
+                    {category.emoji ? (
+                      <span aria-hidden className="mr-2">
+                        {category.emoji}
+                      </span>
+                    ) : null}
+                    {category.name}
+                  </h2>
+                  {category.description ? (
+                    <p className="mt-1 text-fg-muted">{category.description}</p>
                   ) : null}
-                  {category.name}
-                </h2>
-                {category.description ? (
-                  <p className="mt-1 text-fg-muted">{category.description}</p>
-                ) : null}
+                </Reveal>
                 <ul className="mt-4 grid gap-3 sm:grid-cols-2">
-                  {category.products.map((product) => (
-                    <li key={product.id}>
+                  {category.products.map((product, index) => (
+                    <Reveal as="li" key={product.id} delay={Math.min(index, 4) * 0.05}>
                       <ProductCard
                         product={product}
                         category={category}
                         currency={restaurant.currency}
                         onOpen={setSelected}
                       />
-                    </li>
+                    </Reveal>
                   ))}
                 </ul>
               </section>

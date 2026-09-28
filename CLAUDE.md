@@ -76,6 +76,10 @@ Espaces prévus : `s/[slug]` boutique client (réécrite depuis `{slug}.miaamm.a
 - Panier : Zustand persisté dans `localStorage` (`miaamm:cart:{slug}`). La réhydratation est manuelle après le montage, puis `reconcileCart()` retire les produits disparus ou épuisés et réapplique les prix du jour. Logique pure dans `src/lib/cart/lines.ts`, réutilisée côté serveur en phase 3.
 - Filtres (`src/lib/menu/filters.ts`) : recherche sans accents ni ligatures (œ → oe) ; « végé » inclut les plats vegan ; exclusion d'allergènes. Upsell (`src/lib/menu/upsell.ts`) : produits `is_upsell`, catégories absentes du panier en priorité.
 - Lecture pure dans `src/lib/storefront/fetch.ts` (client Supabase injecté) ; `queries.ts` ajoute le cache Next. L'aperçu (`scripts/preview/`) réutilise les mêmes composants, avec des shims pour next/link, next/image et next-intl, et calcule les créneaux côté navigateur.
+- Barre de catégories : défilement calculé en JS (pas de saut d'ancre, intercepté dans une iframe) et suivi verrouillé pendant le défilement. Jamais de `scrollIntoView` pendant un défilement de page : Safari et Chrome l'interrompent.
+- Carte produit : toute la carte ouvre la fiche ; le « + » ajoute directement si aucun choix n'est obligatoire, sinon il ouvre la fiche. Pastille de quantité si le plat est déjà au panier.
+- Animations au scroll : `Reveal` (`src/components/ui/reveal.tsx`) et parallaxe de l'en-tête, rendus statiques si `prefers-reduced-motion`.
+- Police : une seule variable `--font-sans` (globals.css). Le choix final reste à faire (l'aperçu propose 6 candidates).
 - Composants : `src/components/shop/*`. Sur mobile, bottom-sheets en `.glass-thick` (88 % / 82 %) : le verre à 60 % n'est pas lisible sur du contenu dense. Pieds de sheet collants quasi opaques.
 
 ## Conventions de code
