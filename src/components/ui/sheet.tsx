@@ -122,7 +122,7 @@ export function SheetContent({
                 dragElastic={{ top: 0, bottom: 0.6 }}
                 onDragEnd={onDragEnd}
                 className={cn(
-                  'glass pointer-events-auto relative flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-bento-lg shadow-float sm:max-w-lg sm:rounded-bento-lg',
+                  'glass glass-thick pointer-events-auto relative flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-bento-lg shadow-float sm:max-w-lg sm:rounded-bento-lg',
                   className,
                 )}
               >

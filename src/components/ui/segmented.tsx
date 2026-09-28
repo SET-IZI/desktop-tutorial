@@ -1,0 +1,79 @@
+'use client';
+
+import { motion } from 'framer-motion';
+import { useId, useRef } from 'react';
+import { spring } from '@/lib/motion';
+import { cn } from '@/lib/utils';
+
+interface SegmentedProps<T extends string> {
+  label: string;
+  value: T;
+  options: { value: T; label: string; icon?: React.ReactNode }[];
+  onChange: (value: T) => void;
+  className?: string;
+}
+
+/** Contrôle segmenté (façon iOS) : groupe radio accessible, pastille animée. */
+export function Segmented<T extends string>({
+  label,
+  value,
+  options,
+  onChange,
+  className,
+}: SegmentedProps<T>) {
+  const id = useId();
+  const refs = useRef<(HTMLButtonElement | null)[]>([]);
+
+  // Flèches gauche/droite : sélection et focus sur l'option voisine (motif radio ARIA).
+  const onKeyDown = (e: React.KeyboardEvent, index: number) => {
+    if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+    e.preventDefault();
+    const nextIndex = (index + (e.key === 'ArrowRight' ? 1 : options.length - 1)) % options.length;
+    const next = options[nextIndex];
+    if (!next) return;
+    onChange(next.value);
+    refs.current[nextIndex]?.focus();
+  };
+
+  return (
+    <div
+      role="radiogroup"
+      aria-label={label}
+      className={cn('flex rounded-full bg-fg/[0.06] p-1', className)}
+    >
+      {options.map((o, index) => {
+        const active = o.value === value;
+        return (
+          <button
+            key={o.value}
+            ref={(el) => {
+              refs.current[index] = el;
+            }}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            tabIndex={active ? 0 : -1}
+            onKeyDown={(e) => onKeyDown(e, index)}
+            onClick={() => onChange(o.value)}
+            className={cn(
+              'relative flex min-h-touch flex-1 items-center justify-center gap-2 rounded-full px-4 text-[15px] font-semibold transition-colors',
+              active ? 'text-fg' : 'text-fg-muted hover:text-fg',
+            )}
+          >
+            {active ? (
+              <motion.span
+                layoutId={`segmented-${id}`}
+                transition={spring}
+                className="absolute inset-0 rounded-full bg-surface shadow-soft"
+              />
+            ) : null}
+            <span className="relative flex items-center gap-2">
+              {o.icon}
+              {o.label}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}

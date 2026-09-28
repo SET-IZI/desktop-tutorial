@@ -16,9 +16,11 @@
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test",
     "db:reset": "bash scripts/db/reset-local.sh",
     "db:types": "supabase gen types typescript --db-url \"${DATABASE_URL:-postgres://postgres:postgres@127.0.0.1:5432/miaamm_test}\" --schema public > src/types/database.ts && prettier --write src/types/database.ts",
-    "test:db": "vitest run --config vitest.db.config.mts"
+    "test:db": "vitest run --config vitest.db.config.mts",
+    "supabase:lite": "node scripts/dev/supabase-lite.mjs"
   },
   "dependencies": {
+    "@date-fns/tz": "^1.5.0",
     "@fontsource-variable/inter": "^5.3.0",
     "@fontsource-variable/nunito": "^5.3.0",
     "@radix-ui/react-dialog": "^1.1.23",
@@ -27,6 +29,7 @@
     "@supabase/supabase-js": "^2.117.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "date-fns": "^4.4.0",
     "framer-motion": "^13.4.4",
     "lucide-react": "^1.48.0",
     "next": "^14.2.35",
@@ -35,7 +38,8 @@
     "react-dom": "^18.3.1",
     "server-only": "^0.0.1",
     "tailwind-merge": "^3.7.0",
-    "zod": "^4.6.5"
+    "zod": "^4.6.5",
+    "zustand": "^5.0.15"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",

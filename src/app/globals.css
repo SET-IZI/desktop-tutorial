@@ -33,6 +33,7 @@
 
     --glass-bg: 255 255 255;
     --glass-bg-alpha: 0.6;
+    --glass-thick-alpha: 0.88;
     --glass-border-alpha: 0.4;
 
     color-scheme: light;
@@ -48,6 +49,7 @@
       --line: 255 255 255;
       --glass-bg: 28 28 30;
       --glass-bg-alpha: 0.55;
+      --glass-thick-alpha: 0.82;
       --glass-border-alpha: 0.12;
       color-scheme: dark;
     }
@@ -62,6 +64,7 @@
     --line: 255 255 255;
     --glass-bg: 28 28 30;
     --glass-bg-alpha: 0.55;
+    --glass-thick-alpha: 0.82;
     --glass-border-alpha: 0.12;
     color-scheme: dark;
   }
@@ -105,6 +108,10 @@
     z-index: -1;
     background: linear-gradient(180deg, rgb(255 255 255 / 0.35) 0%, rgb(255 255 255 / 0) 38%);
     mix-blend-mode: soft-light;
+  }
+  /* Matériau épais : bottom-sheets posées sur du contenu dense (lisibilité). */
+  .glass-thick {
+    background: rgb(var(--glass-bg) / var(--glass-thick-alpha));
   }
   @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
     .glass {

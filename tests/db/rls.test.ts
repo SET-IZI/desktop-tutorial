@@ -352,3 +352,28 @@ describe('Onboarding · create_restaurant', () => {
       );
     }));
 });
+
+describe('RLS · brouillons invisibles du public', () => {
+  it('les produits, catégories et options inactifs ne sont visibles que par l’équipe', () =>
+    withDb(async (db) => {
+      await db.asSuper();
+      await db.query(`update products set is_active = false where id = $1`, [IDS.productClassique]);
+      await db.query(
+        `update categories set is_active = false where id = 'a0000000-0000-4000-8000-000000000001'`,
+      );
+      await db.query(`update options set is_active = false where name = 'Bacon'`);
+
+      await db.as(anon);
+      expect(
+        await db.query(`select id from products where id = $1`, [IDS.productClassique]),
+      ).toEqual([]);
+      expect(await db.query(`select id from categories`)).toHaveLength(4);
+      expect(await db.query(`select id from options where name = 'Bacon'`)).toEqual([]);
+
+      await db.as(user(IDS.kitchen));
+      expect(
+        await db.query(`select id from products where id = $1`, [IDS.productClassique]),
+      ).toHaveLength(1);
+      expect(await db.query(`select id from categories`)).toHaveLength(5);
+    }));
+});

@@ -25,11 +25,21 @@ export default defineConfig({
     { name: 'desktop', use: { ...devices['Desktop Chrome'] } },
     { name: 'mobile', use: { ...devices['Pixel 7'] } },
   ],
-  webServer: {
-    // Binaire next direct : via pnpm, le serveur survit parfois au teardown de Playwright.
-    command: `node node_modules/next/dist/bin/next start --port ${PORT}`,
-    url: baseURL,
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
-  },
+  // Prérequis : `pnpm db:reset` (données de démo) et `pnpm build`.
+  webServer: [
+    {
+      // API Supabase locale (PostgREST) sur la base de démo.
+      command: 'node scripts/dev/supabase-lite.mjs',
+      url: 'http://127.0.0.1:54321/health',
+      reuseExistingServer: !process.env.CI,
+      timeout: 120_000,
+    },
+    {
+      // Binaire next direct : via pnpm, le serveur survit parfois au teardown de Playwright.
+      command: `node node_modules/next/dist/bin/next start --port ${PORT}`,
+      url: baseURL,
+      reuseExistingServer: !process.env.CI,
+      timeout: 120_000,
+    },
+  ],
 });

@@ -15,21 +15,24 @@ Objectifs : première commande prise en moins de 30 min côté restaurateur, com
 
 ## Commandes
 
-| Commande         | Rôle                                                                             |
-| ---------------- | -------------------------------------------------------------------------------- |
-| `pnpm dev`       | Serveur de dev (http://localhost:3000)                                           |
-| `pnpm build`     | Build de production (inclut lint + typecheck Next)                               |
-| `pnpm lint`      | ESLint (next/core-web-vitals + jsx-a11y), 0 warning toléré                       |
-| `pnpm typecheck` | `tsc --noEmit`                                                                   |
-| `pnpm test`      | Tests unitaires Vitest (`tests/unit`, `src/**/*.test.ts(x)`)                     |
-| `pnpm e2e`       | Playwright (desktop + mobile). **Lancer `pnpm build` avant** (sert `next start`) |
-| `pnpm format`    | Prettier (+ tri des classes Tailwind)                                            |
-| `pnpm check`     | format:check + lint + typecheck + test                                           |
-| `pnpm db:reset`  | Recrée la base Postgres locale : shim Supabase + migrations + seed               |
-| `pnpm test:db`   | Tests SQL (RLS, triggers, fonctions) sur `DATABASE_URL`, après `db:reset`        |
-| `pnpm db:types`  | Régénère `src/types/database.ts` (Supabase CLI `--db-url`) : à committer         |
+| Commande             | Rôle                                                                                  |
+| -------------------- | ------------------------------------------------------------------------------------- |
+| `pnpm dev`           | Serveur de dev (http://localhost:3000)                                                |
+| `pnpm build`         | Build de production (inclut lint + typecheck Next)                                    |
+| `pnpm lint`          | ESLint (next/core-web-vitals + jsx-a11y), 0 warning toléré                            |
+| `pnpm typecheck`     | `tsc --noEmit`                                                                        |
+| `pnpm test`          | Tests unitaires Vitest (`tests/unit`, `src/**/*.test.ts(x)`)                          |
+| `pnpm e2e`           | Playwright (desktop + mobile). **Lancer `pnpm build` avant** (sert `next start`)      |
+| `pnpm format`        | Prettier (+ tri des classes Tailwind)                                                 |
+| `pnpm check`         | format:check + lint + typecheck + test                                                |
+| `pnpm db:reset`      | Recrée la base Postgres locale : shim Supabase + migrations + seed                    |
+| `pnpm test:db`       | Tests SQL (RLS, triggers, fonctions) sur `DATABASE_URL`, après `db:reset`             |
+| `pnpm supabase:lite` | API Supabase locale sans Docker : PostgREST sur `:54321/rest/v1` (base de `db:reset`) |
+| `pnpm db:types`      | Régénère `src/types/database.ts` (Supabase CLI `--db-url`) : à committer              |
 
-Fin de phase : `pnpm check && pnpm db:reset && pnpm test:db && pnpm build && pnpm e2e` doivent être verts.
+Fin de phase : `pnpm check && pnpm db:reset && pnpm test:db && pnpm build && pnpm e2e` doivent être verts (`pnpm e2e` démarre lui-même supabase-lite et `next start`).
+
+Dev local complet : `pnpm db:reset`, `pnpm supabase:lite` dans un terminal, `pnpm dev` dans un autre, puis http://localhost:3000/s/chez-mimi (ou http://chez-mimi.localhost:3000).
 
 Nouvelle migration : `pnpm exec supabase migration new <nom>`, puis `pnpm db:reset && pnpm test:db && pnpm db:types`. La CI échoue si les types committés ne correspondent pas aux migrations.
 
@@ -64,6 +67,15 @@ Espaces prévus : `s/[slug]` boutique client (réécrite depuis `{slug}.miaamm.a
 - RPC : `create_restaurant(name, slug, location)`, `redeem_driver_invite(code)`, `slot_load(location, from, to)` (charge des créneaux, sans exposer les commandes), `purge_delivery_tracks()` (service_role, cron RGPD 24 h).
 - Realtime : `orders`, `deliveries`, `delivery_events` dans `supabase_realtime`. Les positions GPS passeront par Broadcast privé (phase 7).
 - Seed : comptes `mimi@` (owner), `cuisine@` (kitchen), `karim@` (livreur), `lea@` (cliente) `@miaamm.test`, mot de passe `miaamm-demo`. Invitation livreur `DEMO-NADIA`. Codes promo `BIENVENUE`, `LIVRAISONOFFERTE`.
+
+## Boutique client (phase 2)
+
+- Route `src/app/s/[slug]` (RSC). Le middleware réécrit `{slug}.<NEXT_PUBLIC_ROOT_DOMAIN>` vers `/s/{slug}` (`src/lib/tenant.ts`).
+- Données : `getStorefront(slug)` (`src/lib/storefront/queries.ts`) passe par un client Supabase **anonyme sans cookies**, avec `unstable_cache` 60 s et le tag `storefront:{slug}`. **Toute modification de carte ou de réglages doit appeler `revalidateTag(storefrontTag(slug))`** (phase 4). Le modèle front est dans `src/lib/storefront/types.ts`, découplé des lignes SQL.
+- Créneaux : `GET /api/storefront/[slug]/slots?service=pickup|delivery` (no-store) = `computeSlots()` (pur, `src/lib/slots/compute.ts`) + `slot_load` + `time_slots`.
+- Panier : Zustand persisté dans `localStorage` (`miaamm:cart:{slug}`). La réhydratation est manuelle après le montage, puis `reconcileCart()` retire les produits disparus ou épuisés et réapplique les prix du jour. Logique pure dans `src/lib/cart/lines.ts`, réutilisée côté serveur en phase 3.
+- Filtres (`src/lib/menu/filters.ts`) : recherche sans accents ni ligatures (œ → oe) ; « végé » inclut les plats vegan ; exclusion d'allergènes. Upsell (`src/lib/menu/upsell.ts`) : produits `is_upsell`, catégories absentes du panier en priorité.
+- Composants : `src/components/shop/*`. Sur mobile, bottom-sheets en `.glass-thick` (88 % / 82 %) : le verre à 60 % n'est pas lisible sur du contenu dense. Pieds de sheet collants quasi opaques.
 
 ## Conventions de code
 
@@ -108,34 +120,39 @@ Espaces prévus : `s/[slug]` boutique client (réécrite depuis `{slug}.miaamm.a
 
 ## Décisions prises
 
-| Date       | Décision                                                                                                                          |
-| ---------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-09-28 | Une seule app Next.js (route groups), pas de monorepo.                                                                            |
-| 2026-09-28 | Next.js 14 comme demandé (montée de version possible plus tard).                                                                  |
-| 2026-09-28 | Tailwind 3 (compatibilité shadcn/Next 14). Primitives UI écrites à la main façon shadcn.                                          |
-| 2026-09-28 | Polices auto-hébergées via `@fontsource-variable` (build sans réseau vers Google Fonts, RGPD).                                    |
-| 2026-09-28 | i18n sans préfixe d'URL : la langue vient du cookie `NEXT_LOCALE` puis d'`Accept-Language`, FR par défaut.                        |
-| 2026-09-28 | CTA en #0071E3 pour le contraste AA ; #0A84FF reste la couleur d'accent et des icônes.                                            |
-| 2026-09-28 | Variables d'env validées paresseusement par groupe (public/serveur) pour que chaque phase compile sans les clés des suivantes.    |
-| 2026-09-28 | Pricing : gratuit jusqu'à 100 commandes/mois, puis abonnement fixe, sans commission.                                              |
-| 2026-09-28 | SMS et numéros masqués derrière une interface `SmsProvider`/`ProxyPhoneProvider`, mock par défaut (pas de Twilio pour l'instant). |
-| 2026-09-28 | Import du menu par IA via l'API Claude (vision + sortie structurée), toujours relu avant import.                                  |
-| 2026-09-28 | Comptes client par magic link Supabase (pas de mot de passe).                                                                     |
-| 2026-09-28 | Stripe Connect Standard + direct charges, sans `application_fee_amount`.                                                          |
-| 2026-09-28 | `/dev/ui` reste accessible en prod (vitrine interne, `noindex`).                                                                  |
-| 2026-09-28 | Checkout invité = session **Supabase anonyme** : la RLS et Realtime fonctionnent pour les invités sans compte.                    |
-| 2026-09-28 | Pas de PostGIS : lat/lng en `double precision`, polygones en GeoJSON `jsonb`, calculs géographiques côté app.                     |
-| 2026-09-28 | Paliers de frais de livraison = plusieurs zones ordonnées par `position` (la première qui contient l'adresse s'applique).         |
-| 2026-09-28 | Capacité cuisine = N commandes max par créneau ; `time_slots` ne stocke que les surcharges ponctuelles (bloqué, capacité).        |
-| 2026-09-28 | Plages horaires sans passage à minuit (on coupe en deux) ; jours ISO 1 = lundi … 7 = dimanche.                                    |
-| 2026-09-28 | Options de commande figées en `jsonb` dans `order_items` (instantané, insensible aux modifs de carte).                            |
-| 2026-09-28 | Tests SQL en Vitest + `pg` (pas pgTAP) sur un Postgres nu + shim Supabase : tourne sans Docker, en local comme en CI.             |
+| Date       | Décision                                                                                                                               |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-09-28 | Une seule app Next.js (route groups), pas de monorepo.                                                                                 |
+| 2026-09-28 | Next.js 14 comme demandé (montée de version possible plus tard).                                                                       |
+| 2026-09-28 | Tailwind 3 (compatibilité shadcn/Next 14). Primitives UI écrites à la main façon shadcn.                                               |
+| 2026-09-28 | Polices auto-hébergées via `@fontsource-variable` (build sans réseau vers Google Fonts, RGPD).                                         |
+| 2026-09-28 | i18n sans préfixe d'URL : la langue vient du cookie `NEXT_LOCALE` puis d'`Accept-Language`, FR par défaut.                             |
+| 2026-09-28 | CTA en #0071E3 pour le contraste AA ; #0A84FF reste la couleur d'accent et des icônes.                                                 |
+| 2026-09-28 | Variables d'env validées paresseusement par groupe (public/serveur) pour que chaque phase compile sans les clés des suivantes.         |
+| 2026-09-28 | Pricing : gratuit jusqu'à 100 commandes/mois, puis abonnement fixe, sans commission.                                                   |
+| 2026-09-28 | SMS et numéros masqués derrière une interface `SmsProvider`/`ProxyPhoneProvider`, mock par défaut (pas de Twilio pour l'instant).      |
+| 2026-09-28 | Import du menu par IA via l'API Claude (vision + sortie structurée), toujours relu avant import.                                       |
+| 2026-09-28 | Comptes client par magic link Supabase (pas de mot de passe).                                                                          |
+| 2026-09-28 | Stripe Connect Standard + direct charges, sans `application_fee_amount`.                                                               |
+| 2026-09-28 | `/dev/ui` reste accessible en prod (vitrine interne, `noindex`).                                                                       |
+| 2026-09-28 | Checkout invité = session **Supabase anonyme** : la RLS et Realtime fonctionnent pour les invités sans compte.                         |
+| 2026-09-28 | Pas de PostGIS : lat/lng en `double precision`, polygones en GeoJSON `jsonb`, calculs géographiques côté app.                          |
+| 2026-09-28 | Paliers de frais de livraison = plusieurs zones ordonnées par `position` (la première qui contient l'adresse s'applique).              |
+| 2026-09-28 | Capacité cuisine = N commandes max par créneau ; `time_slots` ne stocke que les surcharges ponctuelles (bloqué, capacité).             |
+| 2026-09-28 | Plages horaires sans passage à minuit (on coupe en deux) ; jours ISO 1 = lundi … 7 = dimanche.                                         |
+| 2026-09-28 | Options de commande figées en `jsonb` dans `order_items` (instantané, insensible aux modifs de carte).                                 |
+| 2026-09-28 | Toujours un créneau : pas de « dès que possible » séparé ; le premier créneau libre est présélectionné (« Au plus tôt · 12:30 »).      |
+| 2026-09-28 | Livraison : délai de trajet par défaut de 30 min dans les créneaux, tant que l'adresse (donc la zone) n'est pas connue (phase 6).      |
+| 2026-09-28 | Boutique = établissement actif le plus ancien du restaurant ; le choix d'établissement viendra avec le multi-établissements (phase 4). |
+| 2026-09-28 | Choix unique obligatoire = radio ; choix unique facultatif = case décochable ; aucune option n'est cochée par défaut.                  |
+| 2026-09-28 | E2E sans Docker : `supabase-lite` (PostgREST v12 + mini proxy `/rest/v1`), clés de dev publiques de la Supabase CLI.                   |
+| 2026-09-28 | Tests SQL en Vitest + `pg` (pas pgTAP) sur un Postgres nu + shim Supabase : tourne sans Docker, en local comme en CI.                  |
 
 ## Avancement
 
 - [x] **Phase 0 · Setup** : Next 14 + TS strict, Tailwind + tokens clair/sombre, Liquid Glass, composants de base (Button, Card, Sheet, GlassBar, MeshGradient, Wordmark), i18n FR/EN, env Zod, chiffrement AES-GCM, clients Supabase, Vitest (18 tests), Playwright + axe (14 e2e : desktop et mobile, clair et sombre), CI GitHub Actions.
 - [x] **Phase 1 · Base de données** : 4 migrations (types, schéma, fonctions, RLS), seed « Chez Mimi » complet, 32 tests SQL (RLS, isolation, rôles, transitions, créneaux, livreur, purge RGPD), types générés et vérifiés en CI.
-- [ ] Phase 2 · Boutique client : menu, fiche produit, panier, créneaux
+- [x] **Phase 2 · Boutique client** : carte avec barre collante et suivi de section, recherche et filtres, fiche produit (options, suppléments, note, quantité), panier persistant et réconcilié, upsell, retrait/livraison, créneaux selon la charge réelle (complets et bloqués grisés), sous-domaines, 404 soignée. 48 tests unitaires, 33 tests SQL, 40 e2e (desktop et mobile, axe clair et sombre).
 - [ ] Phase 3 · Paiement : Stripe Connect, checkout invité, webhooks, confirmation
 - [ ] Phase 4 · Back-office : onboarding, éditeur de menu, horaires, réglages
 - [ ] Phase 5 · Temps réel : commandes, écran cuisine, suivi statuts, notifications

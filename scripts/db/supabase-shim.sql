@@ -18,6 +18,15 @@ begin
   end if;
 end $$;
 
+-- Rôle de connexion de PostgREST (bascule ensuite vers anon/authenticated/service_role).
+do $$
+begin
+  if not exists (select 1 from pg_roles where rolname = 'authenticator') then
+    create role authenticator login password 'postgres' noinherit;
+  end if;
+end $$;
+grant anon, authenticated, service_role to authenticator;
+
 create schema if not exists extensions;
 create schema if not exists auth;
 grant usage on schema extensions to anon, authenticated, service_role;
