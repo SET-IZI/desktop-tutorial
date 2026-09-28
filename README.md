@@ -1,5 +1,23 @@
-# Welcome to GitHub Desktop!
+# Miaamm
 
-This is your README. READMEs are where you can communicate what your project is and how to use it.
+Click & Collect et livraison pour restaurants indépendants. Zéro commission.
 
-Write your name on line 6, save it, and then head back to GitHub Desktop.
+> En construction. L'avancement par phase est suivi dans [CLAUDE.md](./CLAUDE.md).
+
+## Démarrer
+
+```bash
+corepack enable          # active la version de pnpm épinglée
+pnpm install
+cp .env.example .env.local
+pnpm dev                 # http://localhost:3000, design system sur /dev/ui
+```
+
+## Vérifier
+
+```bash
+pnpm check               # format, lint, typecheck, tests unitaires
+pnpm build && pnpm e2e   # build de prod puis Playwright (desktop + mobile, axe WCAG AA)
+```
+
+Le guide de déploiement (Vercel + Supabase + Stripe) arrive en phase 11.

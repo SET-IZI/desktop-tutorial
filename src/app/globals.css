@@ -1,0 +1,124 @@
+@import '@fontsource-variable/inter/opsz.css';
+@import '@fontsource-variable/nunito/wght.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Design tokens Miaamm ────────────────────────────────────────────────
+   Canaux RGB (usage : rgb(var(--x) / alpha)). Palette système Apple.
+   --cta : fond des CTA principaux. #0071E3 plutôt que #0A84FF pour tenir
+   le contraste WCAG AA (4.5:1) avec du texte blanc à 17 px.
+   --accent : surchargé par restaurant (style inline sur le conteneur boutique). */
+@layer base {
+  :root {
+    --bg: 245 245 247;
+    --surface: 255 255 255;
+    --surface-2: 242 242 247;
+    --fg: 29 29 31;
+    --fg-muted: 99 99 102; /* ≥ 4.5:1 sur --bg */
+    --line: 0 0 0;
+
+    --blue: 10 132 255;
+    --violet: 191 90 242;
+    --pink: 255 55 95;
+    --orange: 255 159 10;
+    --green: 48 209 88;
+    --red: 255 69 58;
+
+    --accent: 10 132 255;
+    --accent-fg: 255 255 255;
+    --cta: 0 113 227;
+    --cta-fg: 255 255 255;
+
+    --glass-bg: 255 255 255;
+    --glass-bg-alpha: 0.6;
+    --glass-border-alpha: 0.4;
+
+    color-scheme: light;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) {
+      --bg: 0 0 0;
+      --surface: 28 28 30;
+      --surface-2: 44 44 46;
+      --fg: 245 245 247;
+      --fg-muted: 161 161 166;
+      --line: 255 255 255;
+      --glass-bg: 28 28 30;
+      --glass-bg-alpha: 0.55;
+      --glass-border-alpha: 0.12;
+      color-scheme: dark;
+    }
+  }
+
+  :root[data-theme='dark'] {
+    --bg: 0 0 0;
+    --surface: 28 28 30;
+    --surface-2: 44 44 46;
+    --fg: 245 245 247;
+    --fg-muted: 161 161 166;
+    --line: 255 255 255;
+    --glass-bg: 28 28 30;
+    --glass-bg-alpha: 0.55;
+    --glass-border-alpha: 0.12;
+    color-scheme: dark;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    font-optical-sizing: auto; /* active la coupe Display d'Inter sur les grands titres */
+  }
+
+  body {
+    @apply bg-bg font-sans text-body text-fg antialiased;
+  }
+
+  /* Icônes Lucide : trait 1.75 partout */
+  .lucide {
+    stroke-width: 1.75;
+  }
+
+  :focus-visible {
+    outline: 3px solid rgb(var(--blue) / 0.6);
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  /* Liquid Glass : blur 24px + saturate 180 %, fond 60 %, bordure 40 %, reflet en haut */
+  .glass {
+    position: relative;
+    isolation: isolate;
+    background: rgb(var(--glass-bg) / var(--glass-bg-alpha));
+    border: 1px solid rgb(255 255 255 / var(--glass-border-alpha));
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    backdrop-filter: blur(24px) saturate(180%);
+  }
+  .glass::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    z-index: -1;
+    background: linear-gradient(180deg, rgb(255 255 255 / 0.35) 0%, rgb(255 255 255 / 0) 38%);
+    mix-blend-mode: soft-light;
+  }
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .glass {
+      background: rgb(var(--surface) / 0.96);
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
