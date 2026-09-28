@@ -25,8 +25,13 @@ Objectifs : première commande prise en moins de 30 min côté restaurateur, com
 | `pnpm e2e`       | Playwright (desktop + mobile). **Lancer `pnpm build` avant** (sert `next start`) |
 | `pnpm format`    | Prettier (+ tri des classes Tailwind)                                            |
 | `pnpm check`     | format:check + lint + typecheck + test                                           |
+| `pnpm db:reset`  | Recrée la base Postgres locale : shim Supabase + migrations + seed               |
+| `pnpm test:db`   | Tests SQL (RLS, triggers, fonctions) sur `DATABASE_URL`, après `db:reset`        |
+| `pnpm db:types`  | Régénère `src/types/database.ts` (Supabase CLI `--db-url`) : à committer         |
 
-Fin de phase : `pnpm check && pnpm build && pnpm e2e` doivent être verts.
+Fin de phase : `pnpm check && pnpm db:reset && pnpm test:db && pnpm build && pnpm e2e` doivent être verts.
+
+Nouvelle migration : `pnpm exec supabase migration new <nom>`, puis `pnpm db:reset && pnpm test:db && pnpm db:types`. La CI échoue si les types committés ne correspondent pas aux migrations.
 
 ## Arborescence
 
@@ -36,11 +41,29 @@ src/components/ui/  primitives : Button, Card, Sheet, GlassBar, MeshGradient, Wo
 src/lib/            logique pure et clients (env, crypto, color, motion, supabase/…)
 src/i18n/           config next-intl (locale par cookie NEXT_LOCALE puis Accept-Language)
 messages/           fr.json, en.json (mêmes clés, vérifié par un test)
-supabase/           migrations, seed, tests RLS (phase 1)
-tests/unit/         Vitest  ·  e2e/  Playwright
+src/types/          database.ts généré (ne pas éditer à la main)
+supabase/           config.toml, migrations/ (SQL versionné), seed.sql (démo « Chez Mimi »)
+scripts/db/         supabase-shim.sql (Postgres nu → API Supabase minimale), reset-local.sh
+tests/unit/         Vitest  ·  tests/db/  Vitest + pg (RLS)  ·  e2e/  Playwright
 ```
 
 Espaces prévus : `s/[slug]` boutique client (réécrite depuis `{slug}.miaamm.app` par le middleware), `(dashboard)/app` back-office, `kitchen/[locationId]` écran cuisine, `driver` app livreur, `t/[token]` lien de suivi public, `embed/[slug]` widget. `/dev/ui` : vitrine du design system (noindex).
+
+## Modèle de données (phase 1)
+
+- Tables : `restaurants`, `users_roles`, `menus`, `locations`, `opening_hours`, `location_closures`, `time_slots`, `categories`, `products`, `option_groups`, `options`, `customers`, `loyalty_accounts`, `promo_codes`, `campaigns`, `favorites`, `delivery_zones`, `drivers`, `orders`, `order_items`, `deliveries`, `delivery_events`, `delivery_tracks`, `delivery_provider_logs`, `provider_credentials`, `jobs`.
+- Chaque table porte `restaurant_id`. Les liens parent/enfant passent par des **FK composites `(id, restaurant_id)`** : un objet ne peut pas être rattaché à un autre restaurant.
+- **RLS partout** (vérifié par un test). Helpers `SECURITY DEFINER` : `is_staff`, `is_manager`, `is_owner`, `is_public_restaurant`, `owns_order`, `is_assigned_driver`.
+  - Public (anon et clients) : catalogue des restaurants publiés uniquement.
+  - `owner` : tout, y compris l'équipe. `manager` : catalogue, réglages, clients, promos, campagnes, livreurs, logs. `kitchen` : lecture, plus le statut des commandes.
+  - Client : ses commandes (`orders.customer_user_id = auth.uid()`), y compris en session anonyme (checkout invité).
+  - Livreur : ses courses, et l'écriture de ses positions tant que la course est active.
+- **Privilèges par colonne** : l'équipe ne modifie que `status`, `extra_minutes`, `estimated_ready_at` et `cancel_reason` d'une commande (jamais les montants). `restaurants.stripe_account_id`/`order_seq` et `promo_codes.uses_count`, `drivers.user_id` et `customers.user_id` sont réservés au serveur. `provider_credentials.encrypted_secret` n'est lisible par personne hors `service_role`.
+- Écritures réservées au serveur (`service_role`) : création de commande, paiement, `customers`, fidélité, `deliveries`, `delivery_events`, logs, secrets, `jobs`.
+- Triggers : numéro de commande séquentiel par restaurant ; machine à états des commandes (`order_transition_allowed`) avec horodatage automatique ; sortie de `pending_payment` réservée au serveur ; lien de suivi expiré à la fin ; au moins un owner par restaurant.
+- RPC : `create_restaurant(name, slug, location)`, `redeem_driver_invite(code)`, `slot_load(location, from, to)` (charge des créneaux, sans exposer les commandes), `purge_delivery_tracks()` (service_role, cron RGPD 24 h).
+- Realtime : `orders`, `deliveries`, `delivery_events` dans `supabase_realtime`. Les positions GPS passeront par Broadcast privé (phase 7).
+- Seed : comptes `mimi@` (owner), `cuisine@` (kitchen), `karim@` (livreur), `lea@` (cliente) `@miaamm.test`, mot de passe `miaamm-demo`. Invitation livreur `DEMO-NADIA`. Codes promo `BIENVENUE`, `LIVRAISONOFFERTE`.
 
 ## Conventions de code
 
@@ -100,11 +123,18 @@ Espaces prévus : `s/[slug]` boutique client (réécrite depuis `{slug}.miaamm.a
 | 2026-09-28 | Comptes client par magic link Supabase (pas de mot de passe).                                                                     |
 | 2026-09-28 | Stripe Connect Standard + direct charges, sans `application_fee_amount`.                                                          |
 | 2026-09-28 | `/dev/ui` reste accessible en prod (vitrine interne, `noindex`).                                                                  |
+| 2026-09-28 | Checkout invité = session **Supabase anonyme** : la RLS et Realtime fonctionnent pour les invités sans compte.                    |
+| 2026-09-28 | Pas de PostGIS : lat/lng en `double precision`, polygones en GeoJSON `jsonb`, calculs géographiques côté app.                     |
+| 2026-09-28 | Paliers de frais de livraison = plusieurs zones ordonnées par `position` (la première qui contient l'adresse s'applique).         |
+| 2026-09-28 | Capacité cuisine = N commandes max par créneau ; `time_slots` ne stocke que les surcharges ponctuelles (bloqué, capacité).        |
+| 2026-09-28 | Plages horaires sans passage à minuit (on coupe en deux) ; jours ISO 1 = lundi … 7 = dimanche.                                    |
+| 2026-09-28 | Options de commande figées en `jsonb` dans `order_items` (instantané, insensible aux modifs de carte).                            |
+| 2026-09-28 | Tests SQL en Vitest + `pg` (pas pgTAP) sur un Postgres nu + shim Supabase : tourne sans Docker, en local comme en CI.             |
 
 ## Avancement
 
 - [x] **Phase 0 · Setup** : Next 14 + TS strict, Tailwind + tokens clair/sombre, Liquid Glass, composants de base (Button, Card, Sheet, GlassBar, MeshGradient, Wordmark), i18n FR/EN, env Zod, chiffrement AES-GCM, clients Supabase, Vitest (18 tests), Playwright + axe (14 e2e : desktop et mobile, clair et sombre), CI GitHub Actions.
-- [ ] Phase 1 · Base de données : migrations, RLS, seed, types générés
+- [x] **Phase 1 · Base de données** : 4 migrations (types, schéma, fonctions, RLS), seed « Chez Mimi » complet, 32 tests SQL (RLS, isolation, rôles, transitions, créneaux, livreur, purge RGPD), types générés et vérifiés en CI.
 - [ ] Phase 2 · Boutique client : menu, fiche produit, panier, créneaux
 - [ ] Phase 3 · Paiement : Stripe Connect, checkout invité, webhooks, confirmation
 - [ ] Phase 4 · Back-office : onboarding, éditeur de menu, horaires, réglages
@@ -118,5 +148,7 @@ Espaces prévus : `s/[slug]` boutique client (réécrite depuis `{slug}.miaamm.a
 
 ## Notes d'environnement
 
+- Pas de démon Docker dans l'environnement cloud : `supabase start` / `supabase db reset` ne tournent pas. Utiliser `pnpm db:reset` sur le Postgres 16 local (`service postgresql start`, mot de passe `postgres`). La Supabase CLI sert pour `migration new` et `gen types --db-url`.
+- Ne jamais appliquer `scripts/db/supabase-shim.sql` sur un vrai projet Supabase.
 - Dans l'environnement cloud Claude Code, Chromium est préinstallé dans `/opt/pw-browsers` ; `playwright.config.ts` l'utilise automatiquement hors CI. Ne pas lancer `playwright install` en local.
 - Si un `next start` d'un build précédent tourne encore sur le port e2e, Playwright le réutilise et l'hydratation échoue (chunks introuvables). Arrêter les anciens serveurs avant `pnpm e2e`.
