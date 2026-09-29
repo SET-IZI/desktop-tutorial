@@ -4,28 +4,11 @@ import { ImagePlus, Loader2, Trash2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useId, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { compressImage } from '@/lib/image/compress';
 import { createClient } from '@/lib/supabase/browser';
 
 const MAX_SIDE = 1600;
 const MAX_BYTES = 5 * 1024 * 1024;
-
-/** Redimensionne dans le navigateur (1600 px max) et convertit en WebP (JPEG en repli). */
-async function compress(file: File): Promise<Blob> {
-  const bitmap = await createImageBitmap(file);
-  const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height));
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.round(bitmap.width * scale);
-  canvas.height = Math.round(bitmap.height * scale);
-  canvas.getContext('2d')!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  bitmap.close();
-  const toBlob = (type: string) =>
-    new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, type, 0.85));
-  const webp = await toBlob('image/webp');
-  if (webp && webp.type === 'image/webp') return webp;
-  const jpeg = await toBlob('image/jpeg');
-  if (!jpeg) throw new Error('encode');
-  return jpeg;
-}
 
 interface ImageUploadProps {
   restaurantId: string;
@@ -46,7 +29,7 @@ export function ImageUpload({ restaurantId, value, onChange, alt }: ImageUploadP
     setError(false);
     setUploading(true);
     try {
-      const blob = await compress(file);
+      const blob = await compressImage(file, MAX_SIDE);
       if (blob.size > MAX_BYTES) throw new Error('too_large');
       const ext = blob.type === 'image/webp' ? 'webp' : 'jpg';
       const path = `${restaurantId}/${crypto.randomUUID()}.${ext}`;

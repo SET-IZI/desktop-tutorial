@@ -451,5 +451,124 @@
       "dropped": "{name} déposé à la position {position} sur {total}.",
       "cancelled": "Déplacement annulé."
     }
+  },
+  "onboarding": {
+    "title": "Configuration de votre boutique",
+    "subtitle": "Cinq étapes, une vingtaine de minutes. Vous pourrez tout modifier ensuite.",
+    "stepOf": "Étape {current} sur {total}",
+    "stepsLabel": "Étapes de la configuration",
+    "steps": {
+      "1": "Restaurant",
+      "2": "Horaires",
+      "3": "Carte",
+      "4": "Paiements",
+      "5": "Mise en ligne"
+    },
+    "done": "terminée",
+    "continue": "Continuer",
+    "later": "Plus tard",
+    "profile": {
+      "title": "Votre restaurant",
+      "hint": "Ces informations apparaissent sur votre boutique et servent à calculer les distances de livraison.",
+      "name": "Nom du restaurant",
+      "namePlaceholder": "Chez Mimi",
+      "slug": "Adresse de la boutique",
+      "slugHint": "Lettres minuscules, chiffres et tirets.",
+      "address": "Adresse",
+      "addressPlaceholder": "12 rue des Martyrs",
+      "postalCode": "Code postal",
+      "city": "Ville",
+      "phone": "Téléphone (facultatif)",
+      "submit": "Créer mon restaurant",
+      "errors": {
+        "name": "Indiquez le nom du restaurant.",
+        "slug": "Choisissez une adresse de 3 à 40 caractères : lettres minuscules, chiffres et tirets.",
+        "slug_taken": "Cette adresse est déjà prise. Essayez une variante.",
+        "address": "Indiquez le numéro et la rue.",
+        "postalCode": "Le code postal doit contenir 5 chiffres.",
+        "city": "Indiquez la ville.",
+        "phone": "Ce numéro de téléphone n'est pas valide.",
+        "geocode_not_found": "Adresse introuvable. Vérifiez le numéro, la rue et le code postal.",
+        "geocode_unavailable": "Vérification de l'adresse impossible pour le moment. Réessayez dans un instant.",
+        "server_error": "Création impossible pour le moment. Réessayez dans un instant."
+      }
+    },
+    "hours": {
+      "title": "Vos horaires de retrait",
+      "hint": "Vos clients choisiront un créneau pendant ces horaires. Utilisez « Appliquer à tous les jours » pour aller plus vite.",
+      "submit": "Enregistrer et continuer"
+    },
+    "menu": {
+      "title": "Votre carte",
+      "hint": "Importez votre carte existante, puis ajustez photos, options et allergènes dans l'éditeur.",
+      "existing": "{count, plural, one {# plat déjà sur votre carte.} other {# plats déjà sur votre carte.}}",
+      "photo": "Photo ou PDF de votre carte",
+      "photoHint": "Lue automatiquement, vous relisez avant d'importer.",
+      "photoButton": "Choisir un fichier",
+      "analyzing": "Lecture de votre carte…",
+      "csv": "Fichier CSV",
+      "csvHint": "Colonnes : catégorie, nom, description, prix.",
+      "csvButton": "Choisir un fichier CSV",
+      "csvTemplate": "Télécharger le modèle",
+      "skip": "Je crée ma carte plus tard",
+      "review": "Vérifiez avant d'importer",
+      "reviewHint": "Retirez ce qui ne doit pas figurer sur la carte. Vous pourrez tout modifier ensuite.",
+      "remove": "Retirer {name}",
+      "import": "{count, plural, one {Importer # plat} other {Importer # plats}}",
+      "restart": "Choisir un autre fichier",
+      "imported": "{count, plural, one {# plat importé} other {# plats importés}}",
+      "errors": {
+        "empty": "Le fichier est vide.",
+        "columns": "Colonnes introuvables. Utilisez le modèle : catégorie, nom, description, prix.",
+        "price": "Prix illisible à la ligne {line}.",
+        "name": "Nom de plat manquant ou trop long à la ligne {line}.",
+        "too_many": "500 lignes maximum par import.",
+        "file_type": "Utilisez une photo (JPEG, PNG, WebP) ou un PDF.",
+        "file_size": "Le fichier dépasse 5 Mo.",
+        "ai_off": "La lecture automatique n'est pas disponible. Utilisez le fichier CSV.",
+        "ai_unreadable": "Aucun plat lisible dans ce document. Essayez une photo plus nette ou le fichier CSV.",
+        "ai_failed": "La lecture a échoué. Réessayez dans un instant.",
+        "server_error": "Import impossible pour le moment. Réessayez dans un instant."
+      }
+    },
+    "payments": {
+      "title": "Paiement en ligne",
+      "hint": "Vos clients paient par carte, Apple Pay ou Google Pay. L'argent arrive directement sur votre compte Stripe, sans commission Miaamm.",
+      "connect": "Connecter Stripe",
+      "connectHint": "Création du compte ou connexion à un compte existant, sur le site de Stripe (environ 5 minutes).",
+      "ownerOnly": "Seul le propriétaire du restaurant peut connecter Stripe.",
+      "connected": "Stripe est connecté.",
+      "pending": "Dossier envoyé. Stripe vérifie votre compte : les paiements par carte s'activeront automatiquement.",
+      "incomplete": "Le dossier Stripe n'est pas terminé. Reprenez là où vous en étiez.",
+      "resume": "Reprendre sur Stripe",
+      "onSite": "Paiement sur place uniquement pour l'instant",
+      "onSiteHint": "Vos clients paient au retrait. Vous pourrez connecter Stripe plus tard dans les réglages.",
+      "errors": {
+        "forbidden": "Seul le propriétaire du restaurant peut connecter Stripe.",
+        "server_error": "Connexion à Stripe impossible pour le moment. Réessayez dans un instant."
+      }
+    },
+    "publish": {
+      "title": "Votre boutique est prête",
+      "hint": "Partagez ce lien sur vos réseaux, votre site et Google. Imprimez le QR code pour votre vitrine et vos tables.",
+      "link": "Lien de votre boutique",
+      "copy": "Copier le lien",
+      "copied": "Lien copié",
+      "qr": "QR code de votre boutique",
+      "download": "Télécharger le QR code",
+      "preview": "Voir la boutique",
+      "submit": "Mettre ma boutique en ligne",
+      "checklist": "Récapitulatif",
+      "items": {
+        "hours": "Horaires de retrait",
+        "menu": "{count, plural, =0 {Carte vide : ajoutez vos plats avant d'ouvrir} one {# plat sur la carte} other {# plats sur la carte}}",
+        "card": "Paiement par carte",
+        "onSite": "Paiement sur place"
+      },
+      "errors": {
+        "server_error": "Publication impossible pour le moment. Réessayez dans un instant."
+      }
+    },
+    "welcome": "Votre boutique est en ligne. Les commandes arrivent ici."
   }
 }

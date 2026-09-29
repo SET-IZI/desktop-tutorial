@@ -3,6 +3,11 @@
 const SLUG = /^[a-z0-9](?:[a-z0-9-]{1,38}[a-z0-9])$/;
 const RESERVED = new Set(['www', 'app', 'api', 'admin', 'kitchen', 'driver', 'embed', 'static']);
 
+/** Identifiant de boutique utilisable comme sous-domaine (même règle que la base). */
+export function isValidSlug(slug: string): boolean {
+  return SLUG.test(slug) && !RESERVED.has(slug);
+}
+
 export function resolveTenantSlug(
   host: string | null,
   rootDomain: string | undefined,

@@ -121,3 +121,41 @@ export function getPaymentsEnv(): PaymentsEnv {
     publishableKey: parsed.data.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,
   };
 }
+
+// ═══ Géocodage ═══════════════════════════════════════════════════════════════
+
+/**
+ * `geoplateforme` : Géoplateforme IGN (successeur de l'API Adresse, France, sans clé) ;
+ * `mock` : coordonnées fixes pour le dev et les E2E (interdit en production Vercel).
+ */
+export function getGeocoderMode(): 'geoplateforme' | 'mock' {
+  assertServer('getGeocoderMode');
+  if (process.env.MIAAMM_GEOCODER === 'mock') {
+    if (process.env.VERCEL_ENV === 'production') {
+      throw new Error('Géocodage simulé interdit en production.');
+    }
+    return 'mock';
+  }
+  return 'geoplateforme';
+}
+
+// ═══ Import de carte par IA ══════════════════════════════════════════════════
+
+export type AiImportEnv =
+  { mode: 'anthropic'; apiKey: string } | { mode: 'mock' } | { mode: 'off' };
+
+/**
+ * Import de carte depuis une photo (API Claude). Désactivé sans ANTHROPIC_API_KEY ;
+ * `MIAAMM_AI_IMPORT=mock` renvoie une carte d'exemple (dev, E2E), jamais en production.
+ */
+export function getAiImportEnv(): AiImportEnv {
+  assertServer('getAiImportEnv');
+  if (process.env.MIAAMM_AI_IMPORT === 'mock') {
+    if (process.env.VERCEL_ENV === 'production') {
+      throw new Error('Import IA simulé interdit en production.');
+    }
+    return { mode: 'mock' };
+  }
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  return apiKey ? { mode: 'anthropic', apiKey } : { mode: 'off' };
+}

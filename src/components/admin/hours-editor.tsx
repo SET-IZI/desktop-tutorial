@@ -17,13 +17,25 @@ interface HoursEditorProps {
   closures: { id: string; startsOn: string; endsOn: string; reason: string | null }[];
   canManage: boolean;
   deliveryEnabled: boolean;
+  /** Onboarding : action après un enregistrement réussi, libellé du bouton, sans fermetures. */
+  onSaved?: () => Promise<void>;
+  saveLabel?: string;
+  showClosures?: boolean;
 }
 
 const DEFAULT_RANGE = { opensAt: '11:30', closesAt: '14:30' };
 const input =
   'h-11 rounded-xl bg-fg/[0.06] px-3 text-body tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-blue/50 disabled:opacity-60';
 
-export function HoursEditor({ schedules, closures, canManage, deliveryEnabled }: HoursEditorProps) {
+export function HoursEditor({
+  schedules,
+  closures,
+  canManage,
+  deliveryEnabled,
+  onSaved,
+  saveLabel,
+  showClosures = true,
+}: HoursEditorProps) {
   const t = useTranslations('admin.hours');
   const ta = useTranslations('admin');
   const locale = useLocale();
@@ -44,8 +56,10 @@ export function HoursEditor({ schedules, closures, canManage, deliveryEnabled }:
   const save = () =>
     start(async () => {
       const result = await saveHours({ service, schedule });
-      if (result.ok) toast(ta('saved'));
-      else toast(result.error === 'forbidden' ? ta('forbidden') : ta('saveError'), 'error');
+      if (result.ok) {
+        if (onSaved) await onSaved();
+        else toast(ta('saved'));
+      } else toast(result.error === 'forbidden' ? ta('forbidden') : ta('saveError'), 'error');
     });
 
   const errorMessage = (weekday: number) => {
@@ -196,11 +210,11 @@ export function HoursEditor({ schedules, closures, canManage, deliveryEnabled }:
       </Card>
       {canManage ? (
         <Button onClick={save} loading={pending} disabled={errors.length > 0}>
-          {ta('save')}
+          {saveLabel ?? ta('save')}
         </Button>
       ) : null}
 
-      <Closures closures={closures} canManage={canManage} locale={locale} />
+      {showClosures ? <Closures closures={closures} canManage={canManage} locale={locale} /> : null}
     </div>
   );
 }

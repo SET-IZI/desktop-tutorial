@@ -10,6 +10,10 @@ const supabaseHost = process.env.NEXT_PUBLIC_SUPABASE_URL
 
 const nextConfig = {
   reactStrictMode: true,
+  experimental: {
+    // Import de carte par photo/PDF (5 Mo max, vérifié par l'action).
+    serverActions: { bodySizeLimit: '6mb' },
+  },
   images: {
     remotePatterns: supabaseHost
       ? [

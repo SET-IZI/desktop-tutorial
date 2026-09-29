@@ -109,6 +109,13 @@ Espaces prévus : `s/[slug]` boutique client (réécrite depuis `{slug}.miaamm.a
 - Écritures de carte : `save_product(jsonb)` (plat + groupes d'options + options en une transaction, IDs conservés), `reorder_categories` / `reorder_products` ; toutes en SECURITY INVOKER (RLS appliquée). Rupture et visibilité en un geste depuis la liste.
 - Photos : compressées côté navigateur (1600 px, WebP, repli JPEG), envoyées dans le bucket Storage `menu` sous `<restaurant_id>/…` (policy : manager du restaurant, 5 Mo, JPEG/PNG/WebP). Le serveur n'accepte que des URL publiques de ce dossier.
 - Storage local : `scripts/dev/storage-lite.mjs` (envoi brut ou multipart comme storage-js, lecture publique, suppression), même règle d'accès que la policy (`is_manager` évalué avec l'identité de l'utilisateur). Fichiers dans `.tools/storage/` (ignoré par Git), jamais en production.
+- Onboarding (`/app/onboarding`, `src/components/onboarding/*`, actions dans `src/app/app/onboarding/actions.ts`) : `restaurants.onboarding_step` = nombre d'étapes terminées (1 restaurant · 2 horaires · 3 carte · 4 paiements · 5 mise en ligne). On peut revenir sur une étape franchie (`?step=n`), jamais sauter en avant ; la création du restaurant n'est pas rejouable (modifications dans Réglages).
+  - Restaurant : slug proposé depuis le nom (`slugify`, même règle que la base et les sous-domaines réservés), adresse géocodée côté serveur (`src/lib/geo/geocode.ts`) puis `create_restaurant()`. Slug déjà pris → erreur sur le champ.
+  - Géocodage : service de la Géoplateforme IGN `https://data.geopf.fr/geocodage/search?q=…&limit=1` (successeur de l'API Adresse, réponse GeoJSON, score ≥ 0,5). **Non testé contre l'API réelle** (sortie réseau bloquée dans l'environnement de dev) : à vérifier au premier déploiement. `MIAAMM_GEOCODER=mock` en dev/E2E.
+  - Horaires : `HoursEditor` réutilisé (props `onSaved`, `saveLabel`, `showClosures`), retrait uniquement.
+  - Carte : import CSV (parseur pur `src/lib/menu-import/csv.ts`, « ; » ou « , », en-têtes FR/EN) ou photo/PDF lu par l'API Claude (`src/lib/menu-import/ai.ts` : `claude-opus-5-5`, sortie structurée Zod, repli serveur `fallbacks: 'default'` en cas de refus). Toujours relu avant `import_menu()` (SECURITY INVOKER, ajoute à la suite). Option photo masquée sans `ANTHROPIC_API_KEY` ; `MIAAMM_AI_IMPORT=mock` renvoie une carte d'exemple.
+  - Paiements : Stripe Connect avec `controller` (tableau de bord complet, frais et litiges au restaurateur = équivalent Standard), `accountLinks` `account_onboarding`, retour sur `/app/onboarding/stripe` (statut relu, `?refresh=1` régénère le lien). Colonnes Stripe écrites uniquement par le serveur (service role). Réservé au propriétaire. Alternative : paiement sur place uniquement.
+  - Mise en ligne : lien public (`shopPublicUrl`), QR code SVG généré côté serveur (`qrcode`), récapitulatif, publication → `/app?welcome=1`.
 
 ## Conventions de code
 
@@ -155,6 +162,9 @@ Espaces prévus : `s/[slug]` boutique client (réécrite depuis `{slug}.miaamm.a
 
 | Date       | Décision                                                                                                                               |
 | ---------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-09-29 | Géocodage par la Géoplateforme IGN (gratuit, sans clé, France) plutôt que Mapbox pour l'onboarding ; Mapbox reste pour les cartes.     |
+| 2026-09-29 | Import de carte : pas d'emoji ni de photo déduits automatiquement ; le restaurateur complète dans l'éditeur.                           |
+| 2026-09-29 | Onboarding sans Stripe possible (paiement sur place) pour ouvrir en moins de 30 min ; Stripe se connecte plus tard.                    |
 | 2026-09-28 | Une seule app Next.js (route groups), pas de monorepo.                                                                                 |
 | 2026-09-28 | Next.js 14 comme demandé (montée de version possible plus tard).                                                                       |
 | 2026-09-28 | Tailwind 3 (compatibilité shadcn/Next 14). Primitives UI écrites à la main façon shadcn.                                               |
@@ -191,7 +201,7 @@ Espaces prévus : `s/[slug]` boutique client (réécrite depuis `{slug}.miaamm.a
 - [x] **Phase 1 · Base de données** : 4 migrations (types, schéma, fonctions, RLS), seed « Chez Mimi » complet, 32 tests SQL (RLS, isolation, rôles, transitions, créneaux, livreur, purge RGPD), types générés et vérifiés en CI.
 - [x] **Phase 2 · Boutique client** : carte avec barre collante et suivi de section, recherche et filtres, fiche produit (options, suppléments, note, quantité), panier persistant et réconcilié, upsell, retrait/livraison, créneaux selon la charge réelle (complets et bloqués grisés), sous-domaines, 404 soignée. 48 tests unitaires, 33 tests SQL, 40 e2e (desktop et mobile, axe clair et sombre).
 - [x] **Phase 3 · Paiement** : checkout invité en 2 étapes max, prix recalculés côté serveur, création atomique sans surréservation, Stripe Connect direct charges sans commission (Payment Element : carte, Apple Pay, Google Pay), paiement sur place, webhook signé et idempotent, page de confirmation avec suivi du statut, mode simulé pour dev et E2E.
-- [ ] Phase 4 · Back-office : 4a auth, shell, réglages, horaires ✔ · 4b éditeur de carte ✔ · 4c onboarding · 4d équipe et multi-établissements
+- [ ] Phase 4 · Back-office : 4a auth, shell, réglages, horaires ✔ · 4b éditeur de carte ✔ · 4c onboarding ✔ · 4d équipe et multi-établissements
 - [ ] Phase 5 · Temps réel : commandes, écran cuisine, suivi statuts, notifications
 - [ ] Phase 6 · Livraison : zones, frais, adresse, DeliveryProvider, InternalProvider
 - [ ] Phase 7 · Suivi live : app livreur PWA, Realtime, carte client, ETA

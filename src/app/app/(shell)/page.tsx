@@ -1,4 +1,11 @@
-import { ArrowRight, ExternalLink, Receipt, ShoppingBag, TrendingUp } from 'lucide-react';
+import {
+  ArrowRight,
+  CheckCircle2,
+  ExternalLink,
+  Receipt,
+  ShoppingBag,
+  TrendingUp,
+} from 'lucide-react';
 import Link from 'next/link';
 import { getLocale, getTranslations } from 'next-intl/server';
 import { Button } from '@/components/ui/button';
@@ -21,10 +28,15 @@ const STATUS_TONE: Record<string, string> = {
   in_delivery: 'bg-violet/15',
 };
 
-export default async function OverviewPage() {
+export default async function OverviewPage({
+  searchParams,
+}: {
+  searchParams: { welcome?: string };
+}) {
   const { current } = await requireRestaurant();
   const location = await getCurrentLocation(current.restaurantId);
   const t = await getTranslations('admin');
+  const to = await getTranslations('onboarding');
   const locale = await getLocale();
   const intl = locale === 'en' ? 'en-GB' : 'fr-FR';
   const tz = location?.timezone ?? 'Europe/Paris';
@@ -69,6 +81,15 @@ export default async function OverviewPage() {
   return (
     <div className="space-y-8">
       <h1 className="text-display-sm">{t('overview.title')}</h1>
+      {searchParams.welcome && current.isPublished ? (
+        <p
+          role="status"
+          className="flex items-center gap-2 rounded-2xl bg-green/10 px-4 py-3 font-semibold"
+        >
+          <CheckCircle2 className="size-5 shrink-0 text-green" aria-hidden />
+          {to('welcome')}
+        </p>
+      ) : null}
 
       <section aria-labelledby="today" className="space-y-3">
         <h2 id="today" className="text-[20px] font-bold tracking-display">

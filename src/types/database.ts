@@ -1490,6 +1490,7 @@ export type Database = {
         Args: { p_restaurant_id: string; p_roles?: Database['public']['Enums']['member_role'][] };
         Returns: boolean;
       };
+      import_menu: { Args: { p: Json; p_menu_id: string }; Returns: number };
       is_assigned_driver: { Args: { p_delivery_id: string }; Returns: boolean };
       is_manager: { Args: { p_restaurant_id: string }; Returns: boolean };
       is_owner: { Args: { p_restaurant_id: string }; Returns: boolean };

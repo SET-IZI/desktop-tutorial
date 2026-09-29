@@ -451,5 +451,124 @@
       "dropped": "{name} dropped at position {position} of {total}.",
       "cancelled": "Move cancelled."
     }
+  },
+  "onboarding": {
+    "title": "Set up your shop",
+    "subtitle": "Five steps, about twenty minutes. You can change everything later.",
+    "stepOf": "Step {current} of {total}",
+    "stepsLabel": "Setup steps",
+    "steps": {
+      "1": "Restaurant",
+      "2": "Hours",
+      "3": "Menu",
+      "4": "Payments",
+      "5": "Go live"
+    },
+    "done": "done",
+    "continue": "Continue",
+    "later": "Later",
+    "profile": {
+      "title": "Your restaurant",
+      "hint": "Shown on your shop and used to compute delivery distances.",
+      "name": "Restaurant name",
+      "namePlaceholder": "Chez Mimi",
+      "slug": "Shop address",
+      "slugHint": "Lowercase letters, numbers and hyphens.",
+      "address": "Address",
+      "addressPlaceholder": "12 rue des Martyrs",
+      "postalCode": "Postcode",
+      "city": "City",
+      "phone": "Phone (optional)",
+      "submit": "Create my restaurant",
+      "errors": {
+        "name": "Enter the restaurant name.",
+        "slug": "Choose an address of 3 to 40 characters: lowercase letters, numbers and hyphens.",
+        "slug_taken": "This address is already taken. Try a variation.",
+        "address": "Enter the street number and name.",
+        "postalCode": "The postcode must have 5 digits.",
+        "city": "Enter the city.",
+        "phone": "This phone number is not valid.",
+        "geocode_not_found": "Address not found. Check the number, street and postcode.",
+        "geocode_unavailable": "The address can't be checked right now. Try again in a moment.",
+        "server_error": "Couldn't create the restaurant right now. Try again in a moment."
+      }
+    },
+    "hours": {
+      "title": "Your pickup hours",
+      "hint": "Customers pick a time slot within these hours. Use “Apply to every day” to go faster.",
+      "submit": "Save and continue"
+    },
+    "menu": {
+      "title": "Your menu",
+      "hint": "Import your existing menu, then fine-tune photos, options and allergens in the editor.",
+      "existing": "{count, plural, one {# dish already on your menu.} other {# dishes already on your menu.}}",
+      "photo": "Photo or PDF of your menu",
+      "photoHint": "Read automatically, you review it before importing.",
+      "photoButton": "Choose a file",
+      "analyzing": "Reading your menu…",
+      "csv": "CSV file",
+      "csvHint": "Columns: category, name, description, price.",
+      "csvButton": "Choose a CSV file",
+      "csvTemplate": "Download the template",
+      "skip": "I'll build my menu later",
+      "review": "Review before importing",
+      "reviewHint": "Remove anything that shouldn't be on the menu. You can edit everything later.",
+      "remove": "Remove {name}",
+      "import": "{count, plural, one {Import # dish} other {Import # dishes}}",
+      "restart": "Choose another file",
+      "imported": "{count, plural, one {# dish imported} other {# dishes imported}}",
+      "errors": {
+        "empty": "The file is empty.",
+        "columns": "Columns not found. Use the template: category, name, description, price.",
+        "price": "Unreadable price on line {line}.",
+        "name": "Missing or too long dish name on line {line}.",
+        "too_many": "500 lines maximum per import.",
+        "file_type": "Use a photo (JPEG, PNG, WebP) or a PDF.",
+        "file_size": "The file is larger than 5 MB.",
+        "ai_off": "Automatic reading isn't available. Use the CSV file.",
+        "ai_unreadable": "No readable dishes in this document. Try a sharper photo or the CSV file.",
+        "ai_failed": "Reading failed. Try again in a moment.",
+        "server_error": "Import isn't possible right now. Try again in a moment."
+      }
+    },
+    "payments": {
+      "title": "Online payment",
+      "hint": "Customers pay by card, Apple Pay or Google Pay. The money goes straight to your Stripe account, with no Miaamm commission.",
+      "connect": "Connect Stripe",
+      "connectHint": "Create an account or connect an existing one on Stripe's website (about 5 minutes).",
+      "ownerOnly": "Only the restaurant owner can connect Stripe.",
+      "connected": "Stripe is connected.",
+      "pending": "Details submitted. Stripe is verifying your account: card payments will turn on automatically.",
+      "incomplete": "Your Stripe details aren't complete. Pick up where you left off.",
+      "resume": "Resume on Stripe",
+      "onSite": "Pay on pickup only for now",
+      "onSiteHint": "Customers pay when they pick up. You can connect Stripe later in the settings.",
+      "errors": {
+        "forbidden": "Only the restaurant owner can connect Stripe.",
+        "server_error": "Can't connect to Stripe right now. Try again in a moment."
+      }
+    },
+    "publish": {
+      "title": "Your shop is ready",
+      "hint": "Share this link on social media, your website and Google. Print the QR code for your window and tables.",
+      "link": "Your shop link",
+      "copy": "Copy link",
+      "copied": "Link copied",
+      "qr": "Your shop's QR code",
+      "download": "Download the QR code",
+      "preview": "View the shop",
+      "submit": "Put my shop online",
+      "checklist": "Summary",
+      "items": {
+        "hours": "Pickup hours",
+        "menu": "{count, plural, =0 {Empty menu: add dishes before opening} one {# dish on the menu} other {# dishes on the menu}}",
+        "card": "Card payment",
+        "onSite": "Pay on pickup"
+      },
+      "errors": {
+        "server_error": "Publishing isn't possible right now. Try again in a moment."
+      }
+    },
+    "welcome": "Your shop is live. Orders will show up here."
   }
 }
