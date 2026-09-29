@@ -227,6 +227,36 @@ test.describe('Boutique · fiche produit et panier', () => {
   });
 });
 
+test.describe('Boutique · thème', () => {
+  test('le bouton clair/sombre bascule et se souvient du choix', async ({ page }) => {
+    await page.emulateMedia({ colorScheme: 'light' });
+    await gotoHydrated(page, SHOP);
+    await page.getByRole('button', { name: 'Passer en mode sombre' }).click();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+    await page.reload();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+    await page.waitForSelector('html[data-hydrated]');
+    await page.getByRole('button', { name: 'Passer en mode clair' }).click();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  });
+
+  test('pas de défilement horizontal de la page', async ({ page }) => {
+    await gotoHydrated(page, SHOP);
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - window.innerWidth,
+    );
+    expect(overflow).toBeLessThanOrEqual(0);
+  });
+
+  test('toutes les cartes produit ont la même hauteur', async ({ page }) => {
+    await gotoHydrated(page, SHOP);
+    const heights = await page
+      .locator('main ul li > div')
+      .evaluateAll((els) => [...new Set(els.map((el) => (el as HTMLElement).offsetHeight))]);
+    expect(heights).toEqual([136]);
+  });
+});
+
 test.describe('Boutique · sous-domaine', () => {
   test('chez-mimi.<domaine> sert la boutique', async ({ request }) => {
     const res = await request.get('/', { headers: { host: 'chez-mimi.localhost:3000' } });

@@ -120,7 +120,7 @@ function StorefrontBody({
                     <p className="mt-1 text-fg-muted">{category.description}</p>
                   ) : null}
                 </Reveal>
-                <ul className="mt-4 grid gap-3 sm:grid-cols-2">
+                <ul className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
                   {category.products.map((product, index) => (
                     <Reveal as="li" key={product.id} delay={Math.min(index, 4) * 0.05}>
                       <ProductCard

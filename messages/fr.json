@@ -11,7 +11,9 @@
   },
   "common": {
     "close": "Fermer",
-    "loading": "Chargement…"
+    "loading": "Chargement…",
+    "darkMode": "Passer en mode sombre",
+    "lightMode": "Passer en mode clair"
   },
   "shop": {
     "open": "Ouvert",

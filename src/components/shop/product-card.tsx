@@ -55,7 +55,7 @@ export function ProductCard({ product, category, currency, onOpen }: ProductCard
     <motion.div
       whileTap={product.isSoldOut ? undefined : { scale: 0.98 }}
       transition={spring}
-      className="relative flex items-stretch gap-4 rounded-bento-sm bg-surface p-3 shadow-soft transition-shadow hover:shadow-float"
+      className="relative flex h-[136px] items-stretch gap-4 rounded-bento-sm bg-surface p-3 shadow-soft transition-shadow hover:shadow-float"
     >
       {/* Toute la carte ouvre la fiche ; le « + » est un bouton distinct au-dessus. */}
       <button
@@ -64,21 +64,28 @@ export function ProductCard({ product, category, currency, onOpen }: ProductCard
         aria-label={`${product.name}, ${priceLabel}${product.isSoldOut ? `, ${t('soldOut')}` : ''}`}
         className="absolute inset-0 z-0 rounded-bento-sm"
       />
-      <div aria-hidden className="pointer-events-none flex min-w-0 flex-1 flex-col py-1 pl-1">
-        <h3 className="text-[17px] font-semibold leading-snug">{product.name}</h3>
-        {product.description ? (
-          <p className="mt-1 line-clamp-2 text-[15px] text-fg-muted">{product.description}</p>
-        ) : null}
-        <DietBadges tags={product.dietTags} className="mt-2" />
-        <p className="mt-auto pt-2 font-semibold tabular-nums">
+      {/* Hauteur fixe pour toutes les cartes : nom + description partagent 3 lignes,
+          prix et badges tiennent sur une seule ligne en bas. */}
+      <div aria-hidden className="pointer-events-none flex min-w-0 flex-1 flex-col py-0.5 pl-1">
+        <p className="line-clamp-3 text-[15px] leading-[1.35] text-fg-muted">
+          <span className="text-[17px] font-semibold leading-snug text-fg">{product.name}</span>
+          {product.description ? (
+            <>
+              <br />
+              {product.description}
+            </>
+          ) : null}
+        </p>
+        <div className="mt-auto flex min-w-0 items-center gap-2 pt-2">
           {product.isSoldOut ? (
-            <span className="rounded-full bg-fg/[0.08] px-2.5 py-0.5 text-[15px]">
+            <span className="shrink-0 rounded-full bg-fg/[0.08] px-2.5 py-0.5 text-[15px] font-semibold">
               {t('soldOut')}
             </span>
           ) : (
-            priceLabel
+            <span className="shrink-0 font-semibold tabular-nums">{priceLabel}</span>
           )}
-        </p>
+          <DietBadges tags={product.dietTags} compact />
+        </div>
       </div>
       <div className="pointer-events-none relative shrink-0">
         <ProductVisual

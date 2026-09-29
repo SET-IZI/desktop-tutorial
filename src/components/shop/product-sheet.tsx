@@ -80,8 +80,16 @@ export function ProductSheet({ product, category, currency, onClose, onAdded }: 
           title={product.name}
           description={product.description ?? undefined}
           closeLabel={tc('close')}
+          footer={
+            <div className="flex items-center gap-3">
+              <QuantityStepper value={quantity} onChange={setQuantity} />
+              <Button type="submit" form="product-form" block disabled={product.isSoldOut}>
+                {product.isSoldOut ? t('soldOut') : t('addWithPrice', { price: price(total) })}
+              </Button>
+            </div>
+          }
         >
-          <form ref={formRef} onSubmit={submit} className="space-y-6 pb-2 pt-3">
+          <form id="product-form" ref={formRef} onSubmit={submit} className="space-y-6 pb-2 pt-3">
             <ProductVisual
               imageUrl={product.imageUrls[0]}
               alt={product.name}
@@ -127,13 +135,6 @@ export function ProductSheet({ product, category, currency, onClose, onAdded }: 
                 placeholder={t('notesPlaceholder')}
                 className="mt-2 w-full resize-none rounded-[20px] bg-fg/[0.06] px-4 py-3 text-body outline-none placeholder:text-fg-muted focus-visible:ring-2 focus-visible:ring-blue/50"
               />
-            </div>
-
-            <div className="sticky bottom-0 -mx-6 flex items-center gap-3 border-t border-line/[0.08] bg-[rgb(var(--glass-bg)/0.97)] px-6 pb-1 pt-4">
-              <QuantityStepper value={quantity} onChange={setQuantity} />
-              <Button type="submit" block disabled={product.isSoldOut}>
-                {product.isSoldOut ? t('soldOut') : t('addWithPrice', { price: price(total) })}
-              </Button>
             </div>
           </form>
         </SheetContent>

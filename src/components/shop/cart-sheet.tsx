@@ -59,7 +59,29 @@ export function CartSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent title={empty ? t('cartTitle') : t('cartDelicious')} closeLabel={tc('close')}>
+      <SheetContent
+        title={empty ? t('cartTitle') : t('cartDelicious')}
+        closeLabel={tc('close')}
+        footer={
+          empty ? undefined : (
+            <div className="space-y-3">
+              <p className="flex justify-between text-[17px]">
+                <span>{t('subtotal')}</span>
+                <span className="font-semibold tabular-nums">{price(subtotal)}</span>
+              </p>
+              {slot ? (
+                <Button asChild block>
+                  <Link href={`/s/${restaurant.slug}/checkout`}>{t('continue')}</Link>
+                </Button>
+              ) : (
+                <Button block disabled>
+                  {t('chooseSlot')}
+                </Button>
+              )}
+            </div>
+          )
+        }
+      >
         <div className="space-y-6 pb-2 pt-3">
           {fulfillments.length > 1 ? (
             <Segmented<Fulfillment>
@@ -156,24 +178,6 @@ export function CartSheet({
               value={slot}
               onChange={setSlot}
             />
-          ) : null}
-
-          {!empty ? (
-            <div className="sticky bottom-0 -mx-6 space-y-3 border-t border-line/[0.08] bg-[rgb(var(--glass-bg)/0.97)] px-6 pb-1 pt-4">
-              <p className="flex justify-between text-[17px]">
-                <span>{t('subtotal')}</span>
-                <span className="font-semibold tabular-nums">{price(subtotal)}</span>
-              </p>
-              {slot ? (
-                <Button asChild block>
-                  <Link href={`/s/${restaurant.slug}/checkout`}>{t('continue')}</Link>
-                </Button>
-              ) : (
-                <Button block disabled>
-                  {t('chooseSlot')}
-                </Button>
-              )}
-            </div>
           ) : null}
         </div>
       </SheetContent>

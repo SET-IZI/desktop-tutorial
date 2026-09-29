@@ -11,7 +11,9 @@
   },
   "common": {
     "close": "Close",
-    "loading": "Loading…"
+    "loading": "Loading…",
+    "darkMode": "Switch to dark mode",
+    "lightMode": "Switch to light mode"
   },
   "shop": {
     "open": "Open",

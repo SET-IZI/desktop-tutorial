@@ -64,6 +64,8 @@ interface SheetContentProps {
   description?: string;
   className?: string;
   children?: React.ReactNode;
+  /** Pied fixe (CTA) hors de la zone qui défile : le contenu ne passe jamais dessous. */
+  footer?: React.ReactNode;
   closeLabel?: string;
 }
 
@@ -76,6 +78,7 @@ export function SheetContent({
   description,
   className,
   children,
+  footer,
   closeLabel = 'Fermer',
 }: SheetContentProps) {
   const { open, setOpen } = useSheet();
@@ -158,9 +161,19 @@ export function SheetContent({
                     <X className="size-5" aria-hidden />
                   </Dialog.Close>
                 </div>
-                <div className="overflow-y-auto overscroll-contain px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+                <div
+                  className={cn(
+                    'min-h-0 flex-1 overflow-y-auto overscroll-contain px-6',
+                    footer ? 'pb-4' : 'pb-[max(1.5rem,env(safe-area-inset-bottom))]',
+                  )}
+                >
                   {children}
                 </div>
+                {footer ? (
+                  <div className="shrink-0 border-t border-line/[0.08] px-6 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3">
+                    {footer}
+                  </div>
+                ) : null}
               </motion.div>
             </Dialog.Content>
           </div>

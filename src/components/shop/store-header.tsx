@@ -5,6 +5,7 @@ import { MapPin } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
 import { MeshGradient } from '@/components/ui/mesh-gradient';
+import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { isOpenAt } from '@/lib/slots/compute';
 import type { Storefront } from '@/lib/storefront/types';
 import { cn } from '@/lib/utils';
@@ -46,6 +47,7 @@ export function StoreHeader({ storefront }: { storefront: Storefront }) {
       >
         <MeshGradient colors={['orange', 'pink', 'violet']} />
       </motion.div>
+      <ThemeToggle className="absolute right-4 top-[max(1rem,env(safe-area-inset-top))] z-10" />
       <motion.div
         className="relative mx-auto max-w-3xl"
         style={reduce ? undefined : { y: contentY, opacity: contentOpacity }}
@@ -69,13 +71,20 @@ export function StoreHeader({ storefront }: { storefront: Storefront }) {
           {open !== null ? (
             <span
               className={cn(
-                'glass inline-flex items-center gap-2 rounded-full px-3 py-1 text-[14px] font-semibold',
+                'glass inline-flex items-center gap-2 whitespace-nowrap rounded-full px-3 py-1.5 text-[13px] font-semibold',
               )}
             >
-              <span
-                aria-hidden
-                className={cn('size-2 rounded-full', open ? 'bg-green' : 'bg-fg/40')}
-              />
+              <span aria-hidden className="relative flex size-2.5">
+                {open ? (
+                  <span className="absolute inline-flex size-full animate-ping rounded-full bg-green opacity-60" />
+                ) : null}
+                <span
+                  className={cn(
+                    'relative inline-flex size-2.5 rounded-full',
+                    open ? 'bg-green' : 'bg-red',
+                  )}
+                />
+              </span>
               {open ? t('open') : t('closedPreorder')}
             </span>
           ) : null}

@@ -7,6 +7,7 @@ import { createRoot } from 'react-dom/client';
 import { Storefront } from '@/components/shop/storefront';
 import { computeSlots } from '@/lib/slots/compute';
 import type { Storefront as StorefrontData } from '@/lib/storefront/types';
+import { applyTheme, readStoredTheme } from '@/lib/theme';
 import messages from '../../messages/fr.json';
 
 declare const __STOREFRONT__: StorefrontData;
@@ -74,9 +75,9 @@ function FontPicker() {
       // stockage indisponible : le choix vaut pour la session
     }
   }, [font]);
-  // Pastille discrète en haut à droite (défile avec la page, ne gêne pas la barre collante).
+  // Pastille discrète en haut à gauche (le bouton clair/sombre est à droite) (défile avec la page, ne gêne pas la barre collante).
   return (
-    <div className="glass absolute right-4 top-[max(1rem,env(safe-area-inset-top))] z-40 flex h-11 items-center gap-2 rounded-full pl-3.5 pr-3 text-[14px] font-semibold text-fg shadow-float">
+    <div className="glass absolute left-4 top-[max(1rem,env(safe-area-inset-top))] z-40 flex h-11 items-center gap-2 rounded-full pl-3.5 pr-3 text-[14px] font-semibold text-fg shadow-float">
       <span aria-hidden className="font-bold">
         Aa
       </span>
@@ -123,6 +124,8 @@ function PreviewNotice() {
     </div>
   );
 }
+
+applyTheme(readStoredTheme());
 
 createRoot(document.getElementById('miaamm-root')!).render(
   <IntlProvider locale="fr" messages={messages} timeZone="Europe/Paris">
