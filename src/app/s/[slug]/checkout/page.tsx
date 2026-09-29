@@ -1,20 +1,21 @@
-import { ArrowLeft } from 'lucide-react';
-import Link from 'next/link';
-import { getTranslations } from 'next-intl/server';
-import { Button } from '@/components/ui/button';
+import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
+import { CheckoutView } from '@/components/checkout/checkout-view';
+import { cardPaymentsAvailable } from '@/lib/payments/gateway';
+import { getStorefront } from '@/lib/storefront/queries';
 
-// Étape provisoire : le checkout invité + Stripe arrive en phase 3.
+export const dynamic = 'force-dynamic';
+
+export const metadata: Metadata = { robots: { index: false, follow: false } };
+
 export default async function CheckoutPage({ params }: { params: { slug: string } }) {
-  const t = await getTranslations('shop');
+  const storefront = await getStorefront(params.slug);
+  if (!storefront) notFound();
   return (
-    <main className="mx-auto flex min-h-dvh max-w-md flex-col items-center justify-center px-6 text-center">
-      <h1 className="text-display-sm">{t('checkoutSoon')}</h1>
-      <Button asChild variant="secondary" className="mt-8">
-        <Link href={`/s/${params.slug}`}>
-          <ArrowLeft className="size-5" aria-hidden />
-          {t('backToMenu')}
-        </Link>
-      </Button>
-    </main>
+    <CheckoutView
+      storefront={storefront}
+      cardAvailable={cardPaymentsAvailable(storefront.restaurant)}
+      onSiteAvailable={storefront.location.onSitePaymentEnabled}
+    />
   );
 }

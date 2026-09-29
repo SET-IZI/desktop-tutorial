@@ -85,6 +85,18 @@ Espaces prévus : `s/[slug]` boutique client (réécrite depuis `{slug}.miaamm.a
 - Police : une seule variable `--font-sans` (globals.css), actuellement Figtree.
 - Composants : `src/components/shop/*`. Sur mobile, bottom-sheets en `.glass-thick` (88 % / 82 %) : le verre à 60 % n'est pas lisible sur du contenu dense. Pieds de sheet collants quasi opaques.
 
+## Paiement et checkout (phase 3)
+
+- Parcours : panier → `/s/[slug]/checkout` (tes infos + choix du paiement) → paiement (carte uniquement) → `/s/[slug]/commande/[token]`. Deux étapes max ; le paiement sur place tient en une seule.
+- Action serveur `placeOrder` (`src/app/s/[slug]/checkout/actions.ts`) : Zod (`src/lib/checkout/schema.ts`), prix **recalculés** depuis la carte du jour (`priceOrder`), service ouvert, créneau réellement libre, moyen de paiement autorisé. Le client n'envoie que des identifiants et des quantités.
+- `place_order()` (SQL, service_role) crée commande, lignes et fiche client **sous verrou** sur l'établissement : pas de surréservation d'un créneau, sous-total revérifié. Les paniers `pending_payment` réservent leur créneau 15 min.
+- Stripe Connect **direct charges** (`src/lib/payments/gateway.ts`) : `paymentIntents.create(…, { stripeContext: acct, idempotencyKey: order-<id> })`, `automatic_payment_methods` (carte, Apple Pay, Google Pay), **sans `application_fee_amount`**. Côté client : `loadStripe(pk, { stripeAccount })`, Payment Element, `confirmPayment({ redirect: 'if_required' })`.
+- Webhook `/api/webhooks/stripe` : signature vérifiée sur le corps brut (`constructEvent`), déduplication par `event.id` (`stripe_events`), événement relâché si le traitement échoue (Stripe rejoue). `mark_order_paid()` est idempotent et vérifie le montant.
+- `MIAAMM_PAYMENTS_MODE=mock` : paiement simulé (dev/E2E) via `/api/checkout/mock-confirm`, qui joue le même traitement que le webhook. 404 dès que Stripe est configuré, interdit en production Vercel.
+- Confirmation : lecture serveur par `public_token` (jamais exposée au client), rafraîchie toutes les 15 s (2,5 s pendant la confirmation du paiement) en attendant Realtime (phase 5).
+- Stripe Connect côté restaurateur (création du compte, lien d'onboarding) : étape « Stripe » de l'onboarding en phase 4. `account.updated` tient déjà `stripe_charges_enabled` à jour.
+- Documentation Stripe (`docs.stripe.com`) inaccessible depuis l'environnement cloud : intégration vérifiée sur les types officiels des SDK (`stripe` 22.x, API `2026-08-26.dahlia`, `@stripe/stripe-js`, `@stripe/react-stripe-js`).
+
 ## Conventions de code
 
 - **Conventional Commits** (`feat:`, `fix:`, `chore:`, `test:`, `docs:`…), un commit par phase au minimum.
@@ -134,6 +146,9 @@ Espaces prévus : `s/[slug]` boutique client (réécrite depuis `{slug}.miaamm.a
 | 2026-09-28 | Next.js 14 comme demandé (montée de version possible plus tard).                                                                       |
 | 2026-09-28 | Tailwind 3 (compatibilité shadcn/Next 14). Primitives UI écrites à la main façon shadcn.                                               |
 | 2026-09-28 | Polices auto-hébergées via `@fontsource-variable` (build sans réseau vers Google Fonts, RGPD).                                         |
+| 2026-09-29 | Checkout en retrait uniquement : la livraison (adresse, zone, frais) arrive en phase 6, le checkout propose de passer en retrait.      |
+| 2026-09-29 | Invités sans session Supabase pour l'instant : confirmation par jeton public ; session anonyme ajoutée avec Realtime (phase 5).        |
+| 2026-09-29 | Paiement simulé (`mock`) pour dev/E2E/aperçu, jamais en production.                                                                    |
 | 2026-09-29 | Police principale **Figtree** (choisie parmi 6 candidates dans l'aperçu), à la place d'Inter.                                          |
 | 2026-09-28 | i18n sans préfixe d'URL : la langue vient du cookie `NEXT_LOCALE` puis d'`Accept-Language`, FR par défaut.                             |
 | 2026-09-28 | CTA en #0071E3 pour le contraste AA ; #0A84FF reste la couleur d'accent et des icônes.                                                 |
@@ -162,7 +177,7 @@ Espaces prévus : `s/[slug]` boutique client (réécrite depuis `{slug}.miaamm.a
 - [x] **Phase 0 · Setup** : Next 14 + TS strict, Tailwind + tokens clair/sombre, Liquid Glass, composants de base (Button, Card, Sheet, GlassBar, MeshGradient, Wordmark), i18n FR/EN, env Zod, chiffrement AES-GCM, clients Supabase, Vitest (18 tests), Playwright + axe (14 e2e : desktop et mobile, clair et sombre), CI GitHub Actions.
 - [x] **Phase 1 · Base de données** : 4 migrations (types, schéma, fonctions, RLS), seed « Chez Mimi » complet, 32 tests SQL (RLS, isolation, rôles, transitions, créneaux, livreur, purge RGPD), types générés et vérifiés en CI.
 - [x] **Phase 2 · Boutique client** : carte avec barre collante et suivi de section, recherche et filtres, fiche produit (options, suppléments, note, quantité), panier persistant et réconcilié, upsell, retrait/livraison, créneaux selon la charge réelle (complets et bloqués grisés), sous-domaines, 404 soignée. 48 tests unitaires, 33 tests SQL, 40 e2e (desktop et mobile, axe clair et sombre).
-- [ ] Phase 3 · Paiement : Stripe Connect, checkout invité, webhooks, confirmation
+- [x] **Phase 3 · Paiement** : checkout invité en 2 étapes max, prix recalculés côté serveur, création atomique sans surréservation, Stripe Connect direct charges sans commission (Payment Element : carte, Apple Pay, Google Pay), paiement sur place, webhook signé et idempotent, page de confirmation avec suivi du statut, mode simulé pour dev et E2E.
 - [ ] Phase 4 · Back-office : onboarding, éditeur de menu, horaires, réglages
 - [ ] Phase 5 · Temps réel : commandes, écran cuisine, suivi statuts, notifications
 - [ ] Phase 6 · Livraison : zones, frais, adresse, DeliveryProvider, InternalProvider

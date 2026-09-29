@@ -1389,6 +1389,27 @@ export type Database = {
         };
         Relationships: [];
       };
+      stripe_events: {
+        Row: {
+          account: string | null;
+          id: string;
+          received_at: string;
+          type: string;
+        };
+        Insert: {
+          account?: string | null;
+          id: string;
+          received_at?: string;
+          type: string;
+        };
+        Update: {
+          account?: string | null;
+          id?: string;
+          received_at?: string;
+          type?: string;
+        };
+        Relationships: [];
+      };
       time_slots: {
         Row: {
           capacity: number | null;
@@ -1474,6 +1495,10 @@ export type Database = {
       is_owner: { Args: { p_restaurant_id: string }; Returns: boolean };
       is_public_restaurant: { Args: { p_restaurant_id: string }; Returns: boolean };
       is_staff: { Args: { p_restaurant_id: string }; Returns: boolean };
+      mark_order_paid: {
+        Args: { p_amount_cents: number; p_payment_intent: string };
+        Returns: string;
+      };
       order_transition_allowed: {
         Args: {
           p_from: Database['public']['Enums']['order_status'];
@@ -1482,6 +1507,14 @@ export type Database = {
         Returns: boolean;
       };
       owns_order: { Args: { p_order_id: string }; Returns: boolean };
+      place_order: {
+        Args: { p: Json };
+        Returns: {
+          order_id: string;
+          order_number: number;
+          order_token: string;
+        }[];
+      };
       purge_delivery_tracks: { Args: { p_older_than?: string }; Returns: number };
       random_token: { Args: { p_bytes?: number }; Returns: string };
       redeem_driver_invite: { Args: { p_code: string }; Returns: string };

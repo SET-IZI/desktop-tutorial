@@ -4,6 +4,7 @@ import type { MenuCategory, Storefront, StoreLocation } from './types';
 
 const RESTAURANT_SELECT = `
   id, slug, name, description, logo_url, cover_url, accent_color, currency,
+  stripe_account_id, stripe_charges_enabled,
   locations (
     id, name, address_line, postal_code, city, lat, lng, phone, timezone, menu_id, created_at,
     pickup_enabled, delivery_enabled, on_site_payment_enabled,
@@ -124,6 +125,8 @@ export async function fetchStorefront(
       coverUrl: restaurant.cover_url,
       accentColor: restaurant.accent_color,
       currency: restaurant.currency,
+      stripeAccountId: restaurant.stripe_account_id,
+      stripeChargesEnabled: restaurant.stripe_charges_enabled,
     },
     location,
     categories: menu,

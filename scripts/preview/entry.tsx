@@ -48,7 +48,7 @@ window.fetch = async (input, init) => {
 function PreviewNotice() {
   const [message, setMessage] = useState<string | null>(null);
   useEffect(() => {
-    const onNavigate = () => setMessage('Aperçu : le paiement arrive en phase 3.');
+    const onNavigate = () => setMessage("Aperçu : le paiement se teste dans l'app (mode simulé).");
     window.addEventListener('miaamm:preview-navigate', onNavigate);
     return () => window.removeEventListener('miaamm:preview-navigate', onNavigate);
   }, []);

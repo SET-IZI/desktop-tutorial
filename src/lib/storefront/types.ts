@@ -90,6 +90,9 @@ export interface StoreRestaurant {
   coverUrl: string | null;
   accentColor: string;
   currency: string;
+  /** Compte Stripe connecté (acct_…) : public, utilisé par Stripe.js côté client. */
+  stripeAccountId: string | null;
+  stripeChargesEnabled: boolean;
 }
 
 export interface Storefront {

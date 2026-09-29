@@ -90,6 +90,13 @@
   }
 }
 
+@layer utilities {
+  /* Majuscule sur la première lettre seulement (« mardi 30 septembre » → « Mardi 30 septembre »). */
+  .capitalize-first::first-letter {
+    text-transform: uppercase;
+  }
+}
+
 @layer components {
   /* Liquid Glass : blur 24px + saturate 180 %, fond 60 %, bordure 40 %, reflet en haut */
   .glass {
