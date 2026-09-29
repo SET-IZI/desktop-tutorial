@@ -38,7 +38,7 @@ nécessaire. Un nom de domaine personnalisé s'ajoute dans le champ *Custom doma
 | Photos | remplacer les fichiers de `assets/` en gardant les mêmes noms (environ 1400 px de côté, JPEG) |
 | Couleurs | `assets/css/styles.css` — variables `--green-*` en haut du fichier |
 
-Le comparateur avant/après utilise `assets/saule-avant.jpg` et `assets/saule-apres.jpg` :
+Le comparateur avant/après utilise `assets/conifere-avant.jpg` et `assets/conifere-apres.jpg` :
 pour un rendu net, garder deux photos prises du même point de vue.
 
 ## Formulaire de devis
