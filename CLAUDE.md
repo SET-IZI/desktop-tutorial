@@ -105,6 +105,10 @@ Espaces prévus : `s/[slug]` boutique client (réécrite depuis `{slug}.miaamm.a
 - Mode rush (normal / ralenti / pause) accessible en un geste depuis l'en-tête.
 - Vouvoiement côté restaurateur, icônes Lucide, pas d'emoji (sauf emoji de catégorie dans l'éditeur de carte).
 - Auth locale : `supabase-lite` émule l'API Auth (`scripts/dev/auth-lite.mjs` : mot de passe, inscription, anonyme, refresh, getUser, logout), vérifiée avec le client officiel. En production, Supabase Auth.
+- Éditeur de carte (`/app/carte`, `src/components/admin/menu/*`) : glisser-déposer dnd-kit (catégories, et plats dans leur catégorie, un `DndContext` par liste), poignée dédiée, annonces lecteur d'écran en français. Clavier : `listKeyboardCoordinates` avance d'un cran par flèche (la géométrie par défaut bloquait avec des hauteurs variables) et défilement instantané (`scrollBehavior: 'auto'`). Mises à jour optimistes avec retour arrière et toast en cas d'échec.
+- Écritures de carte : `save_product(jsonb)` (plat + groupes d'options + options en une transaction, IDs conservés), `reorder_categories` / `reorder_products` ; toutes en SECURITY INVOKER (RLS appliquée). Rupture et visibilité en un geste depuis la liste.
+- Photos : compressées côté navigateur (1600 px, WebP, repli JPEG), envoyées dans le bucket Storage `menu` sous `<restaurant_id>/…` (policy : manager du restaurant, 5 Mo, JPEG/PNG/WebP). Le serveur n'accepte que des URL publiques de ce dossier.
+- Storage local : `scripts/dev/storage-lite.mjs` (envoi brut ou multipart comme storage-js, lecture publique, suppression), même règle d'accès que la policy (`is_manager` évalué avec l'identité de l'utilisateur). Fichiers dans `.tools/storage/` (ignoré par Git), jamais en production.
 
 ## Conventions de code
 
@@ -187,7 +191,7 @@ Espaces prévus : `s/[slug]` boutique client (réécrite depuis `{slug}.miaamm.a
 - [x] **Phase 1 · Base de données** : 4 migrations (types, schéma, fonctions, RLS), seed « Chez Mimi » complet, 32 tests SQL (RLS, isolation, rôles, transitions, créneaux, livreur, purge RGPD), types générés et vérifiés en CI.
 - [x] **Phase 2 · Boutique client** : carte avec barre collante et suivi de section, recherche et filtres, fiche produit (options, suppléments, note, quantité), panier persistant et réconcilié, upsell, retrait/livraison, créneaux selon la charge réelle (complets et bloqués grisés), sous-domaines, 404 soignée. 48 tests unitaires, 33 tests SQL, 40 e2e (desktop et mobile, axe clair et sombre).
 - [x] **Phase 3 · Paiement** : checkout invité en 2 étapes max, prix recalculés côté serveur, création atomique sans surréservation, Stripe Connect direct charges sans commission (Payment Element : carte, Apple Pay, Google Pay), paiement sur place, webhook signé et idempotent, page de confirmation avec suivi du statut, mode simulé pour dev et E2E.
-- [ ] Phase 4 · Back-office : onboarding, éditeur de menu, horaires, réglages
+- [ ] Phase 4 · Back-office : 4a auth, shell, réglages, horaires ✔ · 4b éditeur de carte ✔ · 4c onboarding · 4d équipe et multi-établissements
 - [ ] Phase 5 · Temps réel : commandes, écran cuisine, suivi statuts, notifications
 - [ ] Phase 6 · Livraison : zones, frais, adresse, DeliveryProvider, InternalProvider
 - [ ] Phase 7 · Suivi live : app livreur PWA, Realtime, carte client, ETA

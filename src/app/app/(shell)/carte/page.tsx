@@ -1,7 +1,17 @@
-import { getTranslations } from 'next-intl/server';
+import { MenuEditor } from '@/components/admin/menu/menu-editor';
+import { getCurrentLocation } from '@/lib/admin/location';
+import { loadAdminMenu } from '@/lib/admin/menu';
+import { canManage, requireRestaurant } from '@/lib/auth/session';
 
-// Remplacé par l'éditeur de carte (phase 4b).
 export default async function MenuPage() {
-  const t = await getTranslations('admin.nav');
-  return <h1 className="text-display-sm">{t('menu')}</h1>;
+  const { current } = await requireRestaurant();
+  const location = await getCurrentLocation(current.restaurantId);
+  const categories = location?.menu_id ? await loadAdminMenu(location.menu_id) : [];
+  return (
+    <MenuEditor
+      categories={categories}
+      restaurantId={current.restaurantId}
+      canManage={canManage(current.role)}
+    />
+  );
 }

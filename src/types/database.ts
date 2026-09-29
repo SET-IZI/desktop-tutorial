@@ -1518,6 +1518,8 @@ export type Database = {
       purge_delivery_tracks: { Args: { p_older_than?: string }; Returns: number };
       random_token: { Args: { p_bytes?: number }; Returns: string };
       redeem_driver_invite: { Args: { p_code: string }; Returns: string };
+      reorder_categories: { Args: { p_ids: string[] }; Returns: undefined };
+      reorder_products: { Args: { p_ids: string[] }; Returns: undefined };
       replace_opening_hours: {
         Args: {
           p_location_id: string;
@@ -1526,6 +1528,7 @@ export type Database = {
         };
         Returns: number;
       };
+      save_product: { Args: { p: Json }; Returns: string };
       slot_load: {
         Args: { p_from: string; p_location_id: string; p_to: string };
         Returns: {

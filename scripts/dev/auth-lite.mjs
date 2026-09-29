@@ -220,5 +220,5 @@ export function createAuthLite({ databaseUrl, jwtSecret, issuer }) {
     }
   }
 
-  return { handle, close: () => pool.end() };
+  return { handle, verify, close: () => pool.end() };
 }
