@@ -11,7 +11,10 @@ const executablePath = !process.env.CI && existsSync(preinstalled) ? preinstalle
 
 export default defineConfig({
   testDir: './e2e',
-  fullyParallel: true,
+  // Base de démo partagée et modifiée par certains tests (rush, horaires) : exécution
+  // séquentielle pour des résultats déterministes.
+  fullyParallel: false,
+  workers: 1,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : 'list',

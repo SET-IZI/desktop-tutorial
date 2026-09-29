@@ -6,14 +6,18 @@
  *
  *   pnpm supabase:lite            → http://127.0.0.1:54321/rest/v1
  *
+ *   /rest/v1  → PostgREST
+ *   /auth/v1  → émulation minimale de Supabase Auth (auth-lite.mjs)
+ *
  * Avec Docker, préférer `pnpm exec supabase start` (mêmes URL et clés de dev).
- * Auth, Realtime et Storage ne sont pas émulés ici.
+ * Realtime et Storage ne sont pas émulés ici.
  */
 import { spawn, execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync } from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createAuthLite } from './auth-lite.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const VERSION = '12.2.12';
@@ -65,8 +69,33 @@ const postgrest = spawn(BIN, [], {
   },
 });
 
+const auth = createAuthLite({
+  databaseUrl: DATABASE_URL,
+  jwtSecret: JWT_SECRET,
+  issuer: `http://127.0.0.1:${PORT}/auth/v1`,
+});
+
+const CORS_HEADERS = {
+  'access-control-allow-methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+  'access-control-allow-headers':
+    'authorization, apikey, content-type, x-client-info, x-supabase-api-version, prefer, accept-profile, content-profile, range',
+  'access-control-expose-headers': 'content-range, x-supabase-api-version',
+  'access-control-max-age': '600',
+};
+
 const server = http.createServer((req, res) => {
   const url = req.url ?? '/';
+  // CORS : le navigateur (localhost:3000) appelle l'API (127.0.0.1:54321).
+  res.setHeader('access-control-allow-origin', req.headers.origin ?? '*');
+  for (const [k, v] of Object.entries(CORS_HEADERS)) res.setHeader(k, v);
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204).end();
+    return;
+  }
+  if (url.startsWith('/auth/v1')) {
+    void auth.handle(req, res);
+    return;
+  }
   if (url === '/health') {
     res.writeHead(200).end('ok');
     return;
@@ -102,6 +131,7 @@ server.listen(PORT, '127.0.0.1', () => {
 
 function shutdown() {
   server.close();
+  void auth.close();
   postgrest.kill('SIGTERM');
   process.exit(0);
 }

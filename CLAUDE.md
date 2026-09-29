@@ -34,7 +34,7 @@ Fin de phase : `pnpm check && pnpm db:reset && pnpm test:db && pnpm build && pnp
 
 Dev local complet : `pnpm db:reset`, `pnpm supabase:lite` dans un terminal, `pnpm dev` dans un autre, puis http://localhost:3000/s/chez-mimi (ou http://chez-mimi.localhost:3000).
 
-Nouvelle migration : `pnpm exec supabase migration new <nom>`, puis `pnpm db:reset && pnpm test:db && pnpm db:types`. La CI échoue si les types committés ne correspondent pas aux migrations.
+Nouvelle migration : `pnpm exec supabase migration new <nom> < /dev/null` (sans terminal, la CLI attend le SQL sur l'entrée standard), puis `pnpm db:reset && pnpm test:db && pnpm db:types`. La CI échoue si les types committés ne correspondent pas aux migrations.
 
 ## Arborescence
 
@@ -96,6 +96,15 @@ Espaces prévus : `s/[slug]` boutique client (réécrite depuis `{slug}.miaamm.a
 - Confirmation : lecture serveur par `public_token` (jamais exposée au client), rafraîchie toutes les 15 s (2,5 s pendant la confirmation du paiement) en attendant Realtime (phase 5).
 - Stripe Connect côté restaurateur (création du compte, lien d'onboarding) : étape « Stripe » de l'onboarding en phase 4. `account.updated` tient déjà `stripe_charges_enabled` à jour.
 - Documentation Stripe (`docs.stripe.com`) inaccessible depuis l'environnement cloud : intégration vérifiée sur les types officiels des SDK (`stripe` 22.x, API `2026-08-26.dahlia`, `@stripe/stripe-js`, `@stripe/react-stripe-js`).
+
+## Back-office (phase 4)
+
+- Routes : `/login`, `/signup` (`src/app/(auth)`), `/app/*` (`src/app/app/(shell)` : Aperçu, Carte, Horaires, Réglages), `/app/onboarding`. Le middleware rafraîchit la session Supabase (`@supabase/ssr`) et protège `/app` (redirection `/login?next=`, retour interne uniquement).
+- Contexte : `requireRestaurant()` (utilisateur + restaurant actif, cookie `miaamm_restaurant`), `assertRole([...])` dans les actions. Toutes les écritures passent par le **client de l'utilisateur** : la RLS et les privilèges par colonne font foi. Après chaque écriture : `revalidateTag(storefrontTag(slug))`.
+- Horaires : validation pure partagée (`src/lib/admin/schedule.ts`), remplacement atomique via `replace_opening_hours()` (SECURITY INVOKER, donc RLS appliquée).
+- Mode rush (normal / ralenti / pause) accessible en un geste depuis l'en-tête.
+- Vouvoiement côté restaurateur, icônes Lucide, pas d'emoji (sauf emoji de catégorie dans l'éditeur de carte).
+- Auth locale : `supabase-lite` émule l'API Auth (`scripts/dev/auth-lite.mjs` : mot de passe, inscription, anonyme, refresh, getUser, logout), vérifiée avec le client officiel. En production, Supabase Auth.
 
 ## Conventions de code
 
@@ -192,4 +201,5 @@ Espaces prévus : `s/[slug]` boutique client (réécrite depuis `{slug}.miaamm.a
 - Pas de démon Docker dans l'environnement cloud : `supabase start` / `supabase db reset` ne tournent pas. Utiliser `pnpm db:reset` sur le Postgres 16 local (`service postgresql start`, mot de passe `postgres`). La Supabase CLI sert pour `migration new` et `gen types --db-url`.
 - Ne jamais appliquer `scripts/db/supabase-shim.sql` sur un vrai projet Supabase.
 - Dans l'environnement cloud Claude Code, Chromium est préinstallé dans `/opt/pw-browsers` ; `playwright.config.ts` l'utilise automatiquement hors CI. Ne pas lancer `playwright install` en local.
+- E2E séquentiels (`workers: 1`) : la base de démo est partagée et certains tests la modifient temporairement (rush, horaires).
 - Si un `next start` d'un build précédent tourne encore sur le port e2e, Playwright le réutilise et l'hydratation échoue (chunks introuvables). Arrêter les anciens serveurs avant `pnpm e2e`.

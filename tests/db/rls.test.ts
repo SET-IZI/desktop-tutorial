@@ -377,3 +377,63 @@ describe('RLS · brouillons invisibles du public', () => {
       expect(await db.query(`select id from categories`)).toHaveLength(5);
     }));
 });
+
+describe('replace_opening_hours', () => {
+  const ranges = JSON.stringify([
+    { weekday: 1, opens_at: '10:00', closes_at: '12:00' },
+    { weekday: 1, opens_at: '18:00', closes_at: '20:00' },
+  ]);
+
+  it('remplace les horaires d’un service en une fois (manager)', () =>
+    withDb(async (db) => {
+      await db.as(user(IDS.owner));
+      const [r] = await db.query<{ replace_opening_hours: number }>(
+        `select replace_opening_hours($1, 'pickup', $2::jsonb)`,
+        [IDS.location, ranges],
+      );
+      expect(r!.replace_opening_hours).toBe(2);
+      expect(
+        await db.query(
+          `select weekday from opening_hours where location_id = $1 and service = 'pickup'`,
+          [IDS.location],
+        ),
+      ).toHaveLength(2);
+      // L'autre service n'est pas touché.
+      expect(
+        (
+          await db.query(
+            `select 1 from opening_hours where location_id = $1 and service = 'delivery'`,
+            [IDS.location],
+          )
+        ).length,
+      ).toBe(12);
+    }));
+
+  it('est refusé à la cuisine, et annule tout en cas d’erreur', () =>
+    withDb(async (db) => {
+      await db.as(user(IDS.kitchen));
+      expect(
+        await db.fails(`select replace_opening_hours($1, 'pickup', $2::jsonb)`, [
+          IDS.location,
+          ranges,
+        ]),
+      ).toMatch(/forbidden/);
+      await db.as(user(IDS.owner));
+      const bad = JSON.stringify([{ weekday: 1, opens_at: '12:00', closes_at: '10:00' }]);
+      expect(
+        await db.fails(`select replace_opening_hours($1, 'pickup', $2::jsonb)`, [
+          IDS.location,
+          bad,
+        ]),
+      ).toMatch(/check constraint/);
+      await db.asSuper();
+      expect(
+        (
+          await db.query(
+            `select 1 from opening_hours where location_id = $1 and service = 'pickup'`,
+            [IDS.location],
+          )
+        ).length,
+      ).toBe(12);
+    }));
+});
