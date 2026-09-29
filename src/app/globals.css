@@ -1,4 +1,4 @@
-@import '@fontsource-variable/inter/opsz.css';
+@import '@fontsource-variable/figtree/wght.css';
 @import '@fontsource-variable/nunito/wght.css';
 
 @tailwind base;
@@ -12,7 +12,7 @@
    --accent : surchargé par restaurant (style inline sur le conteneur boutique). */
 @layer base {
   :root {
-    --font-sans: 'Inter Variable';
+    --font-sans: 'Figtree Variable';
     --bg: 245 245 247;
     --surface: 255 255 255;
     --surface-2: 242 242 247;
@@ -72,7 +72,7 @@
 
   html {
     -webkit-text-size-adjust: 100%;
-    font-optical-sizing: auto; /* active la coupe Display d'Inter sur les grands titres */
+    font-optical-sizing: auto;
   }
 
   body {

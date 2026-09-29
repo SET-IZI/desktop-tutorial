@@ -1,6 +1,5 @@
 /** Point d'entrée de l'aperçu statique de la boutique (sans serveur). */
 import { MotionConfig } from 'framer-motion';
-import { ChevronDown } from 'lucide-react';
 import { IntlProvider } from 'next-intl';
 import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -46,62 +45,6 @@ window.fetch = async (input, init) => {
   return realFetch(input, init);
 };
 
-/** Polices candidates (Google Fonts), essayables en direct dans l'aperçu. */
-const FONTS = [
-  { family: 'Plus Jakarta Sans', label: 'Plus Jakarta Sans · moderne, chaleureuse' },
-  { family: 'Figtree', label: 'Figtree · ronde, amicale' },
-  { family: 'DM Sans', label: 'DM Sans · douce, géométrique' },
-  { family: 'Nunito', label: 'Nunito · très arrondie, gourmande' },
-  { family: 'Outfit', label: 'Outfit · géométrique, affirmée' },
-  { family: 'Inter', label: 'Inter · la police actuelle' },
-];
-const FONT_KEY = 'miaamm:preview:font';
-
-function readFont(): string {
-  try {
-    return localStorage.getItem(FONT_KEY) ?? FONTS[0]!.family;
-  } catch {
-    return FONTS[0]!.family;
-  }
-}
-
-function FontPicker() {
-  const [font, setFont] = useState(readFont);
-  useEffect(() => {
-    document.documentElement.style.setProperty('--font-sans', `'${font}'`);
-    try {
-      localStorage.setItem(FONT_KEY, font);
-    } catch {
-      // stockage indisponible : le choix vaut pour la session
-    }
-  }, [font]);
-  // Pastille discrète en haut à gauche (le bouton clair/sombre est à droite) (défile avec la page, ne gêne pas la barre collante).
-  return (
-    <div className="glass absolute left-4 top-[max(1rem,env(safe-area-inset-top))] z-40 flex h-11 items-center gap-2 rounded-full pl-3.5 pr-3 text-[14px] font-semibold text-fg shadow-float">
-      <span aria-hidden className="font-bold">
-        Aa
-      </span>
-      <span aria-hidden className="max-w-[9rem] truncate font-medium">
-        {font}
-      </span>
-      <ChevronDown className="size-4 text-fg-muted" aria-hidden />
-      {/* Sélecteur natif transparent par-dessus : menu système sur mobile, accessible au clavier. */}
-      <select
-        aria-label="Police de l'aperçu"
-        value={font}
-        onChange={(e) => setFont(e.target.value)}
-        className="absolute inset-0 cursor-pointer rounded-full opacity-0"
-      >
-        {FONTS.map((f) => (
-          <option key={f.family} value={f.family}>
-            {f.label}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
-}
-
 function PreviewNotice() {
   const [message, setMessage] = useState<string | null>(null);
   useEffect(() => {
@@ -130,7 +73,6 @@ applyTheme(readStoredTheme());
 createRoot(document.getElementById('miaamm-root')!).render(
   <IntlProvider locale="fr" messages={messages} timeZone="Europe/Paris">
     <MotionConfig reducedMotion="user">
-      <FontPicker />
       <Storefront storefront={storefront} />
       <PreviewNotice />
     </MotionConfig>

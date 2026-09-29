@@ -79,7 +79,10 @@ Espaces prévus : `s/[slug]` boutique client (réécrite depuis `{slug}.miaamm.a
 - Barre de catégories : défilement calculé en JS (pas de saut d'ancre, intercepté dans une iframe) et suivi verrouillé pendant le défilement. Jamais de `scrollIntoView` pendant un défilement de page : Safari et Chrome l'interrompent.
 - Carte produit : toute la carte ouvre la fiche ; le « + » ajoute directement si aucun choix n'est obligatoire, sinon il ouvre la fiche. Pastille de quantité si le plat est déjà au panier.
 - Animations au scroll : `Reveal` (`src/components/ui/reveal.tsx`) et parallaxe de l'en-tête, rendus statiques si `prefers-reduced-motion`.
-- Police : une seule variable `--font-sans` (globals.css). Le choix final reste à faire (l'aperçu propose 6 candidates).
+- Cartes produit de hauteur fixe (136 px) : nom + description sur 3 lignes max, prix et badges sur une ligne (un badge qui ne tient pas est masqué, jamais coupé).
+- Thème : automatique (système) par défaut ; bouton soleil/lune (`ThemeToggle`) qui pose `data-theme` et le mémorise (`miaamm:theme`). Un script inline dans `<head>` l'applique avant le premier rendu.
+- Sheets : le CTA passe par la prop `footer` (zone fixe hors défilement), jamais en `sticky` dans le contenu.
+- Police : une seule variable `--font-sans` (globals.css), actuellement Figtree.
 - Composants : `src/components/shop/*`. Sur mobile, bottom-sheets en `.glass-thick` (88 % / 82 %) : le verre à 60 % n'est pas lisible sur du contenu dense. Pieds de sheet collants quasi opaques.
 
 ## Conventions de code
@@ -97,7 +100,7 @@ Espaces prévus : `s/[slug]` boutique client (réécrite depuis `{slug}.miaamm.a
 
 ## Règles de design (Apple design language + Liquid Glass)
 
-- Police **Inter Variable** avec axe `opsz` (coupe Display automatique), fallback `-apple-system`. Wordmark en **Nunito** (arrondie).
+- Police **Figtree** (auto-hébergée, `@fontsource-variable/figtree`, variable `--font-sans`), fallback `-apple-system`. Wordmark en **Nunito** (arrondie).
 - Titres : `text-display-sm` (34), `-md` (44), `-lg` (56), `-xl` (80), weight 700, tracking -0.03em. Corps : `text-body` (17 px).
 - Fonds : `bg-bg` (#F5F5F7 / #000), cartes `bg-surface` (#FFF / #1C1C1E). Sombre automatique (`prefers-color-scheme`), forçable via `data-theme` sur `<html>`.
 - Palette : `blue` #0A84FF, `violet` #BF5AF2, `pink` #FF375F, `orange` #FF9F0A, `green` #30D158. Une couleur par catégorie de menu ou carte stat.
@@ -131,6 +134,7 @@ Espaces prévus : `s/[slug]` boutique client (réécrite depuis `{slug}.miaamm.a
 | 2026-09-28 | Next.js 14 comme demandé (montée de version possible plus tard).                                                                       |
 | 2026-09-28 | Tailwind 3 (compatibilité shadcn/Next 14). Primitives UI écrites à la main façon shadcn.                                               |
 | 2026-09-28 | Polices auto-hébergées via `@fontsource-variable` (build sans réseau vers Google Fonts, RGPD).                                         |
+| 2026-09-29 | Police principale **Figtree** (choisie parmi 6 candidates dans l'aperçu), à la place d'Inter.                                          |
 | 2026-09-28 | i18n sans préfixe d'URL : la langue vient du cookie `NEXT_LOCALE` puis d'`Accept-Language`, FR par défaut.                             |
 | 2026-09-28 | CTA en #0071E3 pour le contraste AA ; #0A84FF reste la couleur d'accent et des icônes.                                                 |
 | 2026-09-28 | Variables d'env validées paresseusement par groupe (public/serveur) pour que chaque phase compile sans les clés des suivantes.         |

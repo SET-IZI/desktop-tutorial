@@ -38,7 +38,7 @@ writeFileSync(
   path.join(OUT, 'styles.css'),
   `${globals}
 @layer base {
-  :root { --font-sans: 'Plus Jakarta Sans'; }
+  :root { --font-sans: 'Figtree'; }
   .font-rounded { font-family: 'Nunito', ui-rounded, system-ui, sans-serif; }
 }
 `,
@@ -103,7 +103,7 @@ const html = `<title>${restaurant.name} sur Miaamm</title>
 <meta name="description" content="Aperçu de la boutique ${restaurant.name} sur Miaamm">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400..800&family=Plus+Jakarta+Sans:wght@400..800&family=Figtree:wght@400..800&family=DM+Sans:opsz,wght@9..40,400..800&family=Nunito:wght@400..900&family=Outfit:wght@400..800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400..800&family=Nunito:wght@800&display=swap">
 <style>${css}</style>
 <div id="miaamm-root"></div>
 <script>${js}</script>
