@@ -4,6 +4,10 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { assertRole, getUser } from '@/lib/auth/session';
 import { createClient } from '@/lib/supabase/server';
+import { getLocale, getTranslations } from 'next-intl/server';
+import { getPublicEnv } from '@/lib/env';
+import { sendEmail } from '@/lib/notify/email';
+import { teamInviteEmail } from '@/lib/notify/templates';
 
 /**
  * Équipe : réservé au propriétaire (la RLS le garantit aussi). Les invitations
@@ -33,7 +37,7 @@ const inviteSchema = z.object({
 
 export async function inviteMember(
   input: z.input<typeof inviteSchema>,
-): Promise<{ ok: true; token: string } | { ok: false; error: string }> {
+): Promise<{ ok: true; token: string; emailSent: boolean } | { ok: false; error: string }> {
   return guard(async () => {
     const parsed = inviteSchema.safeParse({ ...input, email: input.email?.trim().toLowerCase() });
     if (!parsed.success) return { ok: false as const, error: 'email_invalid' };
@@ -57,8 +61,22 @@ export async function inviteMember(
       if (error.code === '23505') return { ok: false as const, error: 'already_invited' };
       throw new Error(error.message);
     }
+    // Invitation par email (Resend) ; le lien reste aussi copiable dans la page.
+    const locale = (await getLocale()) === 'en' ? 'en' : 'fr';
+    const roles = await getTranslations('admin.team.roles');
+    const base = getPublicEnv().NEXT_PUBLIC_APP_URL.replace(/\/$/, '');
+    const emailSent = await sendEmail({
+      to: parsed.data.email,
+      ...teamInviteEmail({
+        locale,
+        restaurantName: current.name,
+        roleLabel: roles(parsed.data.role),
+        url: `${base}/app/rejoindre/${data.token}`,
+      }),
+      idempotencyKey: `team-invite-${data.token}`,
+    });
     revalidatePath('/app/equipe');
-    return { ok: true as const, token: data.token };
+    return { ok: true as const, token: data.token, emailSent };
   });
 }
 

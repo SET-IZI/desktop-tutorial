@@ -3,6 +3,7 @@ import { getPaymentsEnv } from '@/lib/env';
 import { getStripe } from '@/lib/payments/gateway';
 import { processStripeEvent } from '@/lib/payments/webhook';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { notifyOrderPlaced } from '@/lib/notify/orders';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,7 +29,9 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await processStripeEvent(createAdminClient(), event);
+    const result = await processStripeEvent(createAdminClient(), event, {
+      onOrderPaid: notifyOrderPlaced,
+    });
     return NextResponse.json({ received: true, result });
   } catch (error) {
     console.error('[stripe webhook]', event.type, event.id, error);

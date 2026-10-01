@@ -11,9 +11,15 @@ type Admin = SupabaseClient<Database>;
  * Idempotent : chaque event.id n'est traité qu'une fois (table stripe_events).
  * Renvoie 'duplicate' si l'événement avait déjà été reçu.
  */
+export interface StripeEventHooks {
+  /** Commande passée en « new » par ce paiement (notifications). */
+  onOrderPaid?: (orderId: string) => Promise<void>;
+}
+
 export async function processStripeEvent(
   admin: Admin,
   event: Stripe.Event,
+  hooks: StripeEventHooks = {},
 ): Promise<'processed' | 'duplicate' | 'ignored'> {
   const { error: insertError } = await admin
     .from('stripe_events')
@@ -28,7 +34,12 @@ export async function processStripeEvent(
     switch (event.type) {
       case 'payment_intent.succeeded': {
         const intent = event.data.object;
-        await handlePaymentSucceeded(admin, intent.id, intent.amount_received || intent.amount);
+        const orderId = await handlePaymentSucceeded(
+          admin,
+          intent.id,
+          intent.amount_received || intent.amount,
+        );
+        if (orderId && hooks.onOrderPaid) await hooks.onOrderPaid(orderId);
         return 'processed';
       }
       case 'payment_intent.payment_failed': {

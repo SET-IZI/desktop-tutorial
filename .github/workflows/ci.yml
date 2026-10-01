@@ -23,6 +23,8 @@ env:
   # Géocodage et import IA simulés (pas d'appel réseau externe en CI).
   MIAAMM_GEOCODER: mock
   MIAAMM_AI_IMPORT: mock
+  MIAAMM_EMAIL_MODE: mock
+  MIAAMM_PUSH_MODE: mock
 
 jobs:
   checks:

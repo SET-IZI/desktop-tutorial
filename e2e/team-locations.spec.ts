@@ -30,7 +30,7 @@ test.describe('Équipe', () => {
       await page.getByLabel('Email', { exact: true }).fill(email);
       await page.getByRole('radio', { name: 'Cuisine' }).click();
       await page.getByRole('button', { name: "Créer l'invitation" }).click();
-      const status = page.getByRole('status').filter({ hasText: 'Invitation créée' });
+      const status = page.getByRole('status').filter({ hasText: /Invitation (créée|envoyée)/ });
       await expect(status).toBeVisible();
       const link = (await status.locator('.select-all').textContent())!;
       expect(link).toMatch(/\/app\/rejoindre\/[0-9a-f]{64}$/);

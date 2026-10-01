@@ -389,7 +389,7 @@
       "confirmRemove": "Remove {email} from the team?",
       "confirm": "Remove",
       "invite": "Invite a member",
-      "inviteHint": "A personal link valid for 7 days, to send to the person you invite. It only works with their email address.",
+      "inviteHint": "A personal link valid for 7 days, emailed to the person you invite. It only works with their email address.",
       "email": "Email",
       "inviteRole": "Role",
       "send": "Create invitation",
@@ -407,7 +407,8 @@
         "already_invited": "An invitation is already pending for this address.",
         "last_owner": "The restaurant must keep at least one owner.",
         "self": "You can't remove yourself."
-      }
+      },
+      "emailSent": "Invitation emailed to {email}. You can also share this link:"
     },
     "locations": {
       "title": "Locations",
@@ -437,6 +438,14 @@
         "last_active": "Keep at least one location visible on the shop."
       },
       "manageShort": "Manage"
+    },
+    "push": {
+      "title": "New order alerts",
+      "hint": "Get a notification on this device for every new order, even with the kitchen screen closed.",
+      "unsupported": "This browser doesn't support notifications. On iPhone, add Miaamm to your home screen first.",
+      "denied": "Notifications are blocked for this site. Allow them in your browser settings.",
+      "enabled": "Alerts turned on for this device",
+      "error": "Couldn't turn them on. Try again."
     }
   },
   "menuEditor": {

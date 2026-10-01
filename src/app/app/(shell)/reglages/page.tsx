@@ -2,6 +2,7 @@ import { ChevronRight, LogOut, MapPin, Users } from 'lucide-react';
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 import { signOut } from '@/app/(auth)/actions';
+import { PushToggle } from '@/components/admin/push-toggle';
 import { SettingsForms } from '@/components/admin/settings-forms';
 import { Card } from '@/components/ui/card';
 import { getCurrentLocation } from '@/lib/admin/location';
@@ -61,6 +62,9 @@ export default async function SettingsPage() {
           </li>
         </ul>
       </Card>
+      {process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ? (
+        <PushToggle publicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY} />
+      ) : null}
       <SettingsForms
         canManage={canManage(current.role)}
         restaurant={{

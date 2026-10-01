@@ -51,7 +51,9 @@ export function TeamManager({
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<'manager' | 'kitchen'>('manager');
   const [inviteError, setInviteError] = useState<string | null>(null);
-  const [created, setCreated] = useState<{ email: string; url: string } | null>(null);
+  const [created, setCreated] = useState<{ email: string; url: string; emailSent: boolean } | null>(
+    null,
+  );
 
   const errorText = (code: string) =>
     t.has(`errors.${code}`)
@@ -87,7 +89,7 @@ export function TeamManager({
         setInviteError(errorText(result.error));
         return;
       }
-      setCreated({ email, url: `${inviteBase}${result.token}` });
+      setCreated({ email, url: `${inviteBase}${result.token}`, emailSent: result.emailSent });
       setEmail('');
       router.refresh();
     });
@@ -216,7 +218,11 @@ export function TeamManager({
             </form>
             {created ? (
               <div role="status" className="mt-5 rounded-2xl bg-green/10 p-4">
-                <p className="font-medium">{t('linkReady', { email: created.email })}</p>
+                <p className="font-medium">
+                  {created.emailSent
+                    ? t('emailSent', { email: created.email })
+                    : t('linkReady', { email: created.email })}
+                </p>
                 <div className="mt-2 flex items-center gap-2 rounded-2xl bg-surface py-1 pl-4 pr-1">
                   <span className="min-w-0 flex-1 select-all truncate text-[15px]">
                     {created.url}

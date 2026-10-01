@@ -128,6 +128,11 @@ Espaces prévus : `s/[slug]` boutique client (réécrite depuis `{slug}.miaamm.a
 - Temps réel : abonnement `postgres_changes` sur `orders` filtré par `location_id`, puis `router.refresh()` ; filet de sécurité toutes les 30 s ; état « En direct / Reconnexion… ». **Toujours appeler `authorizeRealtime(supabase)` avant `.subscribe()`** (`src/lib/supabase/realtime.ts`) : sinon une session restaurée depuis les cookies rejoint le canal en anonyme et la RLS filtre tout.
 - Suivi client (`/s/[slug]/commande/[token]`) : la session anonyme du checkout (`ensureGuestSession`, `src/lib/supabase/guest-session.ts`) relie la commande au navigateur (`customer_user_id`) ; `LiveOrder` s'abonne à `orders` `id=eq.<id>` (RLS `owns_order`) puis rafraîchit la page. Secours : 2,5 s pendant la confirmation du paiement, 15 s sans temps réel (lien ouvert sur un autre appareil), 60 s sinon. Retard annoncé (« Petit retard en cuisine ») et motif de refus/remboursement affichés au client.
 - Son : carillon Web Audio (`src/lib/kitchen/chime.ts`), activé par un geste (bouton « Activer le son », préférence mémorisée), rappel toutes les 20 s tant qu'une commande attend.
+- Notifications (`src/lib/notify/*`), jamais bloquantes (ne lèvent pas) :
+  - Emails Resend (`emails.send`, `idempotencyKey` par événement) : confirmation de commande (lien de suivi), « C'est prêt », annulation/refus (motif, remboursement), invitation d'équipe. Gabarits purs et testés (`templates.ts`) : tutoiement client, vouvoiement équipe, un emoji max en début de titre, données échappées.
+  - Déclencheurs : `placeOrder` (paiement sur place), webhook Stripe et `mock-confirm` (hook `onOrderPaid` de `processStripeEvent`, appelé seulement si la commande vient de passer en `new`), actions cuisine (prête, refus), `inviteMember`.
+  - Web Push (`web-push`, VAPID) : alerte « Nouvelle commande n°X » à tous les appareils de l'équipe (`push_subscriptions`, RLS : chacun les siens, membre de l'équipe), abonnements expirés (404/410) supprimés. Service worker `public/sw.js` (clic → `/app/cuisine`), interrupteur dans Réglages affiché seulement si `NEXT_PUBLIC_VAPID_PUBLIC_KEY` existe, manifeste PWA (`src/app/manifest.ts`, requis sur iPhone). **Abonnement navigateur non testé de bout en bout** (service de push requis) : à vérifier au déploiement.
+  - Modes simulés `MIAAMM_EMAIL_MODE=mock` / `MIAAMM_PUSH_MODE=mock` : messages écrits en JSON dans `MIAAMM_OUTBOX_DIR` (`.tools/outbox`), lus par les E2E (`e2e/outbox.ts`). Interdits en production.
 - Realtime local : `scripts/dev/realtime-lite.mjs` (dans supabase-lite, `ws://127.0.0.1:54321/realtime/v1/websocket`), protocole Phoenix v2 relu dans `@supabase/realtime-js`, triggers `LISTEN/NOTIFY` posés au démarrage sur les tables de la publication `supabase_realtime`, RLS évaluée avec le JWT de l'abonné. `REALTIME_LITE_DEBUG=1` trace les messages. Lancer supabase-lite **après** `pnpm db:reset` (les triggers sont posés au démarrage).
 
 ## Conventions de code
@@ -175,6 +180,8 @@ Espaces prévus : `s/[slug]` boutique client (réécrite depuis `{slug}.miaamm.a
 
 | Date       | Décision                                                                                                                            |
 | ---------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-10-01 | Notifications envoyées en ligne (sans file `jobs`) et jamais bloquantes ; la file arrivera si les volumes l'exigent.                |
+| 2026-10-01 | Cuisine : Accepter → Prête → Récupérée (le statut `preparing` reste disponible mais n'est pas utilisé par l'écran).                 |
 | 2026-10-01 | Une carte par restaurant, partagée par ses établissements ; horaires, capacité et modes de commande par établissement.              |
 | 2026-10-01 | Invitations d'équipe par lien copié (pas d'email avant Resend), liées à l'adresse invitée ; rôle owner attribué ensuite.            |
 | 2026-09-29 | Géocodage par la Géoplateforme IGN (gratuit, sans clé, France) plutôt que Mapbox pour l'onboarding ; Mapbox reste pour les cartes.  |
@@ -217,7 +224,7 @@ Espaces prévus : `s/[slug]` boutique client (réécrite depuis `{slug}.miaamm.a
 - [x] **Phase 2 · Boutique client** : carte avec barre collante et suivi de section, recherche et filtres, fiche produit (options, suppléments, note, quantité), panier persistant et réconcilié, upsell, retrait/livraison, créneaux selon la charge réelle (complets et bloqués grisés), sous-domaines, 404 soignée. 48 tests unitaires, 33 tests SQL, 40 e2e (desktop et mobile, axe clair et sombre).
 - [x] **Phase 3 · Paiement** : checkout invité en 2 étapes max, prix recalculés côté serveur, création atomique sans surréservation, Stripe Connect direct charges sans commission (Payment Element : carte, Apple Pay, Google Pay), paiement sur place, webhook signé et idempotent, page de confirmation avec suivi du statut, mode simulé pour dev et E2E.
 - [x] **Phase 4 · Back-office** : auth et shell (rush en un geste), réglages, horaires et fermetures, éditeur de carte (glisser-déposer souris et clavier, options, allergènes, photos, rupture), onboarding en 5 étapes (géocodage, import CSV ou photo par IA, Stripe Connect, lien + QR), équipe (rôles, invitations par lien), multi-établissements (back-office et boutique).
-- [ ] Phase 5 · Temps réel : commandes, écran cuisine, suivi statuts, notifications
+- [x] **Phase 5 · Temps réel** : écran cuisine en direct (Realtime, son, Accepter → Prête → Récupérée, retard, refus avec remboursement), suivi client en direct (session anonyme), emails transactionnels (Resend), alertes Web Push pour l'équipe, émulation Realtime locale.
 - [ ] Phase 6 · Livraison : zones, frais, adresse, DeliveryProvider, InternalProvider
 - [ ] Phase 7 · Suivi live : app livreur PWA, Realtime, carte client, ETA
 - [ ] Phase 8 · Intégrations : Uber Direct, Stuart, Shipday, e2e

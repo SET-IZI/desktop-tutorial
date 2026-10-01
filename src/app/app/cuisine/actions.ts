@@ -6,6 +6,7 @@ import { assertRole } from '@/lib/auth/session';
 import { refundOrderPayment } from '@/lib/payments/gateway';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
+import { notifyOrderStatus } from '@/lib/notify/orders';
 
 /**
  * Actions de l'écran cuisine (toute l'équipe, rôle cuisine compris). Écritures
@@ -51,6 +52,7 @@ export async function setOrderStatus(input: z.input<typeof statusSchema>): Promi
       throw new Error(error.message);
     }
     if (data.length === 0) return { ok: false, error: 'not_found' };
+    if (parsed.data.to === 'ready') await notifyOrderStatus(parsed.data.orderId);
     revalidatePath('/app', 'layout');
     return { ok: true };
   });
@@ -135,6 +137,7 @@ export async function rejectOrder(input: z.input<typeof rejectSchema>): Promise<
       });
       await admin.from('orders').update({ payment_status: 'refunded' }).eq('id', order.id);
     }
+    await notifyOrderStatus(order.id);
     revalidatePath('/app', 'layout');
     return { ok: true };
   });

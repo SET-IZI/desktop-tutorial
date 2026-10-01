@@ -159,3 +159,61 @@ export function getAiImportEnv(): AiImportEnv {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   return apiKey ? { mode: 'anthropic', apiKey } : { mode: 'off' };
 }
+
+// ═══ Notifications (phase 5) ═════════════════════════════════════════════════
+
+export type EmailEnv =
+  { mode: 'resend'; apiKey: string; from: string } | { mode: 'mock' } | { mode: 'off' };
+
+/**
+ * Emails transactionnels (Resend). `MIAAMM_EMAIL_MODE=mock` écrit les emails dans
+ * la boîte d'envoi locale (dev, E2E), interdit en production. Sans clé : désactivés.
+ */
+export function getEmailEnv(): EmailEnv {
+  assertServer('getEmailEnv');
+  if (process.env.MIAAMM_EMAIL_MODE === 'mock') {
+    if (process.env.VERCEL_ENV === 'production') {
+      throw new Error('Emails simulés interdits en production.');
+    }
+    return { mode: 'mock' };
+  }
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return { mode: 'off' };
+  const from = process.env.RESEND_FROM;
+  if (!from) throw new Error('RESEND_FROM manquant (ex. « Miaamm <commandes@miaamm.app> »).');
+  return { mode: 'resend', apiKey, from };
+}
+
+export type PushEnv =
+  | { mode: 'webpush'; publicKey: string; privateKey: string; subject: string }
+  | { mode: 'mock' }
+  | { mode: 'off' };
+
+/**
+ * Notifications Web Push (clés VAPID). `MIAAMM_PUSH_MODE=mock` écrit les
+ * notifications dans la boîte d'envoi locale, interdit en production.
+ */
+export function getPushEnv(): PushEnv {
+  assertServer('getPushEnv');
+  if (process.env.MIAAMM_PUSH_MODE === 'mock') {
+    if (process.env.VERCEL_ENV === 'production') {
+      throw new Error('Notifications simulées interdites en production.');
+    }
+    return { mode: 'mock' };
+  }
+  const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+  const privateKey = process.env.VAPID_PRIVATE_KEY;
+  if (!publicKey || !privateKey) return { mode: 'off' };
+  return {
+    mode: 'webpush',
+    publicKey,
+    privateKey,
+    subject: process.env.VAPID_SUBJECT ?? 'mailto:contact@miaamm.app',
+  };
+}
+
+/** Boîte d'envoi locale des modes simulés (emails et notifications). */
+export function getOutboxDir(): string {
+  assertServer('getOutboxDir');
+  return process.env.MIAAMM_OUTBOX_DIR ?? '.tools/outbox';
+}

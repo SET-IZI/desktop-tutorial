@@ -389,7 +389,7 @@
       "confirmRemove": "Retirer {email} de l'équipe ?",
       "confirm": "Retirer",
       "invite": "Inviter un membre",
-      "inviteHint": "Un lien personnel valable 7 jours, à envoyer à la personne invitée. Il ne fonctionne qu'avec son adresse email.",
+      "inviteHint": "Un lien personnel valable 7 jours, envoyé par email à la personne invitée. Il ne fonctionne qu'avec son adresse.",
       "email": "Email",
       "inviteRole": "Rôle",
       "send": "Créer l'invitation",
@@ -407,7 +407,8 @@
         "already_invited": "Une invitation est déjà en attente pour cette adresse.",
         "last_owner": "Le restaurant doit garder au moins un propriétaire.",
         "self": "Vous ne pouvez pas vous retirer vous-même."
-      }
+      },
+      "emailSent": "Invitation envoyée par email à {email}. Vous pouvez aussi lui transmettre ce lien :"
     },
     "locations": {
       "title": "Établissements",
@@ -437,6 +438,14 @@
         "last_active": "Gardez au moins un établissement visible sur la boutique."
       },
       "manageShort": "Gérer"
+    },
+    "push": {
+      "title": "Alertes de nouvelles commandes",
+      "hint": "Recevez une notification sur cet appareil à chaque nouvelle commande, même écran cuisine fermé.",
+      "unsupported": "Ce navigateur ne permet pas les notifications. Sur iPhone, ajoutez d'abord Miaamm à l'écran d'accueil.",
+      "denied": "Les notifications sont bloquées pour ce site. Autorisez-les dans les réglages du navigateur.",
+      "enabled": "Alertes activées sur cet appareil",
+      "error": "Activation impossible. Réessayez."
     }
   },
   "menuEditor": {

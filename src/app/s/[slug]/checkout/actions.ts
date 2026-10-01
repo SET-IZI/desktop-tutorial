@@ -15,6 +15,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { createPublicClient } from '@/lib/supabase/public';
 import { createClient } from '@/lib/supabase/server';
 import { withLocation } from '@/lib/storefront/location';
+import { notifyOrderPlaced } from '@/lib/notify/orders';
 
 export type PlaceOrderResult =
   | {
@@ -130,6 +131,7 @@ export async function placeOrder(input: CheckoutInput): Promise<PlaceOrderResult
     if (!order) throw new Error('place_order : aucune commande renvoyée');
 
     if (data.paymentMethod === 'on_site') {
+      await notifyOrderPlaced(order.order_id);
       return { ok: true, token: order.order_token, number: order.order_number, payment: null };
     }
 

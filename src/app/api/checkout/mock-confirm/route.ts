@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { getPaymentsEnv } from '@/lib/env';
 import { handlePaymentSucceeded } from '@/lib/payments/handlers';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { notifyOrderPlaced } from '@/lib/notify/orders';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,6 +30,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'not_found' }, { status: 404 });
   }
 
-  await handlePaymentSucceeded(admin, order.stripe_payment_intent_id, order.total_cents);
+  const orderId = await handlePaymentSucceeded(
+    admin,
+    order.stripe_payment_intent_id,
+    order.total_cents,
+  );
+  if (orderId) await notifyOrderPlaced(orderId);
   return NextResponse.json({ ok: true });
 }
