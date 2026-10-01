@@ -64,7 +64,7 @@ Espaces prévus : `s/[slug]` boutique client (réécrite depuis `{slug}.miaamm.a
 - **Privilèges par colonne** : l'équipe ne modifie que `status`, `extra_minutes`, `estimated_ready_at` et `cancel_reason` d'une commande (jamais les montants). `restaurants.stripe_account_id`/`order_seq` et `promo_codes.uses_count`, `drivers.user_id` et `customers.user_id` sont réservés au serveur. `provider_credentials.encrypted_secret` n'est lisible par personne hors `service_role`.
 - Écritures réservées au serveur (`service_role`) : création de commande, paiement, `customers`, fidélité, `deliveries`, `delivery_events`, logs, secrets, `jobs`.
 - Triggers : numéro de commande séquentiel par restaurant ; machine à états des commandes (`order_transition_allowed`) avec horodatage automatique ; sortie de `pending_payment` réservée au serveur ; lien de suivi expiré à la fin ; au moins un owner par restaurant.
-- RPC : `create_restaurant(name, slug, location)`, `redeem_driver_invite(code)`, `slot_load(location, from, to)` (charge des créneaux, sans exposer les commandes), `purge_delivery_tracks()` (service_role, cron RGPD 24 h).
+- RPC : `create_restaurant(name, slug, location)`, `redeem_driver_invite(code)`, `slot_load(location, from, to)` (charge des créneaux, sans exposer les commandes), `purge_delivery_tracks()` (service_role, cron RGPD 24 h), `team_members(restaurant)`, `invite_details(token)`, `accept_team_invite(token)`, `import_menu(menu, draft)`. Table `team_invites` (phase 4d).
 - Realtime : `orders`, `deliveries`, `delivery_events` dans `supabase_realtime`. Les positions GPS passeront par Broadcast privé (phase 7).
 - Seed : comptes `mimi@` (owner), `cuisine@` (kitchen), `karim@` (livreur), `lea@` (cliente) `@miaamm.test`, mot de passe `miaamm-demo`. Invitation livreur `DEMO-NADIA`. Codes promo `BIENVENUE`, `LIVRAISONOFFERTE`.
 
@@ -76,6 +76,7 @@ Espaces prévus : `s/[slug]` boutique client (réécrite depuis `{slug}.miaamm.a
 - Panier : Zustand persisté dans `localStorage` (`miaamm:cart:{slug}`). La réhydratation est manuelle après le montage, puis `reconcileCart()` retire les produits disparus ou épuisés et réapplique les prix du jour. Logique pure dans `src/lib/cart/lines.ts`, réutilisée côté serveur en phase 3.
 - Filtres (`src/lib/menu/filters.ts`) : recherche sans accents ni ligatures (œ → oe) ; « végé » inclut les plats vegan ; exclusion d'allergènes. Upsell (`src/lib/menu/upsell.ts`) : produits `is_upsell`, catégories absentes du panier en priorité.
 - Lecture pure dans `src/lib/storefront/fetch.ts` (client Supabase injecté) ; `queries.ts` ajoute le cache Next. L'aperçu (`scripts/preview/`) réutilise les mêmes composants, avec des shims pour next/link, next/image et next-intl, et calcule les créneaux côté navigateur.
+- Multi-établissements : `Storefront.locations` (actifs, du plus ancien au plus récent) et `Storefront.location` (affiché). `withLocation(storefront, id)` choisit l'établissement depuis `?etablissement=<id>` (boutique, checkout), `?location=<id>` (API créneaux) ou `locationId` (action `placeOrder`) ; inconnu → établissement par défaut. Pastilles « Nos adresses » dans l'en-tête quand il y en a plusieurs. **Une seule carte par restaurant**, partagée par tous ses établissements.
 - Barre de catégories : défilement calculé en JS (pas de saut d'ancre, intercepté dans une iframe) et suivi verrouillé pendant le défilement. Jamais de `scrollIntoView` pendant un défilement de page : Safari et Chrome l'interrompent.
 - Carte produit : toute la carte ouvre la fiche ; le « + » ajoute directement si aucun choix n'est obligatoire, sinon il ouvre la fiche. Pastille de quantité si le plat est déjà au panier.
 - Animations au scroll : `Reveal` (`src/components/ui/reveal.tsx`) et parallaxe de l'en-tête, rendus statiques si `prefers-reduced-motion`.
@@ -116,6 +117,9 @@ Espaces prévus : `s/[slug]` boutique client (réécrite depuis `{slug}.miaamm.a
   - Carte : import CSV (parseur pur `src/lib/menu-import/csv.ts`, « ; » ou « , », en-têtes FR/EN) ou photo/PDF lu par l'API Claude (`src/lib/menu-import/ai.ts` : `claude-opus-5-5`, sortie structurée Zod, repli serveur `fallbacks: 'default'` en cas de refus). Toujours relu avant `import_menu()` (SECURITY INVOKER, ajoute à la suite). Option photo masquée sans `ANTHROPIC_API_KEY` ; `MIAAMM_AI_IMPORT=mock` renvoie une carte d'exemple.
   - Paiements : Stripe Connect avec `controller` (tableau de bord complet, frais et litiges au restaurateur = équivalent Standard), `accountLinks` `account_onboarding`, retour sur `/app/onboarding/stripe` (statut relu, `?refresh=1` régénère le lien). Colonnes Stripe écrites uniquement par le serveur (service role). Réservé au propriétaire. Alternative : paiement sur place uniquement.
   - Mise en ligne : lien public (`shopPublicUrl`), QR code SVG généré côté serveur (`qrcode`), récapitulatif, publication → `/app?welcome=1`.
+- Équipe (`/app/equipe`, owner : gestion, manager : lecture) : rôles `owner` / `manager` / `kitchen`, changement de rôle et retrait via `users_roles` (RLS owner, trigger « au moins un propriétaire »). Invitations par **lien personnel** (`/app/rejoindre/<jeton>`, 64 hex, 7 jours, usage unique) accepté seulement par le compte dont l'email correspond ; connexion/inscription conservent le lien (`?next=`). L'envoi par email arrivera avec Resend (phase 5) : le propriétaire copie le lien.
+- Établissements (`/app/etablissements`, manager) : création géocodée, **masquée** par défaut (on règle ses horaires, puis on l'active) ; au moins un établissement reste visible. Établissement courant du back-office = cookie `miaamm_location` (`getCurrentLocation`), sélecteurs restaurant/établissement dans le shell (`ContextSwitcher`) dès qu'il y a le choix.
+- Navigation : Établissements et Équipe dans la barre latérale ; sur mobile (4 onglets), accessibles depuis Réglages, avec la déconnexion.
 
 ## Conventions de code
 
@@ -160,40 +164,42 @@ Espaces prévus : `s/[slug]` boutique client (réécrite depuis `{slug}.miaamm.a
 
 ## Décisions prises
 
-| Date       | Décision                                                                                                                               |
-| ---------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-09-29 | Géocodage par la Géoplateforme IGN (gratuit, sans clé, France) plutôt que Mapbox pour l'onboarding ; Mapbox reste pour les cartes.     |
-| 2026-09-29 | Import de carte : pas d'emoji ni de photo déduits automatiquement ; le restaurateur complète dans l'éditeur.                           |
-| 2026-09-29 | Onboarding sans Stripe possible (paiement sur place) pour ouvrir en moins de 30 min ; Stripe se connecte plus tard.                    |
-| 2026-09-28 | Une seule app Next.js (route groups), pas de monorepo.                                                                                 |
-| 2026-09-28 | Next.js 14 comme demandé (montée de version possible plus tard).                                                                       |
-| 2026-09-28 | Tailwind 3 (compatibilité shadcn/Next 14). Primitives UI écrites à la main façon shadcn.                                               |
-| 2026-09-28 | Polices auto-hébergées via `@fontsource-variable` (build sans réseau vers Google Fonts, RGPD).                                         |
-| 2026-09-29 | Checkout en retrait uniquement : la livraison (adresse, zone, frais) arrive en phase 6, le checkout propose de passer en retrait.      |
-| 2026-09-29 | Invités sans session Supabase pour l'instant : confirmation par jeton public ; session anonyme ajoutée avec Realtime (phase 5).        |
-| 2026-09-29 | Paiement simulé (`mock`) pour dev/E2E/aperçu, jamais en production.                                                                    |
-| 2026-09-29 | Police principale **Figtree** (choisie parmi 6 candidates dans l'aperçu), à la place d'Inter.                                          |
-| 2026-09-28 | i18n sans préfixe d'URL : la langue vient du cookie `NEXT_LOCALE` puis d'`Accept-Language`, FR par défaut.                             |
-| 2026-09-28 | CTA en #0071E3 pour le contraste AA ; #0A84FF reste la couleur d'accent et des icônes.                                                 |
-| 2026-09-28 | Variables d'env validées paresseusement par groupe (public/serveur) pour que chaque phase compile sans les clés des suivantes.         |
-| 2026-09-28 | Pricing : gratuit jusqu'à 100 commandes/mois, puis abonnement fixe, sans commission.                                                   |
-| 2026-09-28 | SMS et numéros masqués derrière une interface `SmsProvider`/`ProxyPhoneProvider`, mock par défaut (pas de Twilio pour l'instant).      |
-| 2026-09-28 | Import du menu par IA via l'API Claude (vision + sortie structurée), toujours relu avant import.                                       |
-| 2026-09-28 | Comptes client par magic link Supabase (pas de mot de passe).                                                                          |
-| 2026-09-28 | Stripe Connect Standard + direct charges, sans `application_fee_amount`.                                                               |
-| 2026-09-28 | `/dev/ui` reste accessible en prod (vitrine interne, `noindex`).                                                                       |
-| 2026-09-28 | Checkout invité = session **Supabase anonyme** : la RLS et Realtime fonctionnent pour les invités sans compte.                         |
-| 2026-09-28 | Pas de PostGIS : lat/lng en `double precision`, polygones en GeoJSON `jsonb`, calculs géographiques côté app.                          |
-| 2026-09-28 | Paliers de frais de livraison = plusieurs zones ordonnées par `position` (la première qui contient l'adresse s'applique).              |
-| 2026-09-28 | Capacité cuisine = N commandes max par créneau ; `time_slots` ne stocke que les surcharges ponctuelles (bloqué, capacité).             |
-| 2026-09-28 | Plages horaires sans passage à minuit (on coupe en deux) ; jours ISO 1 = lundi … 7 = dimanche.                                         |
-| 2026-09-28 | Options de commande figées en `jsonb` dans `order_items` (instantané, insensible aux modifs de carte).                                 |
-| 2026-09-28 | Toujours un créneau : pas de « dès que possible » séparé ; le premier créneau libre est présélectionné (« Au plus tôt · 12:30 »).      |
-| 2026-09-28 | Livraison : délai de trajet par défaut de 30 min dans les créneaux, tant que l'adresse (donc la zone) n'est pas connue (phase 6).      |
-| 2026-09-28 | Boutique = établissement actif le plus ancien du restaurant ; le choix d'établissement viendra avec le multi-établissements (phase 4). |
-| 2026-09-28 | Choix unique obligatoire = radio ; choix unique facultatif = case décochable ; aucune option n'est cochée par défaut.                  |
-| 2026-09-28 | E2E sans Docker : `supabase-lite` (PostgREST v12 + mini proxy `/rest/v1`), clés de dev publiques de la Supabase CLI.                   |
-| 2026-09-28 | Tests SQL en Vitest + `pg` (pas pgTAP) sur un Postgres nu + shim Supabase : tourne sans Docker, en local comme en CI.                  |
+| Date       | Décision                                                                                                                            |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-10-01 | Une carte par restaurant, partagée par ses établissements ; horaires, capacité et modes de commande par établissement.              |
+| 2026-10-01 | Invitations d'équipe par lien copié (pas d'email avant Resend), liées à l'adresse invitée ; rôle owner attribué ensuite.            |
+| 2026-09-29 | Géocodage par la Géoplateforme IGN (gratuit, sans clé, France) plutôt que Mapbox pour l'onboarding ; Mapbox reste pour les cartes.  |
+| 2026-09-29 | Import de carte : pas d'emoji ni de photo déduits automatiquement ; le restaurateur complète dans l'éditeur.                        |
+| 2026-09-29 | Onboarding sans Stripe possible (paiement sur place) pour ouvrir en moins de 30 min ; Stripe se connecte plus tard.                 |
+| 2026-09-28 | Une seule app Next.js (route groups), pas de monorepo.                                                                              |
+| 2026-09-28 | Next.js 14 comme demandé (montée de version possible plus tard).                                                                    |
+| 2026-09-28 | Tailwind 3 (compatibilité shadcn/Next 14). Primitives UI écrites à la main façon shadcn.                                            |
+| 2026-09-28 | Polices auto-hébergées via `@fontsource-variable` (build sans réseau vers Google Fonts, RGPD).                                      |
+| 2026-09-29 | Checkout en retrait uniquement : la livraison (adresse, zone, frais) arrive en phase 6, le checkout propose de passer en retrait.   |
+| 2026-09-29 | Invités sans session Supabase pour l'instant : confirmation par jeton public ; session anonyme ajoutée avec Realtime (phase 5).     |
+| 2026-09-29 | Paiement simulé (`mock`) pour dev/E2E/aperçu, jamais en production.                                                                 |
+| 2026-09-29 | Police principale **Figtree** (choisie parmi 6 candidates dans l'aperçu), à la place d'Inter.                                       |
+| 2026-09-28 | i18n sans préfixe d'URL : la langue vient du cookie `NEXT_LOCALE` puis d'`Accept-Language`, FR par défaut.                          |
+| 2026-09-28 | CTA en #0071E3 pour le contraste AA ; #0A84FF reste la couleur d'accent et des icônes.                                              |
+| 2026-09-28 | Variables d'env validées paresseusement par groupe (public/serveur) pour que chaque phase compile sans les clés des suivantes.      |
+| 2026-09-28 | Pricing : gratuit jusqu'à 100 commandes/mois, puis abonnement fixe, sans commission.                                                |
+| 2026-09-28 | SMS et numéros masqués derrière une interface `SmsProvider`/`ProxyPhoneProvider`, mock par défaut (pas de Twilio pour l'instant).   |
+| 2026-09-28 | Import du menu par IA via l'API Claude (vision + sortie structurée), toujours relu avant import.                                    |
+| 2026-09-28 | Comptes client par magic link Supabase (pas de mot de passe).                                                                       |
+| 2026-09-28 | Stripe Connect Standard + direct charges, sans `application_fee_amount`.                                                            |
+| 2026-09-28 | `/dev/ui` reste accessible en prod (vitrine interne, `noindex`).                                                                    |
+| 2026-09-28 | Checkout invité = session **Supabase anonyme** : la RLS et Realtime fonctionnent pour les invités sans compte.                      |
+| 2026-09-28 | Pas de PostGIS : lat/lng en `double precision`, polygones en GeoJSON `jsonb`, calculs géographiques côté app.                       |
+| 2026-09-28 | Paliers de frais de livraison = plusieurs zones ordonnées par `position` (la première qui contient l'adresse s'applique).           |
+| 2026-09-28 | Capacité cuisine = N commandes max par créneau ; `time_slots` ne stocke que les surcharges ponctuelles (bloqué, capacité).          |
+| 2026-09-28 | Plages horaires sans passage à minuit (on coupe en deux) ; jours ISO 1 = lundi … 7 = dimanche.                                      |
+| 2026-09-28 | Options de commande figées en `jsonb` dans `order_items` (instantané, insensible aux modifs de carte).                              |
+| 2026-09-28 | Toujours un créneau : pas de « dès que possible » séparé ; le premier créneau libre est présélectionné (« Au plus tôt · 12:30 »).   |
+| 2026-09-28 | Livraison : délai de trajet par défaut de 30 min dans les créneaux, tant que l'adresse (donc la zone) n'est pas connue (phase 6).   |
+| 2026-09-28 | Boutique = établissement actif le plus ancien par défaut ; le client choisit son adresse (`?etablissement=`) s'il y en a plusieurs. |
+| 2026-09-28 | Choix unique obligatoire = radio ; choix unique facultatif = case décochable ; aucune option n'est cochée par défaut.               |
+| 2026-09-28 | E2E sans Docker : `supabase-lite` (PostgREST v12 + mini proxy `/rest/v1`), clés de dev publiques de la Supabase CLI.                |
+| 2026-09-28 | Tests SQL en Vitest + `pg` (pas pgTAP) sur un Postgres nu + shim Supabase : tourne sans Docker, en local comme en CI.               |
 
 ## Avancement
 
@@ -201,7 +207,7 @@ Espaces prévus : `s/[slug]` boutique client (réécrite depuis `{slug}.miaamm.a
 - [x] **Phase 1 · Base de données** : 4 migrations (types, schéma, fonctions, RLS), seed « Chez Mimi » complet, 32 tests SQL (RLS, isolation, rôles, transitions, créneaux, livreur, purge RGPD), types générés et vérifiés en CI.
 - [x] **Phase 2 · Boutique client** : carte avec barre collante et suivi de section, recherche et filtres, fiche produit (options, suppléments, note, quantité), panier persistant et réconcilié, upsell, retrait/livraison, créneaux selon la charge réelle (complets et bloqués grisés), sous-domaines, 404 soignée. 48 tests unitaires, 33 tests SQL, 40 e2e (desktop et mobile, axe clair et sombre).
 - [x] **Phase 3 · Paiement** : checkout invité en 2 étapes max, prix recalculés côté serveur, création atomique sans surréservation, Stripe Connect direct charges sans commission (Payment Element : carte, Apple Pay, Google Pay), paiement sur place, webhook signé et idempotent, page de confirmation avec suivi du statut, mode simulé pour dev et E2E.
-- [ ] Phase 4 · Back-office : 4a auth, shell, réglages, horaires ✔ · 4b éditeur de carte ✔ · 4c onboarding ✔ · 4d équipe et multi-établissements
+- [x] **Phase 4 · Back-office** : auth et shell (rush en un geste), réglages, horaires et fermetures, éditeur de carte (glisser-déposer souris et clavier, options, allergènes, photos, rupture), onboarding en 5 étapes (géocodage, import CSV ou photo par IA, Stripe Connect, lien + QR), équipe (rôles, invitations par lien), multi-établissements (back-office et boutique).
 - [ ] Phase 5 · Temps réel : commandes, écran cuisine, suivi statuts, notifications
 - [ ] Phase 6 · Livraison : zones, frais, adresse, DeliveryProvider, InternalProvider
 - [ ] Phase 7 · Suivi live : app livreur PWA, Realtime, carte client, ETA

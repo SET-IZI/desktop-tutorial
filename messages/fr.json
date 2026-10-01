@@ -110,7 +110,8 @@
     "notFoundHint": "Vérifie le lien ou demande-le au restaurant.",
     "quickAdd": "Ajouter {name} au panier",
     "chooseOptions": "Choisir les options de {name}",
-    "added": "{name} ajouté au panier"
+    "added": "{name} ajouté au panier",
+    "locations": "Nos adresses"
   },
   "checkout": {
     "title": "Finaliser ma commande",
@@ -230,7 +231,8 @@
       "menu": "Carte",
       "hours": "Horaires",
       "settings": "Réglages",
-      "team": "Équipe"
+      "team": "Équipe",
+      "locations": "Établissements"
     },
     "viewShop": "Voir ma boutique",
     "saved": "Modifications enregistrées",
@@ -348,6 +350,80 @@
         "too_many": "4 plages maximum par jour.",
         "dates": "La date de fin doit être après la date de début."
       }
+    },
+    "context": {
+      "restaurant": "Restaurant",
+      "location": "Établissement",
+      "inactive": "{name} (masqué)"
+    },
+    "team": {
+      "title": "Équipe",
+      "subtitle": "Invitez vos associés et votre équipe de cuisine. Chacun se connecte avec son propre compte.",
+      "members": "Membres",
+      "you": "vous",
+      "role": "Rôle de {email}",
+      "roles": {
+        "owner": "Propriétaire",
+        "manager": "Manager",
+        "kitchen": "Cuisine"
+      },
+      "roleHints": {
+        "owner": "Tout, y compris l'équipe et les paiements.",
+        "manager": "Carte, horaires, réglages et commandes.",
+        "kitchen": "Commandes et carte en lecture seule."
+      },
+      "remove": "Retirer {email}",
+      "confirmRemove": "Retirer {email} de l'équipe ?",
+      "confirm": "Retirer",
+      "invite": "Inviter un membre",
+      "inviteHint": "Un lien personnel valable 7 jours, à envoyer à la personne invitée. Il ne fonctionne qu'avec son adresse email.",
+      "email": "Email",
+      "inviteRole": "Rôle",
+      "send": "Créer l'invitation",
+      "linkReady": "Invitation créée. Envoyez ce lien à {email} :",
+      "copy": "Copier le lien",
+      "copied": "Lien copié",
+      "pending": "Invitations en attente",
+      "expires": "Expire le {date}",
+      "expired": "Expirée",
+      "revoke": "Annuler l'invitation de {email}",
+      "readOnly": "Seul le propriétaire peut modifier l'équipe.",
+      "errors": {
+        "email_invalid": "Cette adresse email n'est pas valide.",
+        "already_member": "Cette personne fait déjà partie de l'équipe.",
+        "already_invited": "Une invitation est déjà en attente pour cette adresse.",
+        "last_owner": "Le restaurant doit garder au moins un propriétaire.",
+        "self": "Vous ne pouvez pas vous retirer vous-même."
+      }
+    },
+    "locations": {
+      "title": "Établissements",
+      "subtitle": "Plusieurs adresses, une seule carte. Horaires, capacité et modes de commande se règlent par établissement.",
+      "current": "Établissement affiché",
+      "manage": "Gérer {name}",
+      "visible": "Visible sur la boutique · {name}",
+      "hidden": "Masqué",
+      "add": "Ajouter un établissement",
+      "addHint": "Il est créé masqué : réglez ses horaires, puis rendez-le visible.",
+      "name": "Nom de l'établissement",
+      "namePlaceholder": "Chez Mimi · Bastille",
+      "address": "Adresse",
+      "postalCode": "Code postal",
+      "city": "Ville",
+      "phone": "Téléphone (facultatif)",
+      "create": "Créer l'établissement",
+      "created": "Établissement créé. Réglez maintenant ses horaires.",
+      "errors": {
+        "name": "Indiquez le nom de l'établissement.",
+        "address": "Indiquez le numéro et la rue.",
+        "postalCode": "Le code postal doit contenir 5 chiffres.",
+        "city": "Indiquez la ville.",
+        "phone": "Ce numéro de téléphone n'est pas valide.",
+        "geocode_not_found": "Adresse introuvable. Vérifiez le numéro, la rue et le code postal.",
+        "geocode_unavailable": "Vérification de l'adresse impossible pour le moment. Réessayez dans un instant.",
+        "last_active": "Gardez au moins un établissement visible sur la boutique."
+      },
+      "manageShort": "Gérer"
     }
   },
   "menuEditor": {
@@ -570,5 +646,19 @@
       }
     },
     "welcome": "Votre boutique est en ligne. Les commandes arrivent ici."
+  },
+  "join": {
+    "title": "Rejoindre {restaurant}",
+    "subtitle": "Vous êtes invité à rejoindre l'équipe en tant que {role}.",
+    "as": "Connecté avec {email}",
+    "accept": "Rejoindre l'équipe",
+    "switch": "Changer de compte",
+    "errors": {
+      "not_found": "Ce lien d'invitation n'existe pas. Demandez-en un nouveau au propriétaire du restaurant.",
+      "expired": "Ce lien d'invitation a expiré. Demandez-en un nouveau au propriétaire du restaurant.",
+      "used": "Cette invitation a déjà été utilisée.",
+      "email_mismatch": "Cette invitation est destinée à {email}. Connectez-vous avec cette adresse.",
+      "server_error": "Impossible de rejoindre l'équipe pour le moment. Réessayez dans un instant."
+    }
   }
 }

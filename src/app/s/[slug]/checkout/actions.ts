@@ -13,6 +13,7 @@ import { fetchStorefront } from '@/lib/storefront/fetch';
 import { getSlotInputs } from '@/lib/storefront/queries';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createPublicClient } from '@/lib/supabase/public';
+import { withLocation } from '@/lib/storefront/location';
 
 export type PlaceOrderResult =
   | {
@@ -40,8 +41,9 @@ export async function placeOrder(input: CheckoutInput): Promise<PlaceOrderResult
   const data = parsed.data;
 
   try {
-    const storefront = await fetchStorefront(createPublicClient(), data.slug);
-    if (!storefront) return { ok: false, error: 'not_found' };
+    const shop = await fetchStorefront(createPublicClient(), data.slug);
+    if (!shop) return { ok: false, error: 'not_found' };
+    const storefront = withLocation(shop, data.locationId);
     const { restaurant, location, categories } = storefront;
 
     // La livraison (adresse, zone, frais) arrive en phase 6.

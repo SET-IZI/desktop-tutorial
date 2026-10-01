@@ -43,17 +43,19 @@ export async function fetchStorefront(
   if (error) throw new Error(`Boutique ${slug} : ${error.message}`);
   if (!restaurant) return null;
 
-  // Établissement principal : le plus ancien actif (multi-établissements en phase 4).
-  const loc = [...restaurant.locations].sort((a, b) => a.created_at.localeCompare(b.created_at))[0];
-  if (!loc?.menu_id) return null;
+  // Établissements actifs (RLS), du plus ancien au plus récent. La carte est
+  // celle du restaurant, partagée par tous ses établissements.
+  const sorted = [...restaurant.locations].sort((x, y) => x.created_at.localeCompare(y.created_at));
+  const menuId = sorted[0]?.menu_id;
+  if (!menuId) return null;
 
   const { data: categories, error: menuError } = await supabase
     .from('categories')
     .select(MENU_SELECT)
-    .eq('menu_id', loc.menu_id);
+    .eq('menu_id', menuId);
   if (menuError) throw new Error(`Carte ${slug} : ${menuError.message}`);
 
-  const location: StoreLocation = {
+  const locations: StoreLocation[] = sorted.map((loc) => ({
     id: loc.id,
     name: loc.name,
     addressLine: loc.address_line,
@@ -78,7 +80,7 @@ export async function fetchStorefront(
       closesAt: h.closes_at,
     })),
     closures: loc.location_closures.map((c) => ({ startsOn: c.starts_on, endsOn: c.ends_on })),
-  };
+  }));
 
   const menu: MenuCategory[] = [...categories]
     .sort(byPosition)
@@ -128,7 +130,8 @@ export async function fetchStorefront(
       stripeAccountId: restaurant.stripe_account_id,
       stripeChargesEnabled: restaurant.stripe_charges_enabled,
     },
-    location,
+    location: locations[0]!,
+    locations,
     categories: menu,
   };
 }

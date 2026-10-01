@@ -14,6 +14,7 @@ import { suggestUpsell } from '@/lib/menu/upsell';
 import type { Fulfillment, MenuProduct, Storefront } from '@/lib/storefront/types';
 import { QuantityStepper } from './quantity-stepper';
 import { SlotPicker } from './slot-picker';
+import { LOCATION_PARAM } from '@/lib/storefront/location';
 
 interface CartSheetProps {
   open: boolean;
@@ -71,7 +72,15 @@ export function CartSheet({
               </p>
               {slot ? (
                 <Button asChild block>
-                  <Link href={`/s/${restaurant.slug}/checkout`}>{t('continue')}</Link>
+                  <Link
+                    href={
+                      storefront.locations.length > 1
+                        ? `/s/${restaurant.slug}/checkout?${LOCATION_PARAM}=${location.id}`
+                        : `/s/${restaurant.slug}/checkout`
+                    }
+                  >
+                    {t('continue')}
+                  </Link>
                 </Button>
               ) : (
                 <Button block disabled>
@@ -173,6 +182,7 @@ export function CartSheet({
           {!empty ? (
             <SlotPicker
               slug={restaurant.slug}
+              locationId={location.id}
               timezone={location.timezone}
               service={fulfillment}
               value={slot}

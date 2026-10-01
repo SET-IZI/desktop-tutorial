@@ -52,7 +52,8 @@ export async function signUp(_prev: AuthState, formData: FormData): Promise<Auth
     if (error.code === 'weak_password') return { error: 'weak_password' };
     return { error: 'server_error' };
   }
-  redirect('/app/onboarding');
+  // Invitation d'équipe : retour sur le lien ; sinon, création du restaurant.
+  redirect(formData.get('next') ? safeNext(formData.get('next')) : '/app/onboarding');
 }
 
 export async function signOut() {

@@ -73,7 +73,7 @@ export function AuthForm({ mode, next }: { mode: 'login' | 'signup'; next?: stri
       <p className="text-center text-[15px] text-fg-muted">
         {mode === 'login' ? t('noAccount') : t('hasAccount')}{' '}
         <Link
-          href={mode === 'login' ? '/signup' : '/login'}
+          href={`${mode === 'login' ? '/signup' : '/login'}${next ? `?next=${encodeURIComponent(next)}` : ''}`}
           className="font-semibold text-[#0062C4] dark:text-blue"
         >
           {mode === 'login' ? t('createOne') : t('signIn')}

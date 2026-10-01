@@ -2,11 +2,13 @@
 
 import { motion, useReducedMotion, useScroll, useTransform } from 'framer-motion';
 import { MapPin } from 'lucide-react';
+import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
 import { MeshGradient } from '@/components/ui/mesh-gradient';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { isOpenAt } from '@/lib/slots/compute';
+import { LOCATION_PARAM } from '@/lib/storefront/location';
 import type { Storefront } from '@/lib/storefront/types';
 import { cn } from '@/lib/utils';
 
@@ -92,6 +94,31 @@ export function StoreHeader({ storefront }: { storefront: Storefront }) {
         <h1 className="mt-5 text-balance text-display-sm sm:text-display-md">{restaurant.name}</h1>
         {restaurant.description ? (
           <p className="mt-2 max-w-xl text-[17px] text-fg">{restaurant.description}</p>
+        ) : null}
+        {storefront.locations.length > 1 ? (
+          <nav aria-label={t('locations')} className="mt-4">
+            <ul className="flex flex-wrap gap-2">
+              {storefront.locations.map((l) => {
+                const current = l.id === location.id;
+                return (
+                  <li key={l.id}>
+                    <Link
+                      href={`/s/${restaurant.slug}?${LOCATION_PARAM}=${l.id}`}
+                      replace
+                      scroll={false}
+                      aria-current={current ? 'true' : undefined}
+                      className={cn(
+                        'inline-flex min-h-touch items-center rounded-full px-4 text-[15px] font-semibold text-fg transition-colors',
+                        current ? 'bg-surface shadow-soft' : 'glass',
+                      )}
+                    >
+                      {l.name}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </nav>
         ) : null}
         <p className="mt-3 flex items-center gap-1.5 text-[15px] text-fg">
           <MapPin className="size-4 shrink-0" aria-hidden />

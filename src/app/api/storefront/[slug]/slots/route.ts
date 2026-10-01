@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { computeSlots } from '@/lib/slots/compute';
+import { withLocation } from '@/lib/storefront/location';
 import { getSlotInputs, getStorefront } from '@/lib/storefront/queries';
 
 export const dynamic = 'force-dynamic';
@@ -12,6 +13,7 @@ const DEFAULT_DELIVERY_LEAD_MINUTES = 30;
 const querySchema = z.object({
   service: z.enum(['pickup', 'delivery']).default('pickup'),
   lead: z.coerce.number().int().min(0).max(180).optional(),
+  location: z.uuid().optional(),
 });
 
 export async function GET(request: Request, { params }: { params: { slug: string } }) {
@@ -20,11 +22,11 @@ export async function GET(request: Request, { params }: { params: { slug: string
   if (!parsed.success) {
     return NextResponse.json({ error: 'invalid_query' }, { status: 400 });
   }
-  const { service, lead } = parsed.data;
+  const { service, lead, location: locationId } = parsed.data;
 
-  const storefront = await getStorefront(params.slug);
-  if (!storefront) return NextResponse.json({ error: 'not_found' }, { status: 404 });
-  const { location } = storefront;
+  const shop = await getStorefront(params.slug);
+  if (!shop) return NextResponse.json({ error: 'not_found' }, { status: 404 });
+  const { location } = withLocation(shop, locationId);
 
   const enabled = service === 'pickup' ? location.pickupEnabled : location.deliveryEnabled;
   if (!enabled) return NextResponse.json({ error: 'service_disabled' }, { status: 409 });

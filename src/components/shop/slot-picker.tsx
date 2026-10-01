@@ -10,6 +10,8 @@ import { cn } from '@/lib/utils';
 
 interface SlotPickerProps {
   slug: string;
+  /** Établissement dont on affiche les créneaux. */
+  locationId: string;
   timezone: string;
   service: Fulfillment;
   value: string | null;
@@ -19,7 +21,14 @@ interface SlotPickerProps {
 type LoadState =
   { status: 'loading' } | { status: 'error' } | { status: 'ready'; data: SlotsResult };
 
-export function SlotPicker({ slug, timezone, service, value, onChange }: SlotPickerProps) {
+export function SlotPicker({
+  slug,
+  locationId,
+  timezone,
+  service,
+  value,
+  onChange,
+}: SlotPickerProps) {
   const t = useTranslations('shop');
   const locale = useLocale();
   const [state, setState] = useState<LoadState>({ status: 'loading' });
@@ -29,15 +38,16 @@ export function SlotPicker({ slug, timezone, service, value, onChange }: SlotPic
   const load = useCallback(async () => {
     setState({ status: 'loading' });
     try {
-      const res = await fetch(`/api/storefront/${slug}/slots?service=${service}`, {
-        cache: 'no-store',
-      });
+      const res = await fetch(
+        `/api/storefront/${slug}/slots?service=${service}&location=${locationId}`,
+        { cache: 'no-store' },
+      );
       if (!res.ok) throw new Error(String(res.status));
       setState({ status: 'ready', data: (await res.json()) as SlotsResult });
     } catch {
       setState({ status: 'error' });
     }
-  }, [slug, service]);
+  }, [slug, service, locationId]);
 
   useEffect(() => {
     void load();

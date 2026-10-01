@@ -16,6 +16,8 @@ export const checkoutLineSchema = z.object({
 
 export const checkoutSchema = z.object({
   slug: z.string().min(1).max(40),
+  /** Établissement choisi ; inconnu ou absent → établissement par défaut. */
+  locationId: z.uuid().optional(),
   fulfillment: z.enum(['pickup', 'delivery']),
   slot: z.iso.datetime({ offset: true }),
   paymentMethod: z.enum(['card', 'on_site']),

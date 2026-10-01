@@ -1,10 +1,12 @@
 import type { Metadata, Viewport } from 'next';
 import { notFound } from 'next/navigation';
 import { Storefront } from '@/components/shop/storefront';
+import { LOCATION_PARAM, withLocation } from '@/lib/storefront/location';
 import { getStorefront } from '@/lib/storefront/queries';
 
 interface Props {
   params: { slug: string };
+  searchParams?: Record<string, string | string[] | undefined>;
 }
 
 export const revalidate = 60;
@@ -25,8 +27,11 @@ export async function generateViewport({ params }: Props): Promise<Viewport> {
   return storefront ? { themeColor: storefront.restaurant.accentColor } : {};
 }
 
-export default async function StorePage({ params }: Props) {
+export default async function StorePage({ params, searchParams }: Props) {
   const storefront = await getStorefront(params.slug);
   if (!storefront) notFound();
-  return <Storefront storefront={storefront} />;
+  const wanted = searchParams?.[LOCATION_PARAM];
+  return (
+    <Storefront storefront={withLocation(storefront, typeof wanted === 'string' ? wanted : null)} />
+  );
 }

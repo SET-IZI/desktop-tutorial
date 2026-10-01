@@ -110,7 +110,8 @@
     "notFoundHint": "Check the link or ask the restaurant for it.",
     "quickAdd": "Add {name} to cart",
     "chooseOptions": "Choose options for {name}",
-    "added": "{name} added to cart"
+    "added": "{name} added to cart",
+    "locations": "Our locations"
   },
   "checkout": {
     "title": "Complete my order",
@@ -230,7 +231,8 @@
       "menu": "Menu",
       "hours": "Hours",
       "settings": "Settings",
-      "team": "Team"
+      "team": "Team",
+      "locations": "Locations"
     },
     "viewShop": "View my shop",
     "saved": "Changes saved",
@@ -348,6 +350,80 @@
         "too_many": "4 time ranges max per day.",
         "dates": "The end date must be after the start date."
       }
+    },
+    "context": {
+      "restaurant": "Restaurant",
+      "location": "Location",
+      "inactive": "{name} (hidden)"
+    },
+    "team": {
+      "title": "Team",
+      "subtitle": "Invite your partners and kitchen staff. Everyone signs in with their own account.",
+      "members": "Members",
+      "you": "you",
+      "role": "Role of {email}",
+      "roles": {
+        "owner": "Owner",
+        "manager": "Manager",
+        "kitchen": "Kitchen"
+      },
+      "roleHints": {
+        "owner": "Everything, including the team and payments.",
+        "manager": "Menu, hours, settings and orders.",
+        "kitchen": "Orders, and the menu read-only."
+      },
+      "remove": "Remove {email}",
+      "confirmRemove": "Remove {email} from the team?",
+      "confirm": "Remove",
+      "invite": "Invite a member",
+      "inviteHint": "A personal link valid for 7 days, to send to the person you invite. It only works with their email address.",
+      "email": "Email",
+      "inviteRole": "Role",
+      "send": "Create invitation",
+      "linkReady": "Invitation created. Send this link to {email}:",
+      "copy": "Copy link",
+      "copied": "Link copied",
+      "pending": "Pending invitations",
+      "expires": "Expires on {date}",
+      "expired": "Expired",
+      "revoke": "Cancel the invitation for {email}",
+      "readOnly": "Only the owner can change the team.",
+      "errors": {
+        "email_invalid": "This email address is not valid.",
+        "already_member": "This person is already on the team.",
+        "already_invited": "An invitation is already pending for this address.",
+        "last_owner": "The restaurant must keep at least one owner.",
+        "self": "You can't remove yourself."
+      }
+    },
+    "locations": {
+      "title": "Locations",
+      "subtitle": "Several addresses, one menu. Hours, capacity and ordering modes are set per location.",
+      "current": "Location shown",
+      "manage": "Manage {name}",
+      "visible": "Visible on the shop · {name}",
+      "hidden": "Hidden",
+      "add": "Add a location",
+      "addHint": "It's created hidden: set its hours, then make it visible.",
+      "name": "Location name",
+      "namePlaceholder": "Chez Mimi · Bastille",
+      "address": "Address",
+      "postalCode": "Postcode",
+      "city": "City",
+      "phone": "Phone (optional)",
+      "create": "Create location",
+      "created": "Location created. Now set its hours.",
+      "errors": {
+        "name": "Enter the location name.",
+        "address": "Enter the street number and name.",
+        "postalCode": "The postcode must have 5 digits.",
+        "city": "Enter the city.",
+        "phone": "This phone number is not valid.",
+        "geocode_not_found": "Address not found. Check the number, street and postcode.",
+        "geocode_unavailable": "The address can't be checked right now. Try again in a moment.",
+        "last_active": "Keep at least one location visible on the shop."
+      },
+      "manageShort": "Manage"
     }
   },
   "menuEditor": {
@@ -570,5 +646,19 @@
       }
     },
     "welcome": "Your shop is live. Orders will show up here."
+  },
+  "join": {
+    "title": "Join {restaurant}",
+    "subtitle": "You're invited to join the team as {role}.",
+    "as": "Signed in as {email}",
+    "accept": "Join the team",
+    "switch": "Switch account",
+    "errors": {
+      "not_found": "This invitation link doesn't exist. Ask the restaurant owner for a new one.",
+      "expired": "This invitation link has expired. Ask the restaurant owner for a new one.",
+      "used": "This invitation has already been used.",
+      "email_mismatch": "This invitation is for {email}. Sign in with that address.",
+      "server_error": "Can't join the team right now. Try again in a moment."
+    }
   }
 }

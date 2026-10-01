@@ -97,6 +97,9 @@ export interface StoreRestaurant {
 
 export interface Storefront {
   restaurant: StoreRestaurant;
+  /** Établissement affiché (par défaut le plus ancien, sinon choisi par le client). */
   location: StoreLocation;
+  /** Établissements actifs, du plus ancien au plus récent (même carte pour tous). */
+  locations: StoreLocation[];
   categories: MenuCategory[];
 }

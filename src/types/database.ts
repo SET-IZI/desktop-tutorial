@@ -1410,6 +1410,53 @@ export type Database = {
         };
         Relationships: [];
       };
+      team_invites: {
+        Row: {
+          accepted_at: string | null;
+          accepted_by: string | null;
+          created_at: string;
+          email: string;
+          expires_at: string;
+          id: string;
+          invited_by: string | null;
+          restaurant_id: string;
+          role: Database['public']['Enums']['member_role'];
+          token: string;
+        };
+        Insert: {
+          accepted_at?: string | null;
+          accepted_by?: string | null;
+          created_at?: string;
+          email: string;
+          expires_at?: string;
+          id?: string;
+          invited_by?: string | null;
+          restaurant_id: string;
+          role: Database['public']['Enums']['member_role'];
+          token?: string;
+        };
+        Update: {
+          accepted_at?: string | null;
+          accepted_by?: string | null;
+          created_at?: string;
+          email?: string;
+          expires_at?: string;
+          id?: string;
+          invited_by?: string | null;
+          restaurant_id?: string;
+          role?: Database['public']['Enums']['member_role'];
+          token?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'team_invites_restaurant_id_fkey';
+            columns: ['restaurant_id'];
+            isOneToOne: false;
+            referencedRelation: 'restaurants';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       time_slots: {
         Row: {
           capacity: number | null;
@@ -1482,6 +1529,7 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      accept_team_invite: { Args: { p_token: string }; Returns: string };
       create_restaurant: {
         Args: { p_location: Json; p_name: string; p_slug: string };
         Returns: string;
@@ -1491,6 +1539,16 @@ export type Database = {
         Returns: boolean;
       };
       import_menu: { Args: { p: Json; p_menu_id: string }; Returns: number };
+      invite_details: {
+        Args: { p_token: string };
+        Returns: {
+          accepted: boolean;
+          email: string;
+          expired: boolean;
+          restaurant_name: string;
+          role: Database['public']['Enums']['member_role'];
+        }[];
+      };
       is_assigned_driver: { Args: { p_delivery_id: string }; Returns: boolean };
       is_manager: { Args: { p_restaurant_id: string }; Returns: boolean };
       is_owner: { Args: { p_restaurant_id: string }; Returns: boolean };
@@ -1535,6 +1593,15 @@ export type Database = {
         Returns: {
           orders_count: number;
           slot_start: string;
+        }[];
+      };
+      team_members: {
+        Args: { p_restaurant_id: string };
+        Returns: {
+          created_at: string;
+          email: string;
+          role: Database['public']['Enums']['member_role'];
+          user_id: string;
         }[];
       };
     };

@@ -1,5 +1,9 @@
+import { ChevronRight, LogOut, MapPin, Users } from 'lucide-react';
+import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
+import { signOut } from '@/app/(auth)/actions';
 import { SettingsForms } from '@/components/admin/settings-forms';
+import { Card } from '@/components/ui/card';
 import { getCurrentLocation } from '@/lib/admin/location';
 import { canManage, requireRestaurant } from '@/lib/auth/session';
 import { createClient } from '@/lib/supabase/server';
@@ -7,6 +11,8 @@ import { createClient } from '@/lib/supabase/server';
 export default async function SettingsPage() {
   const { current } = await requireRestaurant();
   const t = await getTranslations('admin.settings');
+  const ta = await getTranslations('admin');
+  const tauth = await getTranslations('auth');
   const [{ data: restaurant }, location] = await Promise.all([
     createClient()
       .from('restaurants')
@@ -20,6 +26,41 @@ export default async function SettingsPage() {
   return (
     <div className="space-y-6">
       <h1 className="text-display-sm">{t('title')}</h1>
+      {/* Mobile : pages hors onglets et déconnexion. */}
+      <Card className="p-2 lg:hidden">
+        <ul className="divide-y divide-line/[0.06]">
+          {canManage(current.role)
+            ? (
+                [
+                  { href: '/app/etablissements', label: ta('nav.locations'), icon: MapPin },
+                  { href: '/app/equipe', label: ta('nav.team'), icon: Users },
+                ] as const
+              ).map(({ href, label, icon: Icon }) => (
+                <li key={href}>
+                  <Link
+                    href={href}
+                    className="flex min-h-touch items-center gap-3 rounded-2xl px-3 py-2 font-semibold hover:bg-fg/[0.04]"
+                  >
+                    <Icon className="size-5 text-fg-muted" aria-hidden />
+                    <span className="flex-1">{label}</span>
+                    <ChevronRight className="size-5 text-fg-muted" aria-hidden />
+                  </Link>
+                </li>
+              ))
+            : null}
+          <li>
+            <form action={signOut}>
+              <button
+                type="submit"
+                className="flex min-h-touch w-full items-center gap-3 rounded-2xl px-3 py-2 font-semibold hover:bg-fg/[0.04]"
+              >
+                <LogOut className="size-5 text-fg-muted" aria-hidden />
+                {tauth('logout')}
+              </button>
+            </form>
+          </li>
+        </ul>
+      </Card>
       <SettingsForms
         canManage={canManage(current.role)}
         restaurant={{

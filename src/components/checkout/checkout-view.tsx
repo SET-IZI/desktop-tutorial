@@ -122,6 +122,7 @@ function CheckoutBody({ storefront, cardAvailable, onSiteAvailable }: CheckoutVi
 
     const input = {
       slug: restaurant.slug,
+      locationId: location.id,
       fulfillment,
       slot,
       paymentMethod: method,

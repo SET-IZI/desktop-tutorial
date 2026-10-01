@@ -1,6 +1,15 @@
 'use client';
 
-import { Clock, ExternalLink, LayoutGrid, LogOut, Settings, UtensilsCrossed } from 'lucide-react';
+import {
+  Clock,
+  ExternalLink,
+  LayoutGrid,
+  LogOut,
+  MapPin,
+  Settings,
+  Users,
+  UtensilsCrossed,
+} from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -10,12 +19,14 @@ import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { ToastProvider } from '@/components/ui/toast';
 import { Wordmark } from '@/components/ui/wordmark';
 import { cn } from '@/lib/utils';
+import { ContextSwitcher, type ShellContext } from './context-switcher';
 import { RushControl, type RushState } from './rush-control';
 
 interface AdminShellProps {
   restaurant: { name: string; slug: string };
   canManage: boolean;
   rush: RushState | null;
+  context: ShellContext;
   children: React.ReactNode;
 }
 
@@ -26,13 +37,26 @@ const NAV = [
   { href: '/app/reglages', key: 'settings', icon: Settings },
 ] as const;
 
+/** Barre latérale uniquement ; sur mobile, accessibles depuis Réglages. */
+const MANAGE_NAV = [
+  { href: '/app/etablissements', key: 'locations', icon: MapPin },
+  { href: '/app/equipe', key: 'team', icon: Users },
+] as const;
+
+const UNDER_SETTINGS = MANAGE_NAV.map((n) => n.href);
+
 /** Back-office : barre latérale (desktop) et barre d'onglets Liquid Glass (mobile). */
-export function AdminShell({ restaurant, canManage, rush, children }: AdminShellProps) {
+export function AdminShell({ restaurant, canManage, rush, context, children }: AdminShellProps) {
   const t = useTranslations('admin');
   const ta = useTranslations('auth');
   const pathname = usePathname();
   const isActive = (href: string, exact?: boolean) =>
     exact ? pathname === href : pathname.startsWith(href);
+  const sideNav = canManage ? [...NAV, ...MANAGE_NAV] : NAV;
+  // Onglet mobile « Réglages » actif aussi sur Équipe et Établissements.
+  const isTabActive = (href: string, exact?: boolean) =>
+    isActive(href, exact) ||
+    (href === '/app/reglages' && UNDER_SETTINGS.some((h) => pathname.startsWith(h)));
 
   return (
     <ToastProvider>
@@ -42,10 +66,14 @@ export function AdminShell({ restaurant, canManage, rush, children }: AdminShell
           <Link href="/app" className="px-3" aria-label="Miaamm">
             <Wordmark className="text-[24px]" />
           </Link>
-          <p className="mt-6 truncate px-3 text-[15px] font-semibold">{restaurant.name}</p>
+          <ContextSwitcher
+            context={context}
+            restaurantName={restaurant.name}
+            className="mt-6 px-1 text-[15px] [&>p]:px-2"
+          />
           <nav aria-label="Back-office" className="mt-4 flex-1">
             <ul className="space-y-1">
-              {NAV.map(({ href, key, icon: Icon, ...rest }) => {
+              {sideNav.map(({ href, key, icon: Icon, ...rest }) => {
                 const active = isActive(href, 'exact' in rest);
                 return (
                   <li key={href}>
@@ -92,9 +120,11 @@ export function AdminShell({ restaurant, canManage, rush, children }: AdminShell
         <div className="min-w-0 flex-1">
           <header className="sticky top-0 z-30 border-b border-line/[0.06] bg-bg/80 backdrop-blur-xl">
             <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 sm:flex-nowrap sm:px-6">
-              <p className="min-w-0 flex-1 truncate font-semibold lg:invisible">
-                {restaurant.name}
-              </p>
+              <ContextSwitcher
+                context={context}
+                restaurantName={restaurant.name}
+                className="min-w-0 flex-1 lg:invisible"
+              />
               <a
                 href={`/s/${restaurant.slug}`}
                 target="_blank"
@@ -124,7 +154,7 @@ export function AdminShell({ restaurant, canManage, rush, children }: AdminShell
         >
           <GlassBar className="justify-around rounded-[28px] px-1 py-1">
             {NAV.map(({ href, key, icon: Icon, ...rest }) => {
-              const active = isActive(href, 'exact' in rest);
+              const active = isTabActive(href, 'exact' in rest);
               return (
                 <Link
                   key={href}
