@@ -94,7 +94,7 @@ Espaces prévus : `s/[slug]` boutique client (réécrite depuis `{slug}.miaamm.a
 - Stripe Connect **direct charges** (`src/lib/payments/gateway.ts`) : `paymentIntents.create(…, { stripeContext: acct, idempotencyKey: order-<id> })`, `automatic_payment_methods` (carte, Apple Pay, Google Pay), **sans `application_fee_amount`**. Côté client : `loadStripe(pk, { stripeAccount })`, Payment Element, `confirmPayment({ redirect: 'if_required' })`.
 - Webhook `/api/webhooks/stripe` : signature vérifiée sur le corps brut (`constructEvent`), déduplication par `event.id` (`stripe_events`), événement relâché si le traitement échoue (Stripe rejoue). `mark_order_paid()` est idempotent et vérifie le montant.
 - `MIAAMM_PAYMENTS_MODE=mock` : paiement simulé (dev/E2E) via `/api/checkout/mock-confirm`, qui joue le même traitement que le webhook. 404 dès que Stripe est configuré, interdit en production Vercel.
-- Confirmation : lecture serveur par `public_token` (jamais exposée au client), rafraîchie toutes les 15 s (2,5 s pendant la confirmation du paiement) en attendant Realtime (phase 5).
+- Confirmation : lecture serveur par `public_token` (jamais exposée au client), suivie en temps réel depuis la phase 5 (voir plus bas).
 - Stripe Connect côté restaurateur (création du compte, lien d'onboarding) : étape « Stripe » de l'onboarding en phase 4. `account.updated` tient déjà `stripe_charges_enabled` à jour.
 - Documentation Stripe (`docs.stripe.com`) inaccessible depuis l'environnement cloud : intégration vérifiée sur les types officiels des SDK (`stripe` 22.x, API `2026-08-26.dahlia`, `@stripe/stripe-js`, `@stripe/react-stripe-js`).
 
@@ -126,6 +126,7 @@ Espaces prévus : `s/[slug]` boutique client (réécrite depuis `{slug}.miaamm.a
 
 - Écran cuisine `/app/cuisine` (hors shell, plein écran, toute l'équipe) : colonnes Nouvelles / En cuisine / Prêtes (onglets sur mobile), Accepter → Prête → Récupérée, « +10 min » (`extra_minutes`), refus/annulation avec motif (`cancel_reason`). Une commande payée par carte refusée est **remboursée** (`refundOrderPayment`, `refunds.create` sur le compte connecté, idempotent) et passe en `refunded` (service role). Données : `loadKitchenOrders()` (`src/lib/kitchen/orders.ts`), actions `src/app/app/cuisine/actions.ts` via le client de l'utilisateur (RLS + privilèges par colonne + trigger de transitions).
 - Temps réel : abonnement `postgres_changes` sur `orders` filtré par `location_id`, puis `router.refresh()` ; filet de sécurité toutes les 30 s ; état « En direct / Reconnexion… ». **Toujours appeler `authorizeRealtime(supabase)` avant `.subscribe()`** (`src/lib/supabase/realtime.ts`) : sinon une session restaurée depuis les cookies rejoint le canal en anonyme et la RLS filtre tout.
+- Suivi client (`/s/[slug]/commande/[token]`) : la session anonyme du checkout (`ensureGuestSession`, `src/lib/supabase/guest-session.ts`) relie la commande au navigateur (`customer_user_id`) ; `LiveOrder` s'abonne à `orders` `id=eq.<id>` (RLS `owns_order`) puis rafraîchit la page. Secours : 2,5 s pendant la confirmation du paiement, 15 s sans temps réel (lien ouvert sur un autre appareil), 60 s sinon. Retard annoncé (« Petit retard en cuisine ») et motif de refus/remboursement affichés au client.
 - Son : carillon Web Audio (`src/lib/kitchen/chime.ts`), activé par un geste (bouton « Activer le son », préférence mémorisée), rappel toutes les 20 s tant qu'une commande attend.
 - Realtime local : `scripts/dev/realtime-lite.mjs` (dans supabase-lite, `ws://127.0.0.1:54321/realtime/v1/websocket`), protocole Phoenix v2 relu dans `@supabase/realtime-js`, triggers `LISTEN/NOTIFY` posés au démarrage sur les tables de la publication `supabase_realtime`, RLS évaluée avec le JWT de l'abonné. `REALTIME_LITE_DEBUG=1` trace les messages. Lancer supabase-lite **après** `pnpm db:reset` (les triggers sont posés au démarrage).
 
@@ -184,7 +185,7 @@ Espaces prévus : `s/[slug]` boutique client (réécrite depuis `{slug}.miaamm.a
 | 2026-09-28 | Tailwind 3 (compatibilité shadcn/Next 14). Primitives UI écrites à la main façon shadcn.                                            |
 | 2026-09-28 | Polices auto-hébergées via `@fontsource-variable` (build sans réseau vers Google Fonts, RGPD).                                      |
 | 2026-09-29 | Checkout en retrait uniquement : la livraison (adresse, zone, frais) arrive en phase 6, le checkout propose de passer en retrait.   |
-| 2026-09-29 | Invités sans session Supabase pour l'instant : confirmation par jeton public ; session anonyme ajoutée avec Realtime (phase 5).     |
+| 2026-10-01 | Invités : session Supabase **anonyme** créée au checkout (`ensureGuestSession`), commande liée par `customer_user_id`.              |
 | 2026-09-29 | Paiement simulé (`mock`) pour dev/E2E/aperçu, jamais en production.                                                                 |
 | 2026-09-29 | Police principale **Figtree** (choisie parmi 6 candidates dans l'aperçu), à la place d'Inter.                                       |
 | 2026-09-28 | i18n sans préfixe d'URL : la langue vient du cookie `NEXT_LOCALE` puis d'`Accept-Language`, FR par défaut.                          |

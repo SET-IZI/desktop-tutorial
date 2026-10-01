@@ -200,7 +200,15 @@
     "payOnSite": "Pay on site",
     "backToMenu": "Back to menu",
     "orderAgain": "Order again",
-    "refresh": "Refresh"
+    "refresh": "Refresh",
+    "delayed": "Small delay in the kitchen: {minutes} more min, thanks for your patience.",
+    "cancelledGeneric": "{restaurant} couldn't prepare your order.",
+    "cancelledReasons": {
+      "sold_out": "{restaurant} ran out of one of the dishes in your order.",
+      "too_busy": "{restaurant}'s kitchen is too busy right now.",
+      "closed": "{restaurant} is closed right now."
+    },
+    "refunded": "You've been refunded: the amount will be back on your card within a few days."
   },
   "auth": {
     "loginTitle": "Welcome back",

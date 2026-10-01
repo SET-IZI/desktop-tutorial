@@ -17,6 +17,8 @@ import { readableTextOn, toRgbChannels } from '@/lib/color';
 import { spring } from '@/lib/motion';
 import type { IntentResult } from '@/lib/payments/gateway';
 import type { Fulfillment, Storefront } from '@/lib/storefront/types';
+import { createClient } from '@/lib/supabase/browser';
+import { ensureGuestSession } from '@/lib/supabase/guest-session';
 import { cn } from '@/lib/utils';
 import { CardPayment } from './card-payment';
 
@@ -157,6 +159,7 @@ function CheckoutBody({ storefront, cardAvailable, onSiteAvailable }: CheckoutVi
     setFieldErrors({});
 
     startTransition(async () => {
+      await ensureGuestSession(createClient());
       const result: PlaceOrderResult = await placeOrder(input);
       if (!result.ok) {
         setError(errorMessage(result.error, result.productName));

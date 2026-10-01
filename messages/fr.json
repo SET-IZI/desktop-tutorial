@@ -200,7 +200,15 @@
     "payOnSite": "À régler sur place",
     "backToMenu": "Retour à la carte",
     "orderAgain": "Commander à nouveau",
-    "refresh": "Actualiser"
+    "refresh": "Actualiser",
+    "delayed": "Petit retard en cuisine : {minutes} min de plus, merci de ta patience.",
+    "cancelledGeneric": "{restaurant} n'a pas pu préparer ta commande.",
+    "cancelledReasons": {
+      "sold_out": "{restaurant} n'a plus un des plats de ta commande.",
+      "too_busy": "La cuisine de {restaurant} est débordée pour le moment.",
+      "closed": "{restaurant} est fermé pour le moment."
+    },
+    "refunded": "Tu as été remboursé : le montant revient sur ta carte sous quelques jours."
   },
   "auth": {
     "loginTitle": "Bon retour",

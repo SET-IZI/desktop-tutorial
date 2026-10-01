@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getLocale, getTranslations } from 'next-intl/server';
-import { AutoRefresh } from '@/components/order/auto-refresh';
+import { LiveOrder } from '@/components/order/live-order';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { MeshGradient } from '@/components/ui/mesh-gradient';
@@ -30,7 +30,7 @@ export default async function OrderPage({ params }: Props) {
   const { data: order } = await admin
     .from('orders')
     .select(
-      `number, status, payment_method, payment_status, scheduled_for, total_cents, customer_name, tracking_expires_at,
+      `id, number, status, payment_method, payment_status, scheduled_for, extra_minutes, cancel_reason, total_cents, customer_name, tracking_expires_at,
        order_items ( name, quantity, options, total_cents ),
        locations ( name, address_line, postal_code, city, timezone, restaurants ( slug, name, currency ) )`,
     )
@@ -67,24 +67,40 @@ export default async function OrderPage({ params }: Props) {
     cooking: [t('cooking'), t('cookingHint')],
     ready: [t('ready'), t('readyHint', { restaurant: restaurant.name })],
     done: [t('done'), t('doneHint', { restaurant: restaurant.name })],
-    cancelled: [t('cancelled'), t('cancelledHint')],
+    cancelled: [
+      t('cancelled'),
+      [
+        order.cancel_reason && ['sold_out', 'too_busy', 'closed'].includes(order.cancel_reason)
+          ? t(`cancelledReasons.${order.cancel_reason as 'sold_out'}`, {
+              restaurant: restaurant.name,
+            })
+          : t('cancelledGeneric', { restaurant: restaurant.name }),
+        order.payment_status === 'refunded' ? t('refunded') : null,
+      ]
+        .filter(Boolean)
+        .join(' '),
+    ],
   };
   const progress = { received: 1, cooking: 2, ready: 3, done: 3 } as Partial<Record<View, number>>;
   const step = progress[view];
 
-  const when = order.scheduled_for
+  // Retard annoncé par la cuisine : l'heure de retrait affichée suit.
+  const due = order.scheduled_for
+    ? new Date(new Date(order.scheduled_for).getTime() + order.extra_minutes * 60_000)
+    : null;
+  const when = due
     ? t('pickupWhen', {
         day: new Intl.DateTimeFormat(intlLocale, {
           timeZone: location.timezone,
           weekday: 'long',
           day: 'numeric',
           month: 'long',
-        }).format(new Date(order.scheduled_for)),
+        }).format(due),
         time: new Intl.DateTimeFormat(intlLocale, {
           timeZone: location.timezone,
           hour: '2-digit',
           minute: '2-digit',
-        }).format(new Date(order.scheduled_for)),
+        }).format(due),
       })
     : null;
 
@@ -94,7 +110,7 @@ export default async function OrderPage({ params }: Props) {
         colors={view === 'ready' ? ['green', 'blue', 'green'] : ['orange', 'pink', 'violet']}
       />
       {!TERMINAL.includes(view) ? (
-        <AutoRefresh intervalMs={view === 'pending' ? 2500 : 15000} />
+        <LiveOrder orderId={order.id} confirming={view === 'pending'} />
       ) : null}
 
       <header className="relative mx-auto flex max-w-xl items-center gap-3 px-4 pt-[max(1rem,env(safe-area-inset-top))]">
@@ -153,6 +169,11 @@ export default async function OrderPage({ params }: Props) {
                 {t('pickup')}
               </p>
               <p className="capitalize-first mt-1 text-[20px] font-bold">{when}</p>
+              {order.extra_minutes > 0 && (view === 'received' || view === 'cooking') ? (
+                <p className="mt-1 text-[15px] font-medium">
+                  {t('delayed', { minutes: order.extra_minutes })}
+                </p>
+              ) : null}
             </div>
           ) : null}
           <div>

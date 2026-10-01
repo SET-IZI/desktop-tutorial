@@ -13,6 +13,7 @@ import { fetchStorefront } from '@/lib/storefront/fetch';
 import { getSlotInputs } from '@/lib/storefront/queries';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createPublicClient } from '@/lib/supabase/public';
+import { createClient } from '@/lib/supabase/server';
 import { withLocation } from '@/lib/storefront/location';
 
 export type PlaceOrderResult =
@@ -95,10 +96,14 @@ export async function placeOrder(input: CheckoutInput): Promise<PlaceOrderResult
       if (total < MIN_CARD_AMOUNT_CENTS) return { ok: false, error: 'amount_too_low' };
     }
 
+    // Session du navigateur (anonyme pour un invité) : suivi en temps réel via la RLS.
+    const { data: auth } = await createClient().auth.getUser();
+
     const admin = createAdminClient();
     const { data: rows, error } = await admin.rpc('place_order', {
       p: {
         restaurant_id: restaurant.id,
+        customer_user_id: auth.user?.id ?? null,
         location_id: location.id,
         fulfillment: data.fulfillment,
         scheduled_for: slot.startsAt,
