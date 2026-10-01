@@ -80,3 +80,26 @@ export async function createPaymentIntent(input: CreateIntentInput): Promise<Int
     publishableKey: env.publishableKey,
   };
 }
+
+/**
+ * Remboursement intégral d'une commande payée par carte (commande refusée ou
+ * annulée par le restaurant). Créé sur le compte connecté, comme le paiement.
+ */
+export async function refundOrderPayment(input: {
+  intentId: string;
+  accountId: string | null;
+  orderId: string;
+}): Promise<{ refundId: string }> {
+  const env = getPaymentsEnv();
+  if (env.mode === 'mock') return { refundId: `re_mock_${randomUUID().replace(/-/g, '')}` };
+  if (!input.accountId) throw new Error('Restaurant sans compte Stripe connecté.');
+  const refund = await getStripe().refunds.create(
+    {
+      payment_intent: input.intentId,
+      reason: 'requested_by_customer',
+      metadata: { order_id: input.orderId },
+    },
+    { stripeContext: input.accountId, idempotencyKey: `refund-${input.orderId}` },
+  );
+  return { refundId: refund.id };
+}

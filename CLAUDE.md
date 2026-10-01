@@ -15,20 +15,20 @@ Objectifs : première commande prise en moins de 30 min côté restaurateur, com
 
 ## Commandes
 
-| Commande             | Rôle                                                                                  |
-| -------------------- | ------------------------------------------------------------------------------------- |
-| `pnpm dev`           | Serveur de dev (http://localhost:3000)                                                |
-| `pnpm build`         | Build de production (inclut lint + typecheck Next)                                    |
-| `pnpm lint`          | ESLint (next/core-web-vitals + jsx-a11y), 0 warning toléré                            |
-| `pnpm typecheck`     | `tsc --noEmit`                                                                        |
-| `pnpm test`          | Tests unitaires Vitest (`tests/unit`, `src/**/*.test.ts(x)`)                          |
-| `pnpm e2e`           | Playwright (desktop + mobile). **Lancer `pnpm build` avant** (sert `next start`)      |
-| `pnpm format`        | Prettier (+ tri des classes Tailwind)                                                 |
-| `pnpm check`         | format:check + lint + typecheck + test                                                |
-| `pnpm db:reset`      | Recrée la base Postgres locale : shim Supabase + migrations + seed                    |
-| `pnpm test:db`       | Tests SQL (RLS, triggers, fonctions) sur `DATABASE_URL`, après `db:reset`             |
-| `pnpm supabase:lite` | API Supabase locale sans Docker : PostgREST sur `:54321/rest/v1` (base de `db:reset`) |
-| `pnpm db:types`      | Régénère `src/types/database.ts` (Supabase CLI `--db-url`) : à committer              |
+| Commande             | Rôle                                                                                              |
+| -------------------- | ------------------------------------------------------------------------------------------------- |
+| `pnpm dev`           | Serveur de dev (http://localhost:3000)                                                            |
+| `pnpm build`         | Build de production (inclut lint + typecheck Next)                                                |
+| `pnpm lint`          | ESLint (next/core-web-vitals + jsx-a11y), 0 warning toléré                                        |
+| `pnpm typecheck`     | `tsc --noEmit`                                                                                    |
+| `pnpm test`          | Tests unitaires Vitest (`tests/unit`, `src/**/*.test.ts(x)`)                                      |
+| `pnpm e2e`           | Playwright (desktop + mobile). **Lancer `pnpm build` avant** (sert `next start`)                  |
+| `pnpm format`        | Prettier (+ tri des classes Tailwind)                                                             |
+| `pnpm check`         | format:check + lint + typecheck + test                                                            |
+| `pnpm db:reset`      | Recrée la base Postgres locale : shim Supabase + migrations + seed                                |
+| `pnpm test:db`       | Tests SQL (RLS, triggers, fonctions) sur `DATABASE_URL`, après `db:reset`                         |
+| `pnpm supabase:lite` | API Supabase locale sans Docker : REST, Auth, Storage, Realtime sur `:54321` (base de `db:reset`) |
+| `pnpm db:types`      | Régénère `src/types/database.ts` (Supabase CLI `--db-url`) : à committer                          |
 
 Fin de phase : `pnpm check && pnpm db:reset && pnpm test:db && pnpm build && pnpm e2e` doivent être verts (`pnpm e2e` démarre lui-même supabase-lite et `next start`).
 
@@ -121,6 +121,13 @@ Espaces prévus : `s/[slug]` boutique client (réécrite depuis `{slug}.miaamm.a
 - Établissements (`/app/etablissements`, manager) : création géocodée, **masquée** par défaut (on règle ses horaires, puis on l'active) ; au moins un établissement reste visible. Établissement courant du back-office = cookie `miaamm_location` (`getCurrentLocation`), sélecteurs restaurant/établissement dans le shell (`ContextSwitcher`) dès qu'il y a le choix.
 - Logo et bannière (Réglages) : `ImageUpload` réutilisé (logo 512 px, bannière 2000 px), même bucket `menu` et dossier `<restaurant_id>/`, URL contrôlées côté serveur (`isOwnImageUrl`, `src/lib/admin/storage-url.ts`). Sur la boutique, la bannière remplace le dégradé, sous un voile vers `bg` pour garder `text-fg` lisible.
 - Navigation : Établissements et Équipe dans la barre latérale ; sur mobile (4 onglets), accessibles depuis Réglages, avec la déconnexion.
+
+## Temps réel (phase 5)
+
+- Écran cuisine `/app/cuisine` (hors shell, plein écran, toute l'équipe) : colonnes Nouvelles / En cuisine / Prêtes (onglets sur mobile), Accepter → Prête → Récupérée, « +10 min » (`extra_minutes`), refus/annulation avec motif (`cancel_reason`). Une commande payée par carte refusée est **remboursée** (`refundOrderPayment`, `refunds.create` sur le compte connecté, idempotent) et passe en `refunded` (service role). Données : `loadKitchenOrders()` (`src/lib/kitchen/orders.ts`), actions `src/app/app/cuisine/actions.ts` via le client de l'utilisateur (RLS + privilèges par colonne + trigger de transitions).
+- Temps réel : abonnement `postgres_changes` sur `orders` filtré par `location_id`, puis `router.refresh()` ; filet de sécurité toutes les 30 s ; état « En direct / Reconnexion… ». **Toujours appeler `authorizeRealtime(supabase)` avant `.subscribe()`** (`src/lib/supabase/realtime.ts`) : sinon une session restaurée depuis les cookies rejoint le canal en anonyme et la RLS filtre tout.
+- Son : carillon Web Audio (`src/lib/kitchen/chime.ts`), activé par un geste (bouton « Activer le son », préférence mémorisée), rappel toutes les 20 s tant qu'une commande attend.
+- Realtime local : `scripts/dev/realtime-lite.mjs` (dans supabase-lite, `ws://127.0.0.1:54321/realtime/v1/websocket`), protocole Phoenix v2 relu dans `@supabase/realtime-js`, triggers `LISTEN/NOTIFY` posés au démarrage sur les tables de la publication `supabase_realtime`, RLS évaluée avec le JWT de l'abonné. `REALTIME_LITE_DEBUG=1` trace les messages. Lancer supabase-lite **après** `pnpm db:reset` (les triggers sont posés au démarrage).
 
 ## Conventions de code
 

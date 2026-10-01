@@ -232,7 +232,8 @@
       "hours": "Horaires",
       "settings": "Réglages",
       "team": "Équipe",
-      "locations": "Établissements"
+      "locations": "Établissements",
+      "kitchen": "Cuisine"
     },
     "viewShop": "Voir ma boutique",
     "saved": "Modifications enregistrées",
@@ -664,5 +665,66 @@
       "email_mismatch": "Cette invitation est destinée à {email}. Connectez-vous avec cette adresse.",
       "server_error": "Impossible de rejoindre l'équipe pour le moment. Réessayez dans un instant."
     }
+  },
+  "kitchen": {
+    "title": "Cuisine",
+    "back": "Retour au back-office",
+    "live": "En direct",
+    "reconnecting": "Reconnexion…",
+    "soundOn": "Son activé",
+    "soundOff": "Activer le son",
+    "soundHint": "Activez le son pour être prévenu à chaque nouvelle commande.",
+    "columns": {
+      "new": "Nouvelles",
+      "cooking": "En cuisine",
+      "ready": "Prêtes"
+    },
+    "columnsLabel": "Étapes des commandes",
+    "empty": {
+      "new": "Aucune nouvelle commande.",
+      "cooking": "Rien en préparation.",
+      "ready": "Aucune commande en attente de retrait."
+    },
+    "order": "Commande n° {number}",
+    "number": "N° {number}",
+    "pickup": "Retrait",
+    "delivery": "Livraison",
+    "at": "Pour {time}",
+    "asap": "Dès que possible",
+    "today": "aujourd'hui",
+    "inMinutes": "dans {minutes} min",
+    "lateBy": "en retard de {minutes} min",
+    "now": "maintenant",
+    "delayed": "+{minutes} min annoncées",
+    "paid": "Payée",
+    "toCollect": "À encaisser · {amount}",
+    "orderNotes": "Note du client",
+    "accept": "Accepter",
+    "ready": "Prête",
+    "completed": "Récupérée",
+    "delay": "+10 min",
+    "delayLabel": "Ajouter 10 minutes à la commande n° {number}",
+    "reject": "Refuser",
+    "cancel": "Annuler la commande",
+    "rejectTitle": "Pourquoi refuser la commande n° {number} ?",
+    "rejectHint": "Le client est prévenu. Une commande payée par carte est remboursée automatiquement.",
+    "reasons": {
+      "sold_out": "Rupture de stock",
+      "too_busy": "Trop de commandes",
+      "closed": "Fermé",
+      "other": "Autre raison"
+    },
+    "confirmReject": "Confirmer le refus",
+    "keep": "Garder la commande",
+    "toasts": {
+      "accepted": "Commande n° {number} acceptée",
+      "ready": "Commande n° {number} prête",
+      "completed": "Commande n° {number} récupérée",
+      "rejected": "Commande n° {number} refusée",
+      "delayed": "Commande n° {number} : +10 min",
+      "stale": "Cette commande a déjà été traitée sur un autre écran.",
+      "error": "Action impossible. Réessayez."
+    },
+    "newOrder": "Nouvelle commande n° {number}"
   }
 }

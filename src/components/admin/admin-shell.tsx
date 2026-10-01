@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  ChefHat,
   Clock,
   ExternalLink,
   LayoutGrid,
@@ -32,6 +33,7 @@ interface AdminShellProps {
 
 const NAV = [
   { href: '/app', key: 'overview', icon: LayoutGrid, exact: true },
+  { href: '/app/cuisine', key: 'kitchen', icon: ChefHat },
   { href: '/app/carte', key: 'menu', icon: UtensilsCrossed },
   { href: '/app/horaires', key: 'hours', icon: Clock },
   { href: '/app/reglages', key: 'settings', icon: Settings },

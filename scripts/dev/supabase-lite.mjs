@@ -11,7 +11,7 @@
  *   /storage/v1 → émulation minimale de Supabase Storage (storage-lite.mjs)
  *
  * Avec Docker, préférer `pnpm exec supabase start` (mêmes URL et clés de dev).
- * Realtime n'est pas émulé ici.
+ *   /realtime/v1 → émulation de Supabase Realtime, postgres_changes (realtime-lite.mjs)
  */
 import { spawn, execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync } from 'node:fs';
@@ -19,6 +19,7 @@ import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createAuthLite } from './auth-lite.mjs';
+import { createRealtimeLite } from './realtime-lite.mjs';
 import { createStorageLite } from './storage-lite.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -83,6 +84,8 @@ const storage = createStorageLite({
   verify: auth.verify,
 });
 
+const realtime = createRealtimeLite({ databaseUrl: DATABASE_URL, verify: auth.verify });
+
 const CORS_HEADERS = {
   'access-control-allow-methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
   'access-control-allow-headers':
@@ -135,6 +138,12 @@ const server = http.createServer((req, res) => {
     res.end(JSON.stringify({ message: `PostgREST indisponible : ${error.message}` }));
   });
   req.pipe(upstream);
+});
+
+server.on('upgrade', (req, socket, head) => {
+  if ((req.url ?? '').startsWith('/realtime/v1/websocket'))
+    realtime.handleUpgrade(req, socket, head);
+  else socket.destroy();
 });
 
 server.listen(PORT, '127.0.0.1', () => {

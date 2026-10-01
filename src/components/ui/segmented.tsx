@@ -11,6 +11,8 @@ interface SegmentedProps<T extends string> {
   options: { value: T; label: string; icon?: React.ReactNode }[];
   onChange: (value: T) => void;
   className?: string;
+  /** `sm` : libellés serrés (écrans étroits, plus de 2 options). */
+  size?: 'md' | 'sm';
 }
 
 /** Contrôle segmenté (façon iOS) : groupe radio accessible, pastille animée. */
@@ -20,6 +22,7 @@ export function Segmented<T extends string>({
   options,
   onChange,
   className,
+  size = 'md',
 }: SegmentedProps<T>) {
   const refs = useRef<(HTMLButtonElement | null)[]>([]);
 
@@ -72,7 +75,8 @@ export function Segmented<T extends string>({
             onKeyDown={(e) => onKeyDown(e, index)}
             onClick={() => onChange(o.value)}
             className={cn(
-              'relative flex min-h-touch flex-1 basis-0 items-center justify-center gap-2 rounded-full px-4 text-[15px] font-semibold transition-colors',
+              'relative flex min-h-touch flex-1 basis-0 items-center justify-center gap-2 whitespace-nowrap rounded-full font-semibold transition-colors',
+              size === 'sm' ? 'px-2 text-[14px]' : 'px-4 text-[15px]',
               active ? 'text-fg' : 'text-fg-muted hover:text-fg',
             )}
           >

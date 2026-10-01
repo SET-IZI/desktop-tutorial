@@ -232,7 +232,8 @@
       "hours": "Hours",
       "settings": "Settings",
       "team": "Team",
-      "locations": "Locations"
+      "locations": "Locations",
+      "kitchen": "Kitchen"
     },
     "viewShop": "View my shop",
     "saved": "Changes saved",
@@ -664,5 +665,66 @@
       "email_mismatch": "This invitation is for {email}. Sign in with that address.",
       "server_error": "Can't join the team right now. Try again in a moment."
     }
+  },
+  "kitchen": {
+    "title": "Kitchen",
+    "back": "Back to back-office",
+    "live": "Live",
+    "reconnecting": "Reconnecting…",
+    "soundOn": "Sound on",
+    "soundOff": "Turn on sound",
+    "soundHint": "Turn on sound to be alerted of every new order.",
+    "columns": {
+      "new": "New",
+      "cooking": "Cooking",
+      "ready": "Ready"
+    },
+    "columnsLabel": "Order stages",
+    "empty": {
+      "new": "No new orders.",
+      "cooking": "Nothing cooking.",
+      "ready": "No orders waiting for pickup."
+    },
+    "order": "Order #{number}",
+    "number": "#{number}",
+    "pickup": "Pickup",
+    "delivery": "Delivery",
+    "at": "For {time}",
+    "asap": "As soon as possible",
+    "today": "today",
+    "inMinutes": "in {minutes} min",
+    "lateBy": "{minutes} min late",
+    "now": "now",
+    "delayed": "+{minutes} min announced",
+    "paid": "Paid",
+    "toCollect": "To collect · {amount}",
+    "orderNotes": "Customer note",
+    "accept": "Accept",
+    "ready": "Ready",
+    "completed": "Picked up",
+    "delay": "+10 min",
+    "delayLabel": "Add 10 minutes to order #{number}",
+    "reject": "Reject",
+    "cancel": "Cancel order",
+    "rejectTitle": "Why reject order #{number}?",
+    "rejectHint": "The customer is notified. Card payments are refunded automatically.",
+    "reasons": {
+      "sold_out": "Sold out",
+      "too_busy": "Too many orders",
+      "closed": "Closed",
+      "other": "Other reason"
+    },
+    "confirmReject": "Confirm rejection",
+    "keep": "Keep the order",
+    "toasts": {
+      "accepted": "Order #{number} accepted",
+      "ready": "Order #{number} ready",
+      "completed": "Order #{number} picked up",
+      "rejected": "Order #{number} rejected",
+      "delayed": "Order #{number}: +10 min",
+      "stale": "This order was already handled on another screen.",
+      "error": "Action failed. Try again."
+    },
+    "newOrder": "New order #{number}"
   }
 }
