@@ -16,7 +16,7 @@ export default async function SettingsPage() {
   const [{ data: restaurant }, location] = await Promise.all([
     createClient()
       .from('restaurants')
-      .select('name, description, accent_color, is_published')
+      .select('id, name, description, accent_color, is_published, logo_url, cover_url')
       .eq('id', current.restaurantId)
       .single(),
     getCurrentLocation(current.restaurantId),
@@ -64,6 +64,9 @@ export default async function SettingsPage() {
       <SettingsForms
         canManage={canManage(current.role)}
         restaurant={{
+          id: restaurant.id,
+          logoUrl: restaurant.logo_url,
+          coverUrl: restaurant.cover_url,
           name: restaurant.name,
           description: restaurant.description ?? '',
           accentColor: restaurant.accent_color,

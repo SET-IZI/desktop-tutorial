@@ -119,6 +119,7 @@ Espaces prévus : `s/[slug]` boutique client (réécrite depuis `{slug}.miaamm.a
   - Mise en ligne : lien public (`shopPublicUrl`), QR code SVG généré côté serveur (`qrcode`), récapitulatif, publication → `/app?welcome=1`.
 - Équipe (`/app/equipe`, owner : gestion, manager : lecture) : rôles `owner` / `manager` / `kitchen`, changement de rôle et retrait via `users_roles` (RLS owner, trigger « au moins un propriétaire »). Invitations par **lien personnel** (`/app/rejoindre/<jeton>`, 64 hex, 7 jours, usage unique) accepté seulement par le compte dont l'email correspond ; connexion/inscription conservent le lien (`?next=`). L'envoi par email arrivera avec Resend (phase 5) : le propriétaire copie le lien.
 - Établissements (`/app/etablissements`, manager) : création géocodée, **masquée** par défaut (on règle ses horaires, puis on l'active) ; au moins un établissement reste visible. Établissement courant du back-office = cookie `miaamm_location` (`getCurrentLocation`), sélecteurs restaurant/établissement dans le shell (`ContextSwitcher`) dès qu'il y a le choix.
+- Logo et bannière (Réglages) : `ImageUpload` réutilisé (logo 512 px, bannière 2000 px), même bucket `menu` et dossier `<restaurant_id>/`, URL contrôlées côté serveur (`isOwnImageUrl`, `src/lib/admin/storage-url.ts`). Sur la boutique, la bannière remplace le dégradé, sous un voile vers `bg` pour garder `text-fg` lisible.
 - Navigation : Établissements et Équipe dans la barre latérale ; sur mobile (4 onglets), accessibles depuis Réglages, avec la déconnexion.
 
 ## Conventions de code

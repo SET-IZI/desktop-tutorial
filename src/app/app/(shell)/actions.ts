@@ -4,6 +4,7 @@ import { revalidatePath, revalidateTag } from 'next/cache';
 import { z } from 'zod';
 import { getCurrentLocation } from '@/lib/admin/location';
 import { validateSchedule, WEEKDAYS } from '@/lib/admin/schedule';
+import { isOwnImageUrl } from '@/lib/admin/storage-url';
 import { assertRole } from '@/lib/auth/session';
 import { storefrontTag } from '@/lib/storefront/queries';
 import { createClient } from '@/lib/supabase/server';
@@ -70,6 +71,8 @@ const restaurantSchema = z.object({
   name: z.string().trim().min(1, 'name_required').max(80),
   description: z.string().trim().max(500),
   accentColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
+  logoUrl: z.url().max(500).nullable().optional(),
+  coverUrl: z.url().max(500).nullable().optional(),
 });
 
 export async function updateRestaurant(
@@ -83,12 +86,19 @@ export async function updateRestaurant(
         error: parsed.error.issues[0]?.message === 'name_required' ? 'name_required' : 'invalid',
       };
     const { supabase, current } = await context();
+    const { logoUrl, coverUrl } = parsed.data;
+    // Logo et bannière : uniquement des images du dossier Storage du restaurant.
+    if ([logoUrl, coverUrl].some((u) => u && !isOwnImageUrl(u, current.restaurantId))) {
+      return { ok: false, error: 'invalid' };
+    }
     const { error } = await supabase
       .from('restaurants')
       .update({
         name: parsed.data.name,
         description: parsed.data.description || null,
         accent_color: parsed.data.accentColor.toUpperCase(),
+        ...(logoUrl !== undefined ? { logo_url: logoUrl } : {}),
+        ...(coverUrl !== undefined ? { cover_url: coverUrl } : {}),
       })
       .eq('id', current.restaurantId);
     if (error) throw new Error(error.message);

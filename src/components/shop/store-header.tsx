@@ -47,7 +47,21 @@ export function StoreHeader({ storefront }: { storefront: Storefront }) {
         className="absolute inset-0"
         style={reduce ? undefined : { scale: meshScale }}
       >
-        <MeshGradient colors={['orange', 'pink', 'violet']} />
+        {restaurant.coverUrl ? (
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element -- bannière déjà compressée à l'envoi */}
+            <img
+              src={restaurant.coverUrl}
+              alt=""
+              className="size-full object-cover"
+              fetchPriority="high"
+            />
+            {/* Voile vers le fond : le texte (text-fg) reste lisible en clair comme en sombre. */}
+            <span className="absolute inset-0 bg-gradient-to-b from-bg/40 via-bg/75 to-bg" />
+          </>
+        ) : (
+          <MeshGradient colors={['orange', 'pink', 'violet']} />
+        )}
       </motion.div>
       <ThemeToggle className="absolute right-4 top-[max(1rem,env(safe-area-inset-top))] z-10" />
       <motion.div

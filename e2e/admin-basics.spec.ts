@@ -1,6 +1,8 @@
+import AxeBuilder from '@axe-core/playwright';
 import { login, KITCHEN, OWNER } from './admin';
 import { withDb } from './db';
-import { expect, test } from './fixtures';
+import { expect, gotoHydrated, test } from './fixtures';
+import { solidPng } from './png';
 
 test.describe('Back-office · accès', () => {
   test('le back-office exige une connexion et y revient après', async ({ page }) => {
@@ -53,6 +55,69 @@ test.describe('Back-office · réglages', () => {
     } finally {
       await withDb((db) =>
         db.query(`update restaurants set name = 'Chez Mimi' where slug = 'chez-mimi'`),
+      );
+    }
+  });
+
+  test('logo et bannière, affichés sur la boutique', async ({ page }) => {
+    await login(page, OWNER, '/app/reglages');
+    try {
+      await page.getByLabel('Logo', { exact: true }).setInputFiles({
+        name: 'logo.png',
+        mimeType: 'image/png',
+        buffer: solidPng(400, 400, [255, 159, 10]),
+      });
+      await expect(page.getByRole('img', { name: 'Logo', exact: true })).toBeVisible();
+      await page.getByLabel('Bannière', { exact: true }).setInputFiles({
+        name: 'banniere.png',
+        mimeType: 'image/png',
+        buffer: solidPng(1600, 600, [48, 209, 88]),
+      });
+      await expect(page.getByRole('img', { name: 'Bannière', exact: true })).toBeVisible();
+      await page.getByRole('button', { name: 'Enregistrer' }).first().click();
+      await expect(
+        page.getByRole('status').filter({ hasText: 'Modifications enregistrées' }),
+      ).toBeVisible();
+
+      const [row] = (
+        await withDb((db) =>
+          db.query(`select logo_url, cover_url from restaurants where slug = 'chez-mimi'`),
+        )
+      ).rows;
+      expect(row.logo_url).toMatch(/\/storage\/v1\/object\/public\/menu\/11111111-[^/]+\/.+/);
+      expect(row.cover_url).toMatch(/\/storage\/v1\/object\/public\/menu\/11111111-[^/]+\/.+/);
+
+      for (const scheme of ['light', 'dark'] as const) {
+        await page.emulateMedia({ colorScheme: scheme, reducedMotion: 'reduce' });
+        await gotoHydrated(page, '/s/chez-mimi');
+        await expect(page.locator(`header img[src="${row.cover_url}"]`)).toBeVisible();
+        await expect(page.locator(`header img[src="${row.logo_url}"]`)).toBeVisible();
+        const results = await new AxeBuilder({ page })
+          .include('header')
+          .withTags(['wcag2a', 'wcag2aa'])
+          .analyze();
+        expect(results.violations).toEqual([]);
+      }
+
+      // Retirer la bannière : retour au dégradé.
+      await gotoHydrated(page, '/app/reglages');
+      await page.getByRole('button', { name: 'Retirer la photo · Bannière' }).click();
+      await page.getByRole('button', { name: 'Enregistrer' }).first().click();
+      await expect
+        .poll(
+          async () =>
+            (
+              await withDb((db) =>
+                db.query(`select cover_url from restaurants where slug = 'chez-mimi'`),
+              )
+            ).rows[0].cover_url,
+        )
+        .toBeNull();
+    } finally {
+      await withDb((db) =>
+        db.query(
+          `update restaurants set logo_url = null, cover_url = null where slug = 'chez-mimi'`,
+        ),
       );
     }
   });

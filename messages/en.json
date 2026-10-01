@@ -313,7 +313,11 @@
       "errors": {
         "name_required": "Enter the restaurant name.",
         "invalid": "Some values aren't valid."
-      }
+      },
+      "logo": "Logo",
+      "logoHint": "Square, at least 400 px. Shown next to the name on the shop.",
+      "cover": "Banner",
+      "coverHint": "Landscape, at least 1600 px wide. Behind the shop header."
     },
     "hours": {
       "title": "Hours",

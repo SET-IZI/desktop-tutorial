@@ -313,7 +313,11 @@
       "errors": {
         "name_required": "Indiquez le nom du restaurant.",
         "invalid": "Certaines valeurs ne sont pas valides."
-      }
+      },
+      "logo": "Logo",
+      "logoHint": "Carré, au moins 400 px. Affiché à côté du nom sur la boutique.",
+      "cover": "Bannière",
+      "coverHint": "Paysage, au moins 1600 px de large. En fond de l'en-tête de la boutique."
     },
     "hours": {
       "title": "Horaires",

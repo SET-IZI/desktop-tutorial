@@ -9,6 +9,7 @@ import {
   updateRestaurant,
   type ActionResult,
 } from '@/app/app/(shell)/actions';
+import { ImageUpload } from '@/components/admin/menu/image-upload';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
@@ -17,7 +18,15 @@ import { readableTextOn } from '@/lib/color';
 import { cn } from '@/lib/utils';
 
 export interface SettingsData {
-  restaurant: { name: string; description: string; accentColor: string; isPublished: boolean };
+  restaurant: {
+    id: string;
+    name: string;
+    description: string;
+    accentColor: string;
+    isPublished: boolean;
+    logoUrl: string | null;
+    coverUrl: string | null;
+  };
   location: {
     name: string;
     phone: string;
@@ -101,6 +110,8 @@ export function SettingsForms({ restaurant, location, canManage }: SettingsData)
   const [name, setName] = useState(restaurant.name);
   const [description, setDescription] = useState(restaurant.description);
   const [accent, setAccent] = useState(restaurant.accentColor.toUpperCase());
+  const [logoUrl, setLogoUrl] = useState(restaurant.logoUrl);
+  const [coverUrl, setCoverUrl] = useState(restaurant.coverUrl);
   const [nameError, setNameError] = useState<string | null>(null);
   const restaurantSave = useSave();
 
@@ -121,13 +132,37 @@ export function SettingsForms({ restaurant, location, canManage }: SettingsData)
           e.preventDefault();
           setNameError(null);
           restaurantSave.save(
-            () => updateRestaurant({ name, description, accentColor: accent }),
+            () => updateRestaurant({ name, description, accentColor: accent, logoUrl, coverUrl }),
             (err) => err === 'name_required' && setNameError(t('errors.name_required')),
           );
         }}
       >
         <Card className="space-y-5">
           <h2 className="text-[20px] font-bold tracking-display">{t('restaurant')}</h2>
+          <div className="grid gap-5 sm:grid-cols-[auto_minmax(0,1fr)]">
+            <ImageUpload
+              restaurantId={restaurant.id}
+              value={logoUrl}
+              onChange={setLogoUrl}
+              alt={t('logo')}
+              label={t('logo')}
+              hint={t('logoHint')}
+              maxSide={512}
+              shape="square"
+              disabled={!canManage}
+            />
+            <ImageUpload
+              restaurantId={restaurant.id}
+              value={coverUrl}
+              onChange={setCoverUrl}
+              alt={t('cover')}
+              label={t('cover')}
+              hint={t('coverHint')}
+              maxSide={2000}
+              shape="wide"
+              disabled={!canManage}
+            />
+          </div>
           <div className="space-y-1.5">
             <label htmlFor="r-name" className="font-semibold">
               {t('name')}

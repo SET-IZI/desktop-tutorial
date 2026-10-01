@@ -13,6 +13,7 @@ import { assertRole } from '@/lib/auth/session';
 import { getPublicEnv } from '@/lib/env';
 import { storefrontTag } from '@/lib/storefront/queries';
 import { createClient } from '@/lib/supabase/server';
+import { isOwnImageUrl } from '@/lib/admin/storage-url';
 
 export type MenuActionResult = { ok: true; id?: string } | { ok: false; error: string };
 
@@ -41,12 +42,6 @@ async function run(fn: () => Promise<MenuActionResult>): Promise<MenuActionResul
 function refresh(slug: string) {
   revalidateTag(storefrontTag(slug));
   revalidatePath('/app/carte');
-}
-
-/** Seules les photos du dossier Storage du restaurant sont acceptées. */
-function ownImage(url: string, restaurantId: string) {
-  const base = `${getPublicEnv().NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/menu/${restaurantId}/`;
-  return url.startsWith(base) && !url.includes('..');
 }
 
 // ═══ Catégories ═════════════════════════════════════════════════════════════
@@ -123,7 +118,7 @@ export async function saveProduct(input: ProductInput): Promise<MenuActionResult
     if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? 'invalid' };
     const { supabase, current } = await context();
     const d = parsed.data;
-    if (d.imageUrls.some((u) => !ownImage(u, current.restaurantId)))
+    if (d.imageUrls.some((u) => !isOwnImageUrl(u, current.restaurantId)))
       return { ok: false, error: 'invalid' };
 
     const { data, error } = await supabase.rpc('save_product', {
