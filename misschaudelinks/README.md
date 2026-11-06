@@ -1,10 +1,10 @@
-# 💋 misschaudelinks
+# misschaudelinks
 
-Page de liens façon Linktree pour **misschaudex** — noir & rose, animée — avec **vente de photos et de vidéos**, **statistiques détaillées**, **interface admin complète** et **vérification d'âge 18+** sur les liens et contenus de ton choix.
+Page de liens façon Linktree pour **misschaudex** — noir et rose poudré, sobre et animée — avec **vente de photos et de vidéos**, **statistiques détaillées**, **interface admin complète** et **vérification d'âge 18+** sur les liens et contenus de ton choix.
 
-| Page publique | Tableau de bord admin | Contenus payants |
+| Page publique | Vérification d'âge | Tableau de bord admin |
 |---|---|---|
-| ![](docs/pub1.png) | ![](docs/adm-dash.png) | ![](docs/adm-media.png) |
+| ![](docs/page.png) | ![](docs/age.png) | ![](docs/admin.png) |
 
 ## Démarrage
 
@@ -33,16 +33,16 @@ Copie `.env.example` en `.env` :
 ## Fonctionnalités
 
 **Page publique**
-- Avatar avec anneau rose animé, nom en dégradé scintillant, bio, icônes réseaux sociaux
-- Liens animés (apparition en cascade, reflet au survol, effet d'onde au clic, lien « mis en avant » qui pulse)
-- Fond animé : halos roses flottants + paillettes
+- Style épuré : fond noir, touches de rose poudré, typographie serif, icônes au trait (aucun emoji)
+- Animations douces : apparition en cascade, reflet au survol, halo autour de l'avatar, poussière lumineuse discrète
+- Lien « mis en avant » souligné d'un filet rose
 - **18+** : badge sur les liens/contenus concernés, fenêtre de vérification d'âge avant ouverture ; option pour protéger **toute la page**
-- **Boutique** : photos/vidéos avec aperçu flouté + cadenas, achat en 1 clic, déblocage animé (pluie de cœurs), visionneuse plein écran
+- **Boutique** : photos/vidéos avec aperçu flouté + cadenas, achat en 1 clic, déblocage animé (l'image se dévoile), visionneuse plein écran
 - « Mes achats » : lien de récupération pour retrouver ses contenus sur un autre appareil
 
 **Admin** (`/admin`, adapté mobile)
 - **Statistiques** sur aujourd'hui / 7 j / 30 j / 90 j / 1 an, comparées à la période précédente : visites, visiteurs uniques, clics, CTR, ventes, CA, conversion, panier moyen, visiteurs en direct ; courbes d'audience et revenus avec infobulles ; top liens, top contenus, sources (Instagram, TikTok, Snapchat…), appareils, navigateurs/apps, pays ; carte de chaleur jour × heure ; entonnoir de vente ; stats de vérification d'âge ; export CSV
-- **Liens** : ajout/modification, icônes emoji, sous-titre, 18+, mise en avant, masquer/afficher, programmation (début/fin), réordonnancement par glisser-déposer, clics par lien
+- **Liens** : ajout/modification, choix d'icône, sous-titre, 18+, mise en avant, masquer/afficher, programmation (début/fin), réordonnancement par glisser-déposer, clics par lien
 - **Contenus** : upload photo/vidéo par glisser-déposer avec barre de progression, prix, 18+, flou réglable — l'aperçu flouté est généré automatiquement ; vues/ventes/CA par contenu ; offrir un accès gratuit (lien cadeau)
 - **Ventes** : historique, recherche, lien d'accès de l'acheteur, remboursement (Stripe), export CSV
 - **Profil** : photo, nom, bio, couleur d'accent, réseaux sociaux, aperçu en direct sur téléphone
