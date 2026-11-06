@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex" />
+  <meta name="theme-color" content="#0a0508" />
+  <title>Admin · misschaudelinks</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💋</text></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@1,700&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/admin/admin.css" />
+</head>
+<body>
+  <!-- Connexion / première configuration -->
+  <div class="auth" id="auth" hidden>
+    <form class="auth-card" id="authForm">
+      <div class="logo">misschaude<span>links</span></div>
+      <p id="authHint">Connecte-toi à ton espace</p>
+      <input type="password" id="authPw" placeholder="Mot de passe" autocomplete="current-password" required minlength="8" />
+      <input type="password" id="authPw2" placeholder="Confirme le mot de passe" autocomplete="new-password" hidden />
+      <button class="btn primary" type="submit" id="authBtn">Se connecter</button>
+      <p class="err" id="authErr"></p>
+    </form>
+  </div>
+
+  <div class="app" id="app" hidden>
+    <aside class="side">
+      <div class="logo">misschaude<span>links</span></div>
+      <nav class="nav" id="nav">
+        <button data-tab="dashboard" class="active"><i>📊</i><span>Statistiques</span></button>
+        <button data-tab="links"><i>🔗</i><span>Liens</span></button>
+        <button data-tab="media"><i>💎</i><span>Contenus</span></button>
+        <button data-tab="sales"><i>💸</i><span>Ventes</span></button>
+        <button data-tab="profile"><i>💋</i><span>Profil</span></button>
+        <button data-tab="settings"><i>⚙️</i><span>Réglages</span></button>
+      </nav>
+      <a class="viewpage" href="/" target="_blank" rel="noopener">Voir ma page ↗</a>
+    </aside>
+
+    <main class="main">
+      <div class="banner" id="demoBanner" hidden>⚠️ <strong>Mode démo</strong> — les achats sont simulés. Ajoute <code>STRIPE_SECRET_KEY</code> dans <code>.env</code> pour encaisser de vrais paiements.</div>
+
+      <!-- ============ STATISTIQUES ============ -->
+      <section class="tab" id="tab-dashboard">
+        <header class="tab-head">
+          <div><h1>Statistiques</h1><p class="sub"><span class="live-dot"></span> <span id="liveCount">0</span> visiteur(s) en ce moment</p></div>
+          <div class="seg" id="range" role="group" aria-label="Période">
+            <button data-days="1">Aujourd'hui</button><button data-days="7">7 j</button><button data-days="30" class="active">30 j</button><button data-days="90">90 j</button><button data-days="365">1 an</button>
+          </div>
+        </header>
+        <div class="kpis" id="kpis"></div>
+        <div class="cards two">
+          <div class="card span2">
+            <div class="card-head"><h3>Audience</h3><div class="legend"><span><i style="background:var(--s1)"></i>Visites</span><span><i style="background:var(--s2)"></i>Clics</span></div></div>
+            <div class="chart" id="chartAudience"></div>
+          </div>
+          <div class="card span2">
+            <div class="card-head"><h3>Revenus</h3><span class="muted" id="revTotal"></span></div>
+            <div class="chart" id="chartRevenue"></div>
+          </div>
+          <div class="card"><div class="card-head"><h3>Top liens</h3></div><div id="topLinks"></div></div>
+          <div class="card"><div class="card-head"><h3>Contenus payants</h3></div><div id="topMedia"></div></div>
+          <div class="card"><div class="card-head"><h3>Sources de trafic</h3></div><div id="sources"></div></div>
+          <div class="card"><div class="card-head"><h3>Appareils</h3></div><div id="devices"></div></div>
+          <div class="card"><div class="card-head"><h3>Navigateurs / Apps</h3></div><div id="browsers"></div></div>
+          <div class="card"><div class="card-head"><h3>Pays</h3></div><div id="countries"></div></div>
+          <div class="card span2"><div class="card-head"><h3>Quand tes fans sont connectés</h3><span class="muted">visites par jour et heure</span></div><div id="heatmap"></div></div>
+          <div class="card span2"><div class="card-head"><h3>Entonnoir de vente</h3></div><div id="funnel"></div></div>
+          <div class="card span2"><div class="card-head"><h3>Vérification d'âge</h3></div><div id="ageStats"></div></div>
+        </div>
+      </section>
+
+      <!-- ============ LIENS ============ -->
+      <section class="tab" id="tab-links" hidden>
+        <header class="tab-head">
+          <div><h1>Liens</h1><p class="sub">Glisse-dépose pour réordonner</p></div>
+          <button class="btn primary" id="addLink">+ Ajouter un lien</button>
+        </header>
+        <ul class="list" id="linkList"></ul>
+      </section>
+
+      <!-- ============ CONTENUS ============ -->
+      <section class="tab" id="tab-media" hidden>
+        <header class="tab-head">
+          <div><h1>Contenus payants</h1><p class="sub">Photos & vidéos à l'achat — l'aperçu flouté est généré automatiquement</p></div>
+          <button class="btn primary" id="addMedia">+ Ajouter un contenu</button>
+        </header>
+        <div class="media-grid" id="mediaList"></div>
+      </section>
+
+      <!-- ============ VENTES ============ -->
+      <section class="tab" id="tab-sales" hidden>
+        <header class="tab-head">
+          <div><h1>Ventes</h1><p class="sub" id="salesSummary"></p></div>
+          <div class="row-gap">
+            <input class="input" id="salesSearch" placeholder="Rechercher (e-mail, contenu…)" />
+            <a class="btn ghost" href="/api/admin/export/ventes.csv">⬇ CSV</a>
+          </div>
+        </header>
+        <div class="card table-wrap"><table class="table" id="salesTable"></table></div>
+      </section>
+
+      <!-- ============ PROFIL ============ -->
+      <section class="tab" id="tab-profile" hidden>
+        <header class="tab-head"><div><h1>Profil & apparence</h1><p class="sub">Ce que tes fans voient en haut de ta page</p></div></header>
+        <div class="cards two">
+          <form class="card form" id="profileForm">
+            <div class="avatar-edit">
+              <div class="avatar-prev" id="avatarPrev">💋</div>
+              <label class="btn ghost">Changer la photo<input type="file" accept="image/*" id="avatarInput" hidden /></label>
+            </div>
+            <label>Nom affiché<input class="input" name="name" maxlength="60" /></label>
+            <label>Bio<textarea class="input" name="bio" rows="3" maxlength="300"></textarea></label>
+            <label>Couleur d'accent
+              <div class="row-gap"><input type="color" name="accent" /><span class="muted">rose par défaut : #ff2e8a</span></div>
+            </label>
+            <label>Titre de la boutique<input class="input" name="shop_title" maxlength="60" /></label>
+            <label class="switch"><input type="checkbox" name="shop_enabled" /><span></span>Afficher les contenus payants</label>
+            <label class="switch"><input type="checkbox" name="page_age_gate" /><span></span>Toute la page réservée aux +18 ans</label>
+            <h3>Réseaux sociaux</h3>
+            <div class="socials-edit" id="socialsEdit"></div>
+            <button class="btn primary" type="submit">Enregistrer</button>
+          </form>
+          <div class="card phone-wrap">
+            <div class="phone"><iframe id="preview" src="/" title="Aperçu de la page"></iframe></div>
+            <p class="muted center">Aperçu en direct</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ RÉGLAGES ============ -->
+      <section class="tab" id="tab-settings" hidden>
+        <header class="tab-head"><div><h1>Réglages</h1></div></header>
+        <div class="cards two">
+          <form class="card form" id="pwForm">
+            <h3>Changer le mot de passe</h3>
+            <label>Mot de passe actuel<input class="input" type="password" name="current" required autocomplete="current-password" /></label>
+            <label>Nouveau mot de passe<input class="input" type="password" name="next" required minlength="8" autocomplete="new-password" /></label>
+            <button class="btn primary" type="submit">Mettre à jour</button>
+          </form>
+          <div class="card form">
+            <h3>Paiements</h3>
+            <p id="payInfo" class="muted"></p>
+            <h3>Exports</h3>
+            <div class="row-gap">
+              <a class="btn ghost" href="/api/admin/export/ventes.csv">⬇ Ventes (CSV)</a>
+              <a class="btn ghost" href="/api/admin/export/evenements.csv">⬇ Statistiques brutes (CSV)</a>
+            </div>
+            <h3>Session</h3>
+            <button class="btn ghost" id="logout">Se déconnecter</button>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Éditeur de lien -->
+  <dialog class="dlg" id="linkDlg">
+    <form method="dialog" class="form" id="linkForm">
+      <h2 id="linkDlgTitle">Nouveau lien</h2>
+      <div class="row-gap">
+        <label style="width:90px">Icône<input class="input center" name="icon" maxlength="4" placeholder="✨" /></label>
+        <label style="flex:1">Titre<input class="input" name="title" required maxlength="120" placeholder="Mon OnlyFans" /></label>
+      </div>
+      <div class="emoji-pick" id="emojiPick"></div>
+      <label>URL<input class="input" name="url" required placeholder="https://…" /></label>
+      <label>Sous-titre (optionnel)<input class="input" name="subtitle" maxlength="160" placeholder="-50% cette semaine 🔥" /></label>
+      <label class="switch"><input type="checkbox" name="adult" /><span></span>🔞 Réservé aux +18 ans (vérification d'âge)</label>
+      <label class="switch"><input type="checkbox" name="highlight" /><span></span>✨ Mettre en avant (lien animé)</label>
+      <label class="switch"><input type="checkbox" name="active" checked /><span></span>Visible</label>
+      <details>
+        <summary>Programmer l'affichage</summary>
+        <div class="row-gap">
+          <label style="flex:1">Début<input class="input" type="datetime-local" name="starts_at" /></label>
+          <label style="flex:1">Fin<input class="input" type="datetime-local" name="ends_at" /></label>
+        </div>
+      </details>
+      <div class="dlg-actions">
+        <button class="btn ghost" value="cancel" formnovalidate>Annuler</button>
+        <button class="btn primary" value="ok">Enregistrer</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Éditeur de contenu -->
+  <dialog class="dlg" id="mediaDlg">
+    <form method="dialog" class="form" id="mediaForm">
+      <h2 id="mediaDlgTitle">Nouveau contenu</h2>
+      <label class="drop" id="drop">
+        <input type="file" name="file" accept="image/*,video/*" hidden />
+        <div class="drop-inner" id="dropInner"><b>📤 Glisse une photo ou une vidéo</b><span>ou clique pour choisir</span></div>
+      </label>
+      <label>Titre<input class="input" name="title" required maxlength="120" placeholder="Shooting rose 💗" /></label>
+      <label>Description<textarea class="input" name="description" rows="2" maxlength="500"></textarea></label>
+      <div class="row-gap">
+        <label style="flex:1">Prix (€) — 0 = gratuit<input class="input" name="price" type="number" min="0" step="0.01" value="4.99" required /></label>
+        <label style="flex:1">Flou de l'aperçu<input type="range" name="blur" min="0" max="30" value="14" /></label>
+      </div>
+      <label class="switch"><input type="checkbox" name="adult" /><span></span>🔞 Contenu +18</label>
+      <label class="switch"><input type="checkbox" name="active" checked /><span></span>En vente</label>
+      <div class="progress" id="uploadProgress" hidden><div></div></div>
+      <div class="dlg-actions">
+        <button class="btn ghost" value="cancel" formnovalidate>Annuler</button>
+        <button class="btn primary" value="ok" id="mediaSave">Enregistrer</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="tooltip" id="tip" role="tooltip"></div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="/admin/admin.js"></script>
+</body>
+</html>
