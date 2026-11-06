@@ -624,7 +624,7 @@ app.use((err, req, res, next) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`\n💗 MissChaudeLinks en ligne sur ${PUBLIC_URL}`);
+  console.log(`\nmisschaudelinks en ligne sur ${PUBLIC_URL}`);
   console.log(`   Admin : ${PUBLIC_URL}/admin`);
   console.log(`   Paiements : ${PAY_MODE === 'stripe' ? 'Stripe' : 'MODE DÉMO (ajoute STRIPE_SECRET_KEY pour encaisser)'}\n`);
 });

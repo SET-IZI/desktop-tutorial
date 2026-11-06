@@ -36,15 +36,15 @@
     $('#app').hidden = false;
     $('#demoBanner').hidden = status.pay_mode !== 'demo';
     $('#payInfo').innerHTML = status.pay_mode === 'stripe'
-      ? '✅ Stripe est connecté. Les paiements sont encaissés sur ton compte Stripe.'
-      : '⚠️ Mode démo actif : les achats sont simulés. Crée un compte sur stripe.com, puis ajoute ta clé secrète dans <code>STRIPE_SECRET_KEY</code> (fichier <code>.env</code>) et redémarre le serveur.';
+      ? 'Stripe est connecté. Les paiements sont encaissés sur ton compte Stripe.'
+      : 'Mode démo actif : les achats sont simulés. Crée un compte sur stripe.com, puis ajoute ta clé secrète dans <code>STRIPE_SECRET_KEY</code> (fichier <code>.env</code>) et redémarre le serveur.';
     go(location.hash.slice(1) || 'dashboard');
   }
   function showAuth() {
     $('#app').hidden = true;
     $('#auth').hidden = false;
     const setup = status.setup_needed;
-    $('#authHint').textContent = setup ? 'Bienvenue ✨ Choisis ton mot de passe administrateur' : 'Connecte-toi à ton espace';
+    $('#authHint').textContent = setup ? 'Bienvenue. Choisis ton mot de passe administrateur' : 'Connecte-toi à ton espace';
     $('#authBtn').textContent = setup ? 'Créer mon espace' : 'Se connecter';
     $('#authPw2').hidden = !setup;
     $('#authPw2').required = setup;
@@ -109,7 +109,7 @@
       ['Taux de clic (CTR)', pct(c.ctr), delta(c.ctr, p.ctr)],
       ['Ventes', nf.format(c.sales), delta(c.sales, p.sales)],
       ['Chiffre d\'affaires', money(c.revenue_cents), delta(c.revenue_cents, p.revenue_cents)],
-      ['Conversion visiteur → achat', pct(c.conversion), delta(c.conversion, p.conversion)],
+      ['Conversion visiteur / achat', pct(c.conversion), delta(c.conversion, p.conversion)],
       ['Panier moyen', c.sales ? money(c.revenue_cents / c.sales) : '—', delta(c.sales ? c.revenue_cents / c.sales : 0, p.sales ? p.revenue_cents / p.sales : 0)],
     ];
     $('#kpis').innerHTML = kpis.map(([l, v, d], i) => `<div class="kpi" style="animation-delay:${i * 0.04}s"><div class="lbl">${l}</div><div class="val">${v}</div>${d}</div>`).join('');
@@ -123,17 +123,17 @@
     barChart($('#chartRevenue'), labels, s.series.map((d) => d.revenue_cents), money, s.series.map((d) => d.sales));
 
     hbars($('#topLinks'), s.links.filter((l) => l.clicks).slice(0, 8).map((l) => ({
-      name: `${l.icon || '🔗'} ${l.title}${l.adult ? ' 🔞' : ''}`, n: l.clicks, right: `<b>${nf.format(l.clicks)}</b> · ${pct(l.ctr)}`,
+      name: `${l.title}${l.adult ? ' (18+)' : ''}`, n: l.clicks, right: `<b>${nf.format(l.clicks)}</b> · ${pct(l.ctr)}`,
     })), 'Aucun clic sur la période');
     hbars($('#topMedia'), s.media.filter((m) => m.views || m.sales).slice(0, 8).map((m) => ({
-      name: `${m.kind === 'video' ? '▶' : '📸'} ${m.title}`, n: m.revenue_cents || m.views,
+      name: `${m.title} · ${m.kind === 'video' ? 'vidéo' : 'photo'}`, n: m.revenue_cents || m.views,
       right: `<b>${money(m.revenue_cents)}</b> · ${m.sales} vente(s) · ${m.views} vues`,
     })), 'Pas encore de vues');
     const share = (rows) => { const t = rows.reduce((a, r) => a + r.n, 0) || 1; return rows.map((r) => ({ name: r.label || 'Inconnu', n: r.n, right: `<b>${nf.format(r.n)}</b> · ${pct(r.n / t)}` })); };
     hbars($('#sources'), share(s.sources), 'Pas de données');
     hbars($('#devices'), share(s.devices), 'Pas de données');
     hbars($('#browsers'), share(s.browsers), 'Pas de données');
-    hbars($('#countries'), share(s.countries).map((r) => ({ ...r, name: `${flag(r.name)} ${r.name}` })), 'Pas de données');
+    hbars($('#countries'), share(s.countries).map((r) => ({ ...r, name: countryName(r.name) })), 'Pas de données');
     heatmap($('#heatmap'), s.heatmap);
 
     const steps = [
@@ -146,12 +146,13 @@
 
     const ageTotal = c.age_ok + c.age_no;
     hbars($('#ageStats'), ageTotal ? [
-      { name: '✅ Ont confirmé avoir 18 ans ou plus', n: c.age_ok, right: `<b>${nf.format(c.age_ok)}</b> · ${pct(c.age_ok / ageTotal)}` },
-      { name: '⛔ Ont refusé / mineurs', n: c.age_no, right: `<b>${nf.format(c.age_no)}</b> · ${pct(c.age_no / ageTotal)}` },
+      { name: 'Ont confirmé avoir 18 ans ou plus', n: c.age_ok, right: `<b>${nf.format(c.age_ok)}</b> · ${pct(c.age_ok / ageTotal)}` },
+      { name: 'Ont refusé', n: c.age_no, right: `<b>${nf.format(c.age_no)}</b> · ${pct(c.age_no / ageTotal)}` },
     ] : [], 'Aucune vérification d\'âge sur la période');
   }
 
-  const flag = (cc) => (/^[A-Z]{2}$/.test(cc) ? String.fromCodePoint(...[...cc].map((ch) => 127397 + ch.charCodeAt(0))) : '🌐');
+  const regionNames = (() => { try { return new Intl.DisplayNames(['fr'], { type: 'region' }); } catch { return null; } })();
+  const countryName = (cc) => { try { return (/^[A-Z]{2}$/.test(cc) && regionNames?.of(cc)) || 'Inconnu'; } catch { return cc; } };
   const fmtDay = (d, long) => new Date(`${d}T12:00:00`).toLocaleDateString('fr-FR', long ? { weekday: 'short', day: 'numeric', month: 'long' } : { day: 'numeric', month: 'short' });
   const niceMax = (v) => { if (v <= 4) return 4; const p = 10 ** Math.floor(Math.log10(v)); const n = v / p; return (n <= 2 ? 2 : n <= 5 ? 5 : 10) * p; };
 
@@ -191,7 +192,7 @@
     const y = (v) => m.t + ih - (v / max) * ih;
     const tickFmt = (v) => compact(Math.round(v));
     let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Évolution des visites et des clics">
-      <defs><linearGradient id="ga" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#e83e8c" stop-opacity=".35"/><stop offset="1" stop-color="#e83e8c" stop-opacity="0"/></linearGradient></defs>
+      <defs><linearGradient id="ga" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#c9708f" stop-opacity=".22"/><stop offset="1" stop-color="#c9708f" stop-opacity="0"/></linearGradient></defs>
       ${axes(W, H, m, labels, max, tickFmt, x)}`;
     for (const s of series) {
       const pts = s.values.map((v, i) => [x(i), y(v)]);
@@ -244,7 +245,7 @@
       const r = Math.min(4, bw / 2, h);
       const tipTxt = esc(`<div class="tt-date">${fmtDay(labels[i], true)}</div><div class="tt-row"><span>Revenus</span><b>${fmt(v)}</b></div><div class="tt-row"><span>Ventes</span><b>${counts[i]}</b></div>`);
       bars += `<rect x="${m.l + i * slot}" y="${m.t}" width="${slot}" height="${ih}" fill="transparent" data-tip="${tipTxt}"/>`;
-      if (v > 0) bars += `<path class="bar" style="animation-delay:${Math.min(i * 0.015, 0.6)}s;pointer-events:none" fill="#e83e8c"
+      if (v > 0) bars += `<path class="bar" style="animation-delay:${Math.min(i * 0.015, 0.6)}s;pointer-events:none" fill="#c9708f"
         d="M${bx},${m.t + ih} V${m.t + ih - h + r} Q${bx},${m.t + ih - h} ${bx + r},${m.t + ih - h} H${bx + bw - r} Q${bx + bw},${m.t + ih - h} ${bx + bw},${m.t + ih - h + r} V${m.t + ih} Z"/>`;
     });
     const ax = axes(W, H, m, labels, max, tickFmt, (i) => m.l + i * slot + slot / 2);
@@ -263,14 +264,14 @@
     const max = Math.max(1, ...data.flat());
     const daysFr = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
     // Rampe séquentielle à une seule teinte (rose), du plus sombre au plus vif
-    const color = (n) => (n ? `rgba(255, 46, 138, ${0.15 + 0.85 * (n / max)})` : '');
+    const color = (n) => (n ? `rgba(217, 140, 165, ${0.12 + 0.88 * (n / max)})` : '');
     let html = '<div class="heat"><span></span>';
     for (let h = 0; h < 24; h++) html += `<span class="h">${h % 3 === 0 ? `${h}h` : ''}</span>`;
     data.forEach((row, d) => {
       html += `<span>${daysFr[d]}</span>`;
       row.forEach((n, h) => { html += `<span class="c" style="${n ? `background:${color(n)}` : ''}" data-tip="${esc(`<b>${daysFr[d]} ${h}h–${h + 1}h</b><br>${nf.format(n)} visite(s)`)}"></span>`; });
     });
-    html += `</div><div class="heat-scale">moins ${[0.15, 0.4, 0.65, 1].map((a) => `<i style="background:rgba(255,46,138,${a})"></i>`).join('')} plus</div>`;
+    html += `</div><div class="heat-scale">moins ${[0.15, 0.4, 0.65, 1].map((a) => `<i style="background:rgba(217,140,165,${a})"></i>`).join('')} plus</div>`;
     el.innerHTML = html;
   }
 
@@ -280,16 +281,16 @@
     links = await api('/api/admin/links');
     $('#linkList').innerHTML = links.map((l, i) => `
       <li class="item${l.live ? '' : ' off'}" data-id="${l.id}" style="animation-delay:${i * 0.03}s">
-        <span class="handle" title="Déplacer">⋮⋮</span>
-        <span class="ico">${esc(l.icon || '🔗')}</span>
+        <span class="handle" title="Déplacer">${mclIcon('grip')}</span>
+        <span class="ico">${mclIcon(l.icon)}</span>
         <div class="info"><b>${esc(l.title)}</b><small>${esc(l.url)}</small>
-          <div class="chips">${l.adult ? '<span class="chip pink">🔞 18+</span>' : ''}${l.highlight ? '<span class="chip pink">✨ En avant</span>' : ''}
-          ${l.starts_at || l.ends_at ? `<span class="chip">⏰ ${l.starts_at ? new Date(l.starts_at).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) : '…'} → ${l.ends_at ? new Date(l.ends_at).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) : '…'}</span>` : ''}
-          ${l.active && !l.live ? '<span class="chip">Programmé / expiré</span>' : ''}</div></div>
+          <div class="chips">${l.adult ? '<span class="chip pink">18+</span>' : ''}${l.highlight ? '<span class="chip pink">En avant</span>' : ''}
+          ${l.starts_at || l.ends_at ? `<span class="chip">Programmé : ${l.starts_at ? new Date(l.starts_at).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) : '…'} → ${l.ends_at ? new Date(l.ends_at).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) : '…'}</span>` : ''}
+          ${l.active && !l.live ? '<span class="chip">Hors période</span>' : ''}</div></div>
         <div class="stat-mini"><b>${nf.format(l.clicks_30d)}</b>clics 30 j<br><span>${nf.format(l.clicks_total)} au total</span></div>
         <label class="switch" title="Visible"><input type="checkbox" data-toggle ${l.active ? 'checked' : ''}/><span></span></label>
-        <div class="actions"><button class="icon-btn" data-edit title="Modifier">✏️</button><button class="icon-btn" data-del title="Supprimer">🗑️</button></div>
-      </li>`).join('') || '<div class="card empty">Aucun lien. Clique sur « Ajouter un lien » pour commencer ✨</div>';
+        <div class="actions"><button class="icon-btn" data-edit title="Modifier">${mclIcon('edit')}</button><button class="icon-btn" data-del title="Supprimer">${mclIcon('trash')}</button></div>
+      </li>`).join('') || '<div class="card empty">Aucun lien. Clique sur « Ajouter un lien » pour commencer.</div>';
   }
   $('#linkList').addEventListener('click', guard(async (e) => {
     const li = e.target.closest('.item'); if (!li) return;
@@ -309,9 +310,11 @@
     loadLinks();
   }));
 
-  const EMOJIS = ['💋', '🔥', '💖', '🔞', '📸', '🎥', '💎', '👑', '🍑', '🍒', '😈', '💌', '🛍️', '🎁', '⭐', '✨', '📱', '💬', '🎀', '🌸', '💸', '🔗'];
-  $('#emojiPick').innerHTML = EMOJIS.map((e) => `<button type="button">${e}</button>`).join('');
-  $('#emojiPick').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) $('#linkForm').icon.value = b.textContent; });
+  // Remplace les <i data-icon> statiques du HTML par les icônes SVG
+  $$('[data-icon]').forEach((el) => { el.outerHTML = mclIcon(el.dataset.icon); });
+  $('#iconPick').innerHTML = MCL_LINK_ICONS.map((n) => `<button type="button" data-name="${n}" title="${n}">${mclIcon(n)}</button>`).join('');
+  const selectIcon = (n) => { $('#linkForm').icon.value = n; $$('#iconPick button').forEach((b) => b.classList.toggle('sel', b.dataset.name === n)); };
+  $('#iconPick').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) selectIcon(b.dataset.name); });
 
   const toLocalInput = (iso) => { if (!iso) return ''; const d = new Date(iso); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
   let editingLink = null;
@@ -320,7 +323,7 @@
     const f = $('#linkForm');
     f.reset();
     $('#linkDlgTitle').textContent = l ? 'Modifier le lien' : 'Nouveau lien';
-    f.icon.value = l?.icon || ''; f.title.value = l?.title || ''; f.url.value = l?.url || ''; f.subtitle.value = l?.subtitle || '';
+    selectIcon(MCL_ICONS[l?.icon] ? l.icon : 'link'); f.title.value = l?.title || ''; f.url.value = l?.url || ''; f.subtitle.value = l?.subtitle || '';
     f.adult.checked = !!l?.adult; f.highlight.checked = !!l?.highlight; f.active.checked = l ? !!l.active : true;
     f.starts_at.value = toLocalInput(l?.starts_at); f.ends_at.value = toLocalInput(l?.ends_at);
     $('details', f).open = !!(l?.starts_at || l?.ends_at);
@@ -334,7 +337,7 @@
       active: f.active.checked, starts_at: f.starts_at.value || null, ends_at: f.ends_at.value || null };
     if (editingLink) await api(`/api/admin/links/${editingLink.id}`, { method: 'PUT', body });
     else await api('/api/admin/links', { method: 'POST', body });
-    toast(editingLink ? 'Lien mis à jour ✨' : 'Lien ajouté ✨');
+    toast(editingLink ? 'Lien mis à jour' : 'Lien ajouté');
     loadLinks();
   }));
 
@@ -374,7 +377,7 @@
     $('#mediaList').innerHTML = media.map((m, i) => `
       <div class="mcard" data-id="${m.id}" style="animation-delay:${i * 0.04}s${m.active ? '' : ';opacity:.55'}">
         <div class="mthumb" style="background-image:url('${esc(m.preview_url || '')}')" title="Glisse pour réordonner">
-          <span class="kind">${m.kind === 'video' ? '▶ Vidéo' : '📸 Photo'}${m.adult ? ' · 🔞' : ''}</span>
+          <span class="kind">${m.kind === 'video' ? 'Vidéo' : 'Photo'}${m.adult ? ' · 18+' : ''}</span>
           <span class="price">${m.price_cents ? money(m.price_cents) : 'Gratuit'}</span>
         </div>
         <div class="mbody"><b>${esc(m.title)}</b>
@@ -382,14 +385,14 @@
           <div class="mactions">
             <label class="switch" title="En vente"><input type="checkbox" data-toggle ${m.active ? 'checked' : ''}/><span></span></label>
             <div class="actions">
-              <button class="icon-btn" data-view title="Voir l'original">👁️</button>
-              <button class="icon-btn" data-gift title="Offrir un accès">🎁</button>
-              <button class="icon-btn" data-edit title="Modifier">✏️</button>
-              <button class="icon-btn" data-del title="Supprimer">🗑️</button>
+              <button class="icon-btn" data-view title="Voir l'original">${mclIcon('eye')}</button>
+              <button class="icon-btn" data-gift title="Offrir un accès">${mclIcon('gift')}</button>
+              <button class="icon-btn" data-edit title="Modifier">${mclIcon('edit')}</button>
+              <button class="icon-btn" data-del title="Supprimer">${mclIcon('trash')}</button>
             </div>
           </div>
         </div>
-      </div>`).join('') || '<div class="card empty" style="grid-column:1/-1">Aucun contenu. Ajoute ta première photo ou vidéo à vendre 💎</div>';
+      </div>`).join('') || '<div class="card empty" style="grid-column:1/-1">Aucun contenu. Ajoute ta première photo ou vidéo à vendre.</div>';
   }
   sortable($('#mediaList'), '.mcard', '.mthumb', guard(async (ids) => { await api('/api/admin/media/reorder', { method: 'POST', body: { ids } }); toast('Ordre enregistré'); }));
 
@@ -402,7 +405,7 @@
       const email = prompt('Offrir ce contenu gratuitement.\nE-mail du destinataire (optionnel) :', '');
       if (email === null) return;
       const r = await api('/api/admin/purchases/gift', { method: 'POST', body: { media_id: m.id, email } });
-      try { await navigator.clipboard.writeText(r.recover_url); toast('Lien cadeau copié 🎁'); } catch { prompt('Lien cadeau à envoyer :', r.recover_url); }
+      try { await navigator.clipboard.writeText(r.recover_url); toast('Lien cadeau copié'); } catch { prompt('Lien cadeau à envoyer :', r.recover_url); }
     }
     if (e.target.closest('[data-del]') && confirm(`Supprimer « ${m.title} » ? Les acheteurs perdront l'accès.`)) {
       await api(`/api/admin/media/${m.id}`, { method: 'DELETE' });
@@ -427,7 +430,7 @@
     form.title.value = m?.title || ''; form.description.value = m?.description || '';
     form.price.value = m ? (m.price_cents / 100).toFixed(2) : '4.99';
     form.adult.checked = !!m?.adult; form.active.checked = m ? !!m.active : true;
-    $('#dropInner').innerHTML = '<b>📤 Glisse une photo ou une vidéo</b><span>ou clique pour choisir</span>';
+    $('#dropInner').innerHTML = mclIcon('upload') + '<b>Glisse une photo ou une vidéo</b><span>ou clique pour choisir</span>';
     $('#uploadProgress').hidden = true;
     $('#mediaDlg').showModal();
   }
@@ -517,7 +520,7 @@
         await upload(`/api/admin/media/${editingMedia.id}`, 'PUT', fd);
       }
       $('#mediaDlg').close();
-      toast(editingMedia ? 'Contenu mis à jour 💎' : 'Contenu en ligne 💎');
+      toast(editingMedia ? 'Contenu mis à jour' : 'Contenu en ligne');
       loadMedia();
     } catch (err) { toast(err.message, true); } finally { btn.disabled = false; btn.textContent = 'Enregistrer'; }
   });
@@ -567,7 +570,7 @@
     setAvatar(s.avatar_url);
     $('#socialsEdit').innerHTML = SOCIALS.map(([k, l]) => `<label>${l}<input class="input" data-social="${k}" value="${esc(s.socials[k] || '')}" placeholder="pseudo ou lien" /></label>`).join('');
   }
-  function setAvatar(url) { const a = $('#avatarPrev'); a.style.backgroundImage = url ? `url('${url}')` : ''; a.textContent = url ? '' : '💋'; }
+  function setAvatar(url) { const a = $('#avatarPrev'); a.style.backgroundImage = url ? `url('${url}')` : ''; a.textContent = url ? '' : 'm'; }
   const reloadPreview = () => { $('#preview').src = `/?t=${Date.now()}`; };
   $('#profileForm').addEventListener('submit', guard(async (e) => {
     e.preventDefault();
@@ -577,7 +580,7 @@
       name: f.name.value, bio: f.bio.value, accent: f.accent.value, shop_title: f.shop_title.value,
       shop_enabled: f.shop_enabled.checked ? '1' : '0', page_age_gate: f.page_age_gate.checked ? '1' : '0', socials,
     } });
-    toast('Profil enregistré 💋'); reloadPreview();
+    toast('Profil enregistré'); reloadPreview();
   }));
   $('#avatarInput').addEventListener('change', guard(async (e) => {
     const file = e.target.files[0]; if (!file) return;
@@ -590,7 +593,7 @@
   $('#pwForm').addEventListener('submit', guard(async (e) => {
     e.preventDefault();
     await api('/api/admin/password', { method: 'POST', body: { current: e.target.current.value, next: e.target.next.value } });
-    e.target.reset(); toast('Mot de passe mis à jour 🔐');
+    e.target.reset(); toast('Mot de passe mis à jour');
   }));
 
   // Rafraîchissement auto du compteur « en direct » et des stats

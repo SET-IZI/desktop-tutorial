@@ -84,9 +84,9 @@ CREATE TABLE IF NOT EXISTS sessions (
 
 const DEFAULT_SETTINGS = {
   name: 'misschaudex',
-  bio: 'Bienvenue dans mon univers 💋 Tous mes liens & contenus exclusifs ici.',
+  bio: 'Bienvenue dans mon univers.\nTous mes liens et contenus exclusifs.',
   avatar: '',
-  accent: '#ff2e8a',
+  accent: '#d98ca5',
   page_age_gate: '0',
   socials: JSON.stringify({ instagram: '', tiktok: '', x: '', snapchat: '', youtube: '' }),
   shop_title: 'Contenus exclusifs',

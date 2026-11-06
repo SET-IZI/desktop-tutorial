@@ -31,7 +31,7 @@
     document.title = `${profile.name} · liens`;
     if (profile.accent) document.documentElement.style.setProperty('--pink', profile.accent);
     const av = $('#avatar');
-    if (profile.avatar) av.style.backgroundImage = `url("${profile.avatar}")`; else av.textContent = '💋';
+    if (profile.avatar) av.style.backgroundImage = `url("${profile.avatar}")`; else av.textContent = (profile.name || 'm').trim().charAt(0).toLowerCase();
     $('#name').textContent = profile.name;
     $('#bio').textContent = profile.bio;
 
@@ -42,11 +42,11 @@
     $('#links').innerHTML = links.map((l, i) => `
       <a class="link${l.highlight ? ' highlight' : ''}" href="/go/${l.id}" data-id="${l.id}" data-adult="${l.adult ? 1 : 0}"
          target="_blank" rel="noopener" style="animation-delay:${0.35 + i * 0.08}s">
-        <span class="ico">${esc(l.icon || '✨')}</span>
+        <span class="ico">${mclIcon(l.icon)}</span>
         <span class="txt"><span class="ttl">${esc(l.title)}</span><span class="sub">${esc(l.subtitle || l.host)}</span></span>
         ${l.adult ? '<span class="tag18">18+</span>' : ''}
-        <span class="arrow">→</span>
-      </a>`).join('') || '<p class="muted" style="text-align:center">Aucun lien pour le moment ✨</p>';
+        <span class="arrow">${mclIcon('arrow')}</span>
+      </a>`).join('') || '<p class="bio">Aucun lien pour le moment.</p>';
 
     $('#shop').hidden = !media.length;
     $('#shopTitle').textContent = profile.shop_title || 'Contenus exclusifs';
@@ -66,11 +66,11 @@
     return `<button class="tile${locked ? ' locked' : ''}" data-media="${m.id}" style="animation-delay:${0.5 + i * 0.06}s">
       <span class="img" style="${bg ? `background-image:url('${esc(bg)}')` : ''}"></span>
       <span class="shade"></span>
-      <span class="kind">${m.kind === 'video' ? '▶ Vidéo' : '📸 Photo'}</span>
+      <span class="kind">${m.kind === 'video' ? 'Vidéo' : 'Photo'}</span>
       ${m.adult ? '<span class="tag18">18+</span>' : ''}
-      ${locked ? '<span class="lock">🔒</span>' : ''}
+      ${locked ? `<span class="lock">${mclIcon('lock')}</span>` : ''}
       <span class="meta"><span class="t">${esc(m.title)}</span>
-        <span class="row"><span class="price${m.owned ? ' owned' : ''}">${m.owned ? (m.price_cents ? '✓ Débloqué' : 'Gratuit') : esc(m.price)}</span></span></span>
+        <span class="row"><span class="price${m.owned ? ' owned' : ''}">${m.owned ? (m.price_cents ? `${mclIcon('check')} Débloqué` : 'Offert') : esc(m.price)}</span></span></span>
     </button>`;
   }
 
@@ -100,7 +100,7 @@
         $('#ageYes').onclick = $('#ageNo').onclick = null;
         closeModal(m);
         track(ok ? 'age_ok' : 'age_no');
-        if (ok) setAgeOk(); else toast('Ce contenu est réservé aux adultes 🔞');
+        if (ok) setAgeOk(); else toast('Ce contenu est réservé aux adultes');
         resolve(ok);
       };
       $('#ageYes').onclick = () => done(true);
@@ -173,8 +173,7 @@
     await load(false);
     const t = document.querySelector(`.tile[data-media="${id}"]`);
     if (t) { t.classList.add('unlocking'); t.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
-    hearts();
-    toast('Contenu débloqué 💖 Merci !');
+    toast('Contenu débloqué — merci');
   }
 
   function view(m) {
@@ -192,46 +191,33 @@
       $('#myPurchasesBtn').hidden = !list.length;
       $('#mineList').innerHTML = list.map((p) => `<li><strong>${esc(p.title)}</strong><br>
         <button data-copy="${esc(p.recover_url)}">Copier mon lien de récupération</button></li>`).join('');
+      $('#myPurchasesBtn').innerHTML = `${mclIcon('key')} Mes achats`;
     } catch { /* ignore */ }
   }
   $('#myPurchasesBtn').addEventListener('click', () => openModal($('#mineModal')));
   $('#mineList').addEventListener('click', async (e) => {
     const b = e.target.closest('[data-copy]');
     if (!b) return;
-    try { await navigator.clipboard.writeText(b.dataset.copy); toast('Lien copié ✨'); } catch { prompt('Ton lien :', b.dataset.copy); }
+    try { await navigator.clipboard.writeText(b.dataset.copy); toast('Lien copié'); } catch { prompt('Ton lien :', b.dataset.copy); }
   });
 
   // ----------------------------------------------------------- effets
-  function hearts() {
-    for (let i = 0; i < 18; i++) {
-      const h = document.createElement('span');
-      h.className = 'heart';
-      h.textContent = ['💖', '💗', '💕', '✨', '💋'][i % 5];
-      h.style.left = `${40 + Math.random() * 20}%`;
-      h.style.top = `${55 + Math.random() * 20}%`;
-      h.style.setProperty('--dx', `${(Math.random() - 0.5) * 300}px`);
-      h.style.setProperty('--r', `${(Math.random() - 0.5) * 120}deg`);
-      h.style.animationDelay = `${Math.random() * 0.3}s`;
-      document.body.appendChild(h);
-      setTimeout(() => h.remove(), 2200);
-    }
-  }
-
+  // Poussière lumineuse très discrète
   function sparkles() {
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    const c = $('#sparkles'), ctx = c.getContext('2d');
+    const c = $('#dust'), ctx = c.getContext('2d');
     let w, h, dpr;
     const resize = () => { dpr = Math.min(devicePixelRatio || 1, 2); w = c.width = innerWidth * dpr; h = c.height = innerHeight * dpr; };
     resize(); addEventListener('resize', resize);
-    const N = Math.min(60, Math.round(innerWidth / 14));
-    const ps = Array.from({ length: N }, () => ({ x: Math.random(), y: Math.random(), r: Math.random() * 1.6 + 0.4, s: Math.random() * 0.0004 + 0.0001, p: Math.random() * 6.28 }));
+    const N = Math.min(28, Math.round(innerWidth / 30));
+    const ps = Array.from({ length: N }, () => ({ x: Math.random(), y: Math.random(), r: Math.random() * 0.9 + 0.3, s: Math.random() * 0.00015 + 0.00005, p: Math.random() * 6.28 }));
     (function frame(t) {
       ctx.clearRect(0, 0, w, h);
       for (const p of ps) {
         p.y -= p.s; if (p.y < -0.02) { p.y = 1.02; p.x = Math.random(); }
-        const a = 0.35 + 0.65 * Math.abs(Math.sin(t / 900 + p.p));
+        const a = 0.15 + 0.35 * Math.abs(Math.sin(t / 2400 + p.p));
         ctx.beginPath();
-        ctx.fillStyle = `rgba(255, ${150 + Math.round(60 * a)}, 210, ${a * 0.8})`;
+        ctx.fillStyle = `rgba(244, 230, 234, ${a})`;
         ctx.arc(p.x * w, p.y * h, p.r * dpr, 0, 6.28);
         ctx.fill();
       }

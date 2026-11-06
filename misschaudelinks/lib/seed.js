@@ -11,27 +11,28 @@ if (db.prepare('SELECT COUNT(*) AS n FROM links').get().n && !process.argv.inclu
 }
 
 const links = [
-  ['💖', 'Mon OnlyFans', 'https://onlyfans.com/misschaudex', 'Contenu exclusif tous les jours', 1, 1],
-  ['📸', 'Instagram', 'https://instagram.com/misschaudex', 'Mes photos du quotidien', 0, 0],
-  ['🎥', 'TikTok', 'https://tiktok.com/@misschaudex', 'Mes vidéos fun', 0, 0],
-  ['🔥', 'MYM', 'https://mym.fans/misschaudex', 'Mes médias privés', 1, 0],
-  ['💌', 'Me contacter', 'mailto:contact@example.com', 'Collabs & partenariats', 0, 0],
+  ['heart', 'Mon OnlyFans', 'https://onlyfans.com/misschaudex', 'Contenu exclusif tous les jours', 1, 1],
+  ['camera', 'Instagram', 'https://instagram.com/misschaudex', 'Mes photos du quotidien', 0, 0],
+  ['video', 'TikTok', 'https://tiktok.com/@misschaudex', 'Mes vidéos', 0, 0],
+  ['lock', 'MYM', 'https://mym.fans/misschaudex', 'Mes médias privés', 1, 0],
+  ['mail', 'Me contacter', 'mailto:contact@example.com', 'Collabs & partenariats', 0, 0],
 ];
 const insLink = db.prepare('INSERT INTO links(icon, title, url, subtitle, adult, highlight, position) VALUES(?, ?, ?, ?, ?, ?, ?)');
 const linkIds = links.map((l, i) => Number(insLink.run(...l, i).lastInsertRowid));
 
 const svg = (a, b, label, blur) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 800">
-  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient>
+  <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient>
+  <radialGradient id="r" cx=".5" cy=".38" r=".5"><stop offset="0" stop-color="#fff" stop-opacity=".22"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
   ${blur ? '<filter id="f"><feGaussianBlur stdDeviation="40"/></filter>' : ''}</defs>
   <rect width="600" height="800" fill="url(#g)"/>
-  <g ${blur ? 'filter="url(#f)"' : ''}><circle cx="300" cy="330" r="160" fill="#fff" opacity=".25"/><circle cx="420" cy="560" r="110" fill="#000" opacity=".2"/>
-  <text x="300" y="720" font-family="Georgia" font-style="italic" font-size="54" fill="#fff" text-anchor="middle">${label}</text></g></svg>`;
+  <g ${blur ? 'filter="url(#f)"' : ''}><ellipse cx="300" cy="330" rx="230" ry="300" fill="url(#r)"/>
+  ${label ? `<text x="300" y="420" font-family="Georgia" font-style="italic" font-size="44" fill="#fff" fill-opacity=".7" text-anchor="middle">${label}</text>` : ''}</g></svg>`;
 
 const samples = [
-  ['Shooting rose 💗', 'Une série de photos exclusives', '#ff2e8a', '#3a0f25', 499, 0],
-  ['Backstage 🎬', 'Les coulisses de mon dernier shooting', '#a3135b', '#120509', 799, 1],
-  ['Soirée privée 🍒', 'Pack réservé aux plus de 18 ans', '#ff7ab8', '#4a0b2c', 1299, 1],
-  ['Petit cadeau 🎁', 'Offert pour toi', '#ffc2de', '#ff2e8a', 0, 0],
+  ['Shooting rose', 'Une série de photos exclusives', '#6b3a4a', '#121012', 499, 0],
+  ['Backstage', 'Les coulisses de mon dernier shooting', '#3b2a30', '#0c0b0c', 799, 1],
+  ['Soirée privée', 'Pack réservé aux plus de 18 ans', '#8a5a68', '#1a1316', 1299, 1],
+  ['Petit cadeau', 'Offert pour toi', '#c9a3ad', '#4a3a3f', 0, 0],
 ];
 const insMedia = db.prepare(`INSERT INTO media(title, description, kind, file, mime, preview, price_cents, adult, position)
   VALUES(?, ?, 'photo', ?, 'image/svg+xml', ?, ?, ?, ?)`);
@@ -82,4 +83,4 @@ for (let d = 29; d >= 0; d--) {
   }
 }
 db.exec('COMMIT');
-console.log('✨ Données de démo ajoutées : liens, contenus et 30 jours de statistiques.');
+console.log('Données de démo ajoutées : liens, contenus et 30 jours de statistiques.');
